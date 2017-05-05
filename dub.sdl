@@ -1,0 +1,24 @@
+name                "lbmethod"
+targetName          "LBMethoD"
+targetType          "executable"
+description         "Mater Thesis Project Lattice Boltzmann Method on GPU using Vulkan"
+homepage            ""
+copyright           "Copyright (c) 2017 Peter Particle"
+authors             "Peter Particle"
+license             "MIT"
+
+dependency          "derelict-glfw3"    version = "~>3.1.0"
+//dependency          "erupted"           version = "~>1.6.0"
+dependency          "erupted"           path    = "../ErupteD"
+dependency          "vdrive"            path    = "../V-Drive"
+dependency          "dlsl"              path    = "~>0.1.2"
+
+libs                "E:/Code/Lib_CPP/imgui_lib/Release/imgui"
+lflags              "/LTCG" "/NODEFAULTLIB:LIBCMT" //"/NODEFAULTLIB:MSVCRT" "/NODEFAULTLIB:LIBVCRUNTIME"
+
+//buildOptions      "profile"
+//buildOptions      "profileGC"
+//dub build --build=release --arch=x86_64
+
+buildRequirements   "allowWarnings"
+

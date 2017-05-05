@@ -1,0 +1,109 @@
+{
+    "folders":
+    [
+        {
+            "path"                      : "D:/Code/DLang/dmd2/src/phobos",
+            "name"                      : "phobos",
+            "file_exclude_patterns"     : [ ".*", "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.mak", "LICENSE*", "*.ddoc", "*.dd"  ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ],
+        },
+
+        {
+            "path"                      : "../../Lib_CPP/imgui",
+            "name"                      : "imgui",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+        },
+
+        {
+            "path"                      : "E:/Uni/___Master/Code/lbm_gpu_cpp/source",
+            "name"                      : "lbm_gpu_cpp",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+        },
+
+        {
+            "path"                      : "../Vulkan-Docs/src",
+            "name"                      : "vulkan docs",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ],
+        },
+
+        {
+            "path"                      : "../../DLang/projects/DLSL",
+            "name"                      : "DLSL",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ],
+        },
+
+        {
+            "path"                      : "../ErupteD",
+            "name"                      : "ErupteD",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ],
+        },
+
+        {
+            "path"                      : "../V-Drive",
+            "name"                      : "V-Drive",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+        },
+
+        {
+            "path"                      : ".",
+            "name"                      : "LBMethoD",
+            "file_exclude_patterns"     : [ "*.spv", "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+        },
+
+        {
+            "path"                      : "../../DLang/projects/DLSL/source/dlsl",
+            "name"                      : "dlsl",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ],
+        },
+
+        {
+            "path"                      : "../ErupteD/source/erupted",
+            "name"                      : "erupted",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ],
+        },
+
+        {
+            "path"                      : "../V-Drive/source/vdrive",
+            "name"                      : "vdrive",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+        },
+
+        {
+            "path"                      : "../V-Drive/example",
+            "name"                      : "vd example",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+        },
+
+        {
+            "path"                      : "shader",
+            "name"                      : "lbmd shader",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+        },
+
+        {
+            "path"                      : "source",
+            "name"                      : "lbmd",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.deps", "*.dbuildstat" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+        },
+
+    ],
+
+    "settings": {
+        "tab_size"                      : 4,
+        "detect_indentation"            : true,
+        "translate_tabs_to_spaces"      : false,
+    },
+}
