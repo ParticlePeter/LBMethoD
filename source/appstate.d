@@ -134,7 +134,52 @@ void updateProjection( ref VDrive_State vd ) {
 }
 
 
+void drawInit( ref VDrive_State vd ) {
+    // check if window was resized and handle the case
+    if( vd.window_resized ) {
+        vd.window_resized = false;
+        vd.recreateSwapchain;
+        import resources : createResizedCommands;
+        vd.createResizedCommands;
+    } else if( vd.tb.dirty ) {
+        vd.updateWVPM;  // this happens anyway in recreateSwapchain
+    }
+
+    // acquire next swapchain image
+    vd.device.vkAcquireNextImageKHR( vd.surface.swapchain, uint64_t.max, vd.acquired_semaphore, VK_NULL_HANDLE, &vd.next_image_index );
+
+    // wait for finished drawing
+    vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );
+    vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
+}
+
+
+ubyte pp_compute = 1;
 void draw( ref VDrive_State vd ) {
+
+//*
+    // submit the current lucien command buffer
+    vd.submit_info.pCommandBuffers = &vd.cmd_buffers[ vd.next_image_index ]; //imgui_cmd_buffer;//&cmd_buffers[ next_image_index ];
+    vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
+/*/
+    // react to sim step event
+    if( vd.sim_step ) {
+        vd.sim_step = false;
+        vd.submit_info.commandBufferCount = 2;
+        pp_compute = cast( ubyte )( 1 - pp_compute );
+    }
+
+    VkCommandBuffer[2] cmd_buffers = [ vd.cmd_buffers[ vd.next_image_index ], vd.compute_cmd_buffers[ pp_compute ]];
+    vd.submit_info.pCommandBuffers = cmd_buffers.ptr;
+    vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
+    vd.submit_info.commandBufferCount = 1;
+//*/
+
+
+    // present rendered image
+    vd.present_info.pImageIndices = &vd.next_image_index;
+    vd.surface.present_queue.vkQueuePresentKHR( &vd.present_info );
+
 
     // check if window was resized and handle the case
     if( vd.window_resized ) {
@@ -153,25 +198,6 @@ void draw( ref VDrive_State vd ) {
     vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );
     vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
 
-//*
-    // submit the current lucien command buffer
-    vd.submit_info.pCommandBuffers = &vd.cmd_buffers[ vd.next_image_index ]; //imgui_cmd_buffer;//&cmd_buffers[ next_image_index ];
-    vd.graphic_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-
-/*/
-
-    // record next command buffer asynchronous
-    //import gui : newGuiFrame;
-    //this.newGuiFrame;
-
-    // submit the current gui command buffer
-    submit_info.pCommandBuffers = & gui_cmd_buffers[ next_image_index ]; //imgui_cmd_buffer;//&cmd_buffers[ next_image_index ];
-    vd.graphic_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-//*/
-
-    // present rendered image
-    vd.present_info.pImageIndices = &vd.next_image_index;
-    vd.surface.present_queue.vkQueuePresentKHR( &vd.present_info );
 
 }
 
