@@ -2,17 +2,10 @@
     "folders":
     [
         {
-            "path"                      : "D:/Code/DLang/dmd2/src/phobos",
-            "name"                      : "phobos",
-            "file_exclude_patterns"     : [ ".*", "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.mak", "LICENSE*", "*.ddoc", "*.dd"  ],
-            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ],
-        },
-
-        {
-            "path"                      : "../../Lib_CPP/imgui",
-            "name"                      : "imgui",
+            "path"                      : "../Vulkan-Docs/src",
+            "name"                      : "vulkan docs",
             "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
-            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ],
         },
 
         {
@@ -23,10 +16,10 @@
         },
 
         {
-            "path"                      : "../Vulkan-Docs/src",
-            "name"                      : "vulkan docs",
-            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
-            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ],
+            "path"                      : "../../Lib_CPP/imgui_lib",
+            "name"                      : "imgui_lib",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.opendb", "*.sln", "*.vcx*" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release", ".vs" ]
         },
 
         {
@@ -47,6 +40,20 @@
             "path"                      : "../V-Drive",
             "name"                      : "V-Drive",
             "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+        },
+
+        {
+            "path"                      : "../V-Drive-Develop",
+            "name"                      : "V-Drive-Develop",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+        },
+
+        {
+            "path"                      : "../../DLang/engineProjectsDSA/lbm",
+            "name"                      : "Engine LBM",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
             "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
         },
 
@@ -79,8 +86,22 @@
         },
 
         {
+            "path"                      : "../V-Drive-Develop/source",
+            "name"                      : "vd develop",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+        },
+
+        {
             "path"                      : "../V-Drive/example",
             "name"                      : "vd example",
+            "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+        },
+
+        {
+            "path"                      : "../../DLang/engineProjectsDSA/lbm/shader",
+            "name"                      : "elbm shader",
             "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
             "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
         },
