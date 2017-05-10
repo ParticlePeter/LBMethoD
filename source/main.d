@@ -34,7 +34,7 @@ int main() {
     auto vkResult = vd.initVulkan( 1600, 900 );     // initialize instance and (physical) device
     if( vkResult ) return vkResult;                 // exit if initialization failed, VK_SUCCESS = 0
 
-    vd  .createCommandResources                     // create command pool and sync primitives
+    vd  .createCommandObjects                       // create command pool and sync primitives
         .createMemoryObjects                        // create memory objects once used through out programm lifetime
         .createDescriptorSet                        // create descriptor set
         .createRenderResources                      // configure swapchain, create renderpass and pipeline state object
@@ -48,6 +48,9 @@ int main() {
     } else {
         vd.createResizedCommands;                   // create draw loop runtime commands, only used without gui
     }
+
+    // initial draw
+    vd.drawInit;
 
 
     // record the first gui command buffer
