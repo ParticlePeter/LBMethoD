@@ -300,12 +300,12 @@ auto ref createRenderResources( ref VDrive_State vd ) {
         size        : uint32_t.sizeof,
     };
 
-    uint comp_x = 512;
+    //uint comp_x = 256;
     VkSpecializationInfo specialization_info = {
         mapEntryCount   : 1,
         pMapEntries     : & specialization_map_entry,
-        dataSize        : comp_x.sizeof, //vd.sim_dim.x.sizeof,
-        pData           : & comp_x, //vd.sim_dim[ 0 ],
+        dataSize        : vd.sim_dim.x.sizeof,
+        pData           : vd.sim_dim.ptr,
     };
 
     // create initial compute pso with specialization
@@ -315,7 +315,7 @@ auto ref createRenderResources( ref VDrive_State vd ) {
             vd.createPipelineShaderStage(
                 VK_SHADER_STAGE_COMPUTE_BIT,
                 "shader/lbmd_init.comp",
-                & specialization_info ))
+                /*& specialization_info*/ ))
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
         .construct
         .destroyShaderModule

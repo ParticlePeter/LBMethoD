@@ -7,12 +7,15 @@
 //  typ(X/Y) = divisions of the cell type grid (typ = div + 2)
 // --- DEFINE ---
 
-layout( constant_id = 0 ) const uint lsx = 512;
-//layout( constant_id = 1 ) const float thingScale = 4.2f;
-//layout( constant_id = 2 ) const bool doThat = false;
-
-// work group definition
-layout( local_size_x = lsx, local_size_y = 1 ) in;
+// spetialization constants for local work group size
+layout( local_size_x_id = 0 ) in;
+layout( local_size_y_id = 1 ) in;
+layout( local_size_z_id = 2 ) in;
+/*  */
+// local work group defaults, when constants are not defined
+layout( local_size_x = 256 ) in;
+layout( local_size_y =   1 ) in;
+layout( local_size_z =   1 ) in;
 
 // populations 1 single buffered rest velocity, 8 double buffered link velocities
 layout( binding = 2, r32f  ) uniform restrict writeonly imageBuffer popul_buf[17];
@@ -65,7 +68,7 @@ void main( void )  {
         imageStore( popul_buf[ p     ], i, vec4( 0 ));
         imageStore( popul_buf[ p + 8 ], i, vec4( 0 ));
 
-        if( x == lsx / 4 && y == lsx / 4 ) {
+        if( x == gl_WorkGroupSize.x / 4 && y == gl_WorkGroupSize.x / 4 ) {
         	imageStore( popul_buf[ p     ], i, vec4( w[ p ] ));
         	imageStore( popul_buf[ p + 8 ], i, vec4( w[ p ] ));
         }
