@@ -1,0 +1,139 @@
+// --- COMP ---
+#version 450 core
+
+// input uniforms
+layout( push_constant ) uniform Push_Constant {
+    int ping;
+} pc;
+
+// Inject definition for:
+//  cls(X/Y) = computeLocalSize divisions
+//  div(X/Y) = divisions of the simulation grid
+//  typ(X/Y) = divisions of the cell type grid (typ = div + 2)
+// --- DEFINE ---
+
+layout( constant_id = 0 ) const uint lsx = 512;
+//layout( constant_id = 1 ) const float thingScale = 4.2f;
+//layout( constant_id = 2 ) const bool doThat = false;
+
+// work group definition
+layout( local_size_x = lsx, local_size_y = 1 ) in;
+
+// populations 1 single buffered rest velocity, 8 double buffered link velocities
+layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buf[17];
+
+// velocity and density write target, will be rendered as texture in next pass
+layout( binding = 3, rgba16f ) uniform restrict writeonly image2D vel_rho_img;
+
+// boundary and force definitions texture/array
+//layout( binding = 1 ) uniform writeonly iimage2D imgCellType;
+
+
+// population indices
+// 6 2 5 //
+//  \|/  //
+// 3-0-1 //
+//  /|\  //
+// 7 4 8 //
+
+
+// LBM constants
+const float   tau = 0.8;    // tau or omega representing viscosity
+// Directions:       R      E       N       W       S       NE      NW      SW      SE
+const float[9]  w = { 4.0/9,    1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 };
+const int[9]  inv = { 0, 3, 4, 1, 2, 7, 8, 5, 6 };
+const vec2[9]   v = { vec2(0),
+                      vec2(1, 0), vec2( 1, 0), vec2(-1, 0), vec2(0, -1),
+                      vec2(1, 1), vec2(-1, 1), vec2(-1,-1), vec2(1, -1) };
+
+
+// Cell Type Attributes
+//#define NOSLIP 1
+//#define FORCE 2
+
+// indices for LBM data
+int i = int( gl_GlobalInvocationID.x );
+
+// indices for 2D velocity and density image
+
+ivec2 d = imageSize( vel_rho_img );
+int x = i % d.x;
+int y = i / d.x;
+int node_count = d.x * d.y;
+
+int[9] buf_offset = { 0, 1, -d.x, -1, d.x, 1 - d.x, -1 - d.x, -1 + d.x, 1 + d.x };
+
+int ping = pc.ping;
+int pong = 8 - ping;
+
+void stream( int i, int p, float f ) {
+    int index = ( i + buf_offset[ p ] + node_count ) % node_count;
+    imageStore( popul_buf[ pong + p ], index, vec4( f ));
+}
+
+void bounce( int i, int p, float f ) {
+    //int index = ( i + buf_offset[ p ] + node_count ) % node_count;
+    imageStore( popul_buf[ pong + inv[ p ] ], i, vec4( f ));
+}
+
+// main simulation function
+void main( void ) {
+
+
+    // Simulate
+    float f[9];
+    f[0] = imageLoad( popul_buf[0], i ).r;
+    float rho = f[0];
+    vec2  vel = vec2(0);
+
+    // fill the functions from the previous (pong) image
+    for( int p = 1; p < 9; ++p ) {
+        f[p] = f[0] = imageLoad( popul_buf[ ping + p ], i ).r;
+        vel += f[p] * v[p];
+        rho += f[p];
+    }
+
+    if( y == d.y - 1 ) {
+        vel.x = 0.5;
+    }
+
+    vel /= max( rho, 0.0001 );
+
+    // Collide
+    for( int p = 0; p < 9; ++p ) {
+        float v_dot_vel = dot( v[p], vel );
+        float f0 = w[ p ] * rho * ( 1
+                        - 1.5 * dot( vel, vel )
+                        + 3.0 * v_dot_vel
+                        + 4.5 * v_dot_vel * v_dot_vel );
+
+        f[p] = ( 1.0 - tau ) * f[p] + tau * f0;
+    }
+
+    // store velocities and densities in image
+    imageStore( vel_rho_img, ivec2( x, y ), vec4( vec3( vel, rho ), 1 ));
+
+    // Store new functions
+    imageStore( popul_buf[0], i, vec4( f[0] ));
+
+    for( int p = 1; p < 9; ++p ) {
+        stream( i, p, f[p] );
+    }
+
+    if( x == d.x - 1 ) bounce( i, 1, f[1] ); else stream( i, 1, f[1] );
+    if( y == d.y - 1 ) bounce( i, 2, f[2] ); else stream( i, 2, f[2] );
+    if( x ==       0 ) bounce( i, 3, f[3] ); else stream( i, 3, f[3] );
+    if( y ==       0 ) bounce( i, 4, f[4] ); else stream( i, 4, f[4] );
+
+    if( x == d.x - 1 || y == d.y - 1 ) bounce( i, 5, f[5] ); else stream( i, 5, f[5] );
+    if( y == d.y - 1 || x ==       0 ) bounce( i, 6, f[6] ); else stream( i, 6, f[6] );
+    if( x ==       0 || y ==       0 ) bounce( i, 7, f[7] ); else stream( i, 7, f[7] );
+    if( y ==       0 || x == d.x - 1 ) bounce( i, 8, f[8] ); else stream( i, 8, f[8] );
+}
+
+
+
+
+
+// Directions   :   R   N   S   E   W   NE  SW  SE  NW
+// Cascaded     :   R   NW  W   SW  S   SE  E   NE  N

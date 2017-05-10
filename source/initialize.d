@@ -193,11 +193,11 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
         vd.initDevice( filtered_queues, deviceExtensions, layers, &features );
 
         // get device queues
-        vd.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &vd.graphic_queue );
+        vd.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &vd.graphics_queue );
         vd.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &vd.surface.present_queue );
 
         // store queue family index, required for command pool creation
-        vd.graphic_queue_family_index = filtered_queues[0].family_index;
+        vd.graphics_queue_family_index = filtered_queues[0].family_index;
 
 
     } else {
@@ -222,12 +222,12 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
         vd.initDevice( filtered_queues, deviceExtensions, layers, &features );
 
         // get device queues
-        vd.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &vd.graphic_queue );
+        vd.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &vd.graphics_queue );
         vd.device.vkGetDeviceQueue( filtered_queues[1].family_index, 0, &vd.surface.present_queue );
 
         // store queue family index, required for command pool creation
         // family_index of presentation queue seems not to be required later on
-        vd.graphic_queue_family_index = filtered_queues[0].family_index;
+        vd.graphics_queue_family_index = filtered_queues[0].family_index;
     }
 
     return VK_SUCCESS;

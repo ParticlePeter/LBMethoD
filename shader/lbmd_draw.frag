@@ -3,6 +3,24 @@
 layout( location = 0 ) in   vec2 vs_texcoord;	// input from vertex shader
 layout( location = 0 ) out  vec4 fs_color;		// output from fragment shader
 
+layout( binding = 4 ) uniform sampler2D vel_rho_tex;      // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+
+
+// Blue	: 0.0 - 0.25 - 0.5
+// Green	: 0.0	- 0.25 -  - - 0.75 - 1.0
+// Red	:					0.5 - 0.75 - 1.0
+
+vec3 ramp( float t ) {
+	return 4 * vec3(
+		clamp( t, 0.5, 0.75 ) - 0.5,
+		clamp( t, 0.0, 0.25 ) - clamp( t, 0.75, 1.0 ) + 0.75,
+		0.5 - clamp( t, 0.25, 0.5 ));
+}
+
+
 void main() {
-    fs_color = vec4( vs_texcoord, 0, 1 );
+	//vec3 vel_rho = texture( vel_rho_tex, vs_texcoord ).rgb;
+    //fs_color = vec4( ramp( 2 * length( vel_rho.rg )), 1 );
+
+    fs_color = texture( vel_rho_tex, vs_texcoord );
 }

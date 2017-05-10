@@ -17,8 +17,8 @@ struct VDrive_State {
     // initialize
     Vulkan                      vk;
     alias                       vk this;
-    VkQueue                     graphic_queue;
-    uint32_t                    graphic_queue_family_index; // required for command pool
+    VkQueue                     graphics_queue;
+    uint32_t                    graphics_queue_family_index; // required for command pool
     GLFWwindow*                 window;
     VkDebugReportCallbackEXT    debugReportCallback;
 
@@ -40,6 +40,12 @@ struct VDrive_State {
     Meta_Image                  depth_image;
     Meta_Buffer                 wvpm_buffer;
     VkMappedMemoryRange         wvpm_flush;
+    VkSampler                   lbmd_sampler;
+    Meta_Image                  lbmd_image;
+    Meta_Buffer                 lbmd_buffer;
+    Meta_Memory                 lbmd_memory;
+    VkBufferView[ 1 + 2 * 8 ]   lbmd_buffer_views;
+
 
     // command and related
     VkCommandPool               cmd_pool;
@@ -47,6 +53,8 @@ struct VDrive_State {
     VkPipelineStageFlags        submit_wait_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;//VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
     VkPresentInfoKHR            present_info;
     VkSubmitInfo                submit_info;
+    VkCommandPool               compute_cmd_pool;   // we do not reset this on window resize events
+    VkCommandBuffer[2]          compute_cmd_buffers;
 
     // synchronize
     VkFence[MAX_FRAMES]         submit_fence;
@@ -57,15 +65,19 @@ struct VDrive_State {
     // render setup
     Meta_Renderpass             render_pass;
     Core_Descriptor             descriptor;
-    Core_Pipeline               pipeline;
+    Core_Pipeline               graphics_pso;
+    Core_Pipeline               compute_pso;
     Meta_Framebuffers           framebuffers;
 
     // dynamic state
+    import dlsl.vector;
+    uvec2                       sim_dim = uvec2( 512, 512 );
     VkViewport                  viewport;
     VkRect2D                    scissors;
 
     // window resize callback result
     bool                        window_resized = false;
+    bool                        sim_step = false;
 
 
 }
