@@ -11,7 +11,7 @@
 layout( local_size_x_id = 0 ) in;
 layout( local_size_y_id = 1 ) in;
 layout( local_size_z_id = 2 ) in;
-/*  */
+
 // local work group defaults, when constants are not defined
 layout( local_size_x = 256 ) in;
 layout( local_size_y =   1 ) in;
@@ -44,33 +44,40 @@ const int[9]  inv = { 0, 3, 4, 1, 2, 7, 8, 5, 6 };
 //#define NOSLIP 1
 //#define FORCE 2
 
-// indices for LBM data as well as velocity and density
-//uint u = gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID;
-uint u = gl_WorkGroupID.y * gl_WorkGroupSize.y + gl_LocalInvocationID.x;
+// indices velocity and density
+#define X gl_GlobalInvocationID.x
+#define Y gl_GlobalInvocationID.y
+#define Z gl_GlobalInvocationID.z
 
+// define global equivalent to local gl_WorkGroupSize
+uvec3 global_work_size = gl_WorkGroupSize * gl_NumWorkGroups;
+#define D global_work_size
 
+// define global equivalent for gl_LocalInvocationIndex
+uint U = 
+    Z * global_work_size.x * global_work_size.y +
+    Y * global_work_size.x +
+    X;
+
+int I = int( U );
 
 
 void main( void )  {
 
-	// indices for 2D velocity and density image
-	uint x = gl_GlobalInvocationID.x;
-	uint y = gl_GlobalInvocationID.y;
-	int  i = int( u );
-
     // Init velocities and densities
-    imageStore( vel_rho_img, ivec2( x, y ), vec4( 1, 0, 0, 1 ));
-
+    imageStore( vel_rho_img, ivec2( X, Y ), vec4( 0, 0, 0, 1 ));
 
     // init all distribution f(unctions) with equilibrium, p = population
-    imageStore( popul_buf[ 0 ], i, vec4( w[ 0 ] ));
-    for( int p = 1; p < 9; ++p )  {
-        imageStore( popul_buf[ p     ], i, vec4( 0 ));
-        imageStore( popul_buf[ p + 8 ], i, vec4( 0 ));
+    //imageStore( popul_buf[ 0 ], I, vec4( w[ 0 ] ));
+    for( int p = 0; p < 9; ++p )  {
+        //imageStore( popul_buf[ p     ], I, vec4( w[ p ] ) );
+        //imageStore( popul_buf[ p + 8 ], I, vec4( w[ p ] ) );
 
-        if( x == gl_WorkGroupSize.x / 4 && y == gl_WorkGroupSize.x / 4 ) {
-        	imageStore( popul_buf[ p     ], i, vec4( w[ p ] ));
-        	imageStore( popul_buf[ p + 8 ], i, vec4( w[ p ] ));
-        }
+//        if( X == D.x / 4 && Y == D.y / 3 ) {
+        	imageStore( popul_buf[ p     ], I, vec4( w[ p ] ));
+            imageStore( vel_rho_img, ivec2( X, Y ), vec4( 1, 0, 0, 1 ));
+        	//if( p > 0 )
+            //    imageStore( popul_buf[ p + 8 ], I, vec4( w[ p ] ));
+//        }
     }
 }

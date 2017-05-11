@@ -468,7 +468,7 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
         ImGui.Text( "Application minimum %.3f ms/frame (%.1f FPS)", 1000.0f / minFramerate, minFramerate );
         ImGui.Text( "Application maximum %.3f ms/frame (%.1f FPS)", 1000.0f / maxFramerate, maxFramerate );
 
-        //if( ImGui.Button( "Step" )) vg.sim_step = true;
+        if( ImGui.Button( "Step" )) vg.sim_step = true;
     }
 //*/
     ImGui.End();

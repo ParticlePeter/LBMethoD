@@ -19,8 +19,12 @@ vec3 ramp( float t ) {
 
 
 void main() {
-	//vec3 vel_rho = texture( vel_rho_tex, vs_texcoord ).rgb;
-    //fs_color = vec4( ramp( 2 * length( vel_rho.rg )), 1 );
+	vec3 vel_rho = texture( vel_rho_tex, vs_texcoord ).rgb;
+    fs_color = vec4( ramp( 1 * length( vel_rho.rg )), 1 );
 
-    fs_color = texture( vel_rho_tex, vs_texcoord );
+
+    //fs_color = vec4( texture( vel_rho_tex, vs_texcoord ).b, 0, 0, 1 );
+
+    //float rho = texture( vel_rho_tex, vs_texcoord ).b;
+    //fs_color = vec4( rho <= 1.0 / 40 ? 0 : rho + 5.0 / 9 ) ;
 }

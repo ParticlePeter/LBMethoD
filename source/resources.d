@@ -131,6 +131,7 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
     uint32_t population_mem_size = vd.sim_dim.x * vd.sim_dim.y * float.sizeof.toUint;
     uint32_t buffer_size = ( 1 + 2 * 8 ) * population_mem_size;
 
+    // Todo(pp): here checks are required if this image format is available for VK_IMAGE_USAGE_STORAGE_BIT 
     vd.lbmd_image( vd )
         .create( VK_FORMAT_R16G16B16A16_SFLOAT, vd.sim_dim.x, vd.sim_dim.y, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT );
         //.createMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT )
@@ -315,7 +316,7 @@ auto ref createRenderResources( ref VDrive_State vd ) {
             vd.createPipelineShaderStage(
                 VK_SHADER_STAGE_COMPUTE_BIT,
                 "shader/lbmd_init.comp",
-                /*& specialization_info*/ ))
+                & specialization_info ))
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
         .construct
         .destroyShaderModule

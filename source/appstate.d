@@ -71,7 +71,7 @@ struct VDrive_State {
 
     // dynamic state
     import dlsl.vector;
-    uvec2                       sim_dim = uvec2( 512, 512 );
+    uvec2                       sim_dim = uvec2( 256 );
     VkViewport                  viewport;
     VkRect2D                    scissors;
 
@@ -157,14 +157,14 @@ void drawInit( ref VDrive_State vd ) {
 ubyte pp_compute = 1;
 void draw( ref VDrive_State vd ) {
 
-//*
+/*
     // submit the current lucien command buffer
     vd.submit_info.pCommandBuffers = &vd.cmd_buffers[ vd.next_image_index ]; //imgui_cmd_buffer;//&cmd_buffers[ next_image_index ];
     vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
 /*/
     // react to sim step event
     if( vd.sim_step ) {
-        vd.sim_step = false;
+        //vd.sim_step = false;
         vd.submit_info.commandBufferCount = 2;
         pp_compute = cast( ubyte )( 1 - pp_compute );
     }
@@ -187,8 +187,10 @@ void draw( ref VDrive_State vd ) {
         vd.recreateSwapchain;
         import resources : createResizedCommands;
         vd.createResizedCommands;
-    } else if( vd.tb.dirty ) {
+    } /*else if( vd.tb.dirty )*/ {
         vd.updateWVPM;  // this happens anyway in recreateSwapchain
+        //import core.stdc.stdio : printf;
+        //printf( "%d\n", (*( vd.wvpm ))[0].y );
     }
 
     // acquire next swapchain image

@@ -12,12 +12,15 @@ layout( push_constant ) uniform Push_Constant {
 //  typ(X/Y) = divisions of the cell type grid (typ = div + 2)
 // --- DEFINE ---
 
-layout( constant_id = 0 ) const uint lsx = 512;
-//layout( constant_id = 1 ) const float thingScale = 4.2f;
-//layout( constant_id = 2 ) const bool doThat = false;
+// spetialization constants for local work group size
+layout( local_size_x_id = 0 ) in;
+layout( local_size_y_id = 1 ) in;
+layout( local_size_z_id = 2 ) in;
 
-// work group definition
-layout( local_size_x = lsx, local_size_y = 1 ) in;
+// local work group defaults, when constants are not defined
+layout( local_size_x = 256 ) in;
+layout( local_size_y =   1 ) in;
+layout( local_size_z =   1 ) in;
 
 // populations 1 single buffered rest velocity, 8 double buffered link velocities
 layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buf[17];
@@ -38,97 +41,142 @@ layout( binding = 3, rgba16f ) uniform restrict writeonly image2D vel_rho_img;
 
 
 // LBM constants
-const float   tau = 0.8;    // tau or omega representing viscosity
+const float   tau = 1.2;        // collision frequency
+const float omega = 1.0 / tau;  // rate of relaxation
 // Directions:       R      E       N       W       S       NE      NW      SW      SE
 const float[9]  w = { 4.0/9,    1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 };
 const int[9]  inv = { 0, 3, 4, 1, 2, 7, 8, 5, 6 };
-const vec2[9]   v = { vec2(0),
-                      vec2(1, 0), vec2( 1, 0), vec2(-1, 0), vec2(0, -1),
-                      vec2(1, 1), vec2(-1, 1), vec2(-1,-1), vec2(1, -1) };
 
 
 // Cell Type Attributes
 //#define NOSLIP 1
 //#define FORCE 2
 
-// indices for LBM data
-int i = int( gl_GlobalInvocationID.x );
 
 // indices for 2D velocity and density image
 
-ivec2 d = imageSize( vel_rho_img );
-int x = i % d.x;
-int y = i / d.x;
-int node_count = d.x * d.y;
+// indices velocity and density
+#define UX gl_GlobalInvocationID.x
+#define UY gl_GlobalInvocationID.y
+#define UZ gl_GlobalInvocationID.z
 
-int[9] buf_offset = { 0, 1, -d.x, -1, d.x, 1 - d.x, -1 - d.x, -1 + d.x, 1 + d.x };
+#define X int( UX )
+#define Y int( UY )
+#define Z int( UZ )
 
-int ping = pc.ping;
-int pong = 8 - ping;
 
-void stream( int i, int p, float f ) {
-    int index = ( i + buf_offset[ p ] + node_count ) % node_count;
-    imageStore( popul_buf[ pong + p ], index, vec4( f ));
+// define global equivalent to local gl_WorkGroupSize
+#define GWGS ( gl_WorkGroupSize * gl_NumWorkGroups )
+#define D ivec3( GWGS )
+#define LWGS ivec3( gl_WorkGroupSize )
+
+
+// define global equivalent for gl_LocalInvocationIndex
+#define UI ( UZ * GWGS.x * GWGS.y + UY * GWGS.x + UX )
+
+// U and I are also the index velocity population index
+#define I int( UI )
+
+// derived total count of nodes
+int node_count = int( GWGS.z * GWGS.y * GWGS.x );
+
+
+// buffer offsets coresponding streaming ( in 2D so far )
+int[9] buf_offset = { 0, 1, -LWGS.x, -1, LWGS.x, 1 - LWGS.x, -1 - LWGS.x, -1 + LWGS.x, 1 + LWGS.x };
+
+#define ping pc.ping
+#define pong 8 - pc.ping
+
+void stream( int p, float f ) {
+    int i = ( I + buf_offset[ p ] + node_count ) % node_count;
+    imageStore( popul_buf[ pong + p ], i, vec4( f ));
 }
 
-void bounce( int i, int p, float f ) {
+void bounce( int p, float f ) {
     //int index = ( i + buf_offset[ p ] + node_count ) % node_count;
-    imageStore( popul_buf[ pong + inv[ p ] ], i, vec4( f ));
+    imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
 }
+
+
 
 // main simulation function
 void main( void ) {
 
-
     // Simulate
-    float f[9];
-    f[0] = imageLoad( popul_buf[0], i ).r;
-    float rho = f[0];
-    vec2  vel = vec2(0);
+    float f[9] = {
+        imageLoad( popul_buf[ 0        ], I ).r,
+        imageLoad( popul_buf[ 1 + ping ], I ).r,
+        imageLoad( popul_buf[ 2 + ping ], I ).r,
+        imageLoad( popul_buf[ 3 + ping ], I ).r,
+        imageLoad( popul_buf[ 4 + ping ], I ).r,
+        imageLoad( popul_buf[ 5 + ping ], I ).r,
+        imageLoad( popul_buf[ 6 + ping ], I ).r,
+        imageLoad( popul_buf[ 7 + ping ], I ).r,
+        imageLoad( popul_buf[ 8 + ping ], I ).r
+    };
 
-    // fill the functions from the previous (pong) image
-    for( int p = 1; p < 9; ++p ) {
-        f[p] = f[0] = imageLoad( popul_buf[ ping + p ], i ).r;
-        vel += f[p] * v[p];
-        rho += f[p];
-    }
+    float rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
+    vec2  vel = ( vec2(f[1],f[2]) - vec2(f[3],f[4]) + vec2(f[5]) - vec2(f[7]) + vec2(f[8],f[6]) - vec2(f[6],f[8])) / rho;
+    //vec2  vel = vec2(   f[1] - f[3] + f[5] - f[7] + f[8] - f[6],
+    //                    f[2] - f[4] + f[5] - f[7] + f[6] - f[8] ) / rho;
 
-    if( y == d.y - 1 ) {
+    // pseudo force
+    if( Y == D.y - 1 ) {
         vel.x = 0.5;
     }
 
-    vel /= max( rho, 0.0001 );
+    
+    #define X_P_Y ( vel.x + vel.y )
+    #define X_M_Y ( vel.x - vel.y )
+    #define V_X_2 ( 4.5 * vel.x * vel.x )
+    #define V_Y_2 ( 4.5 * vel.y * vel.y )
+    #define XPY_2 ( 4.5 * X_P_Y * X_P_Y )
+    #define XMY_2 ( 4.5 * X_M_Y * X_M_Y )
+    #define V_D_V ( 1.5 * dot( vel, vel ))
 
+    float f_eq[9] = {                                   // #define SQ(x) ((x) * (x))
+        w[0] * rho * ( 1                     - V_D_V ), // w[0] * rho * (1                                                   - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+        w[1] * rho * ( 1 + 3 * vel.x + V_X_2 - V_D_V ), // w[1] * rho * (1 + 3 * ( vel.x)         + 4.5 * SQ( vel.x)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+        w[2] * rho * ( 1 + 3 * vel.y + V_Y_2 - V_D_V ), // w[2] * rho * (1 + 3 * ( vel.y)         + 4.5 * SQ( vel.y)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+        w[3] * rho * ( 1 - 3 * vel.x + V_X_2 - V_D_V ), // w[3] * rho * (1 + 3 * (-vel.x)         + 4.5 * SQ(-vel.x)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+        w[4] * rho * ( 1 - 3 * vel.y + V_Y_2 - V_D_V ), // w[4] * rho * (1 + 3 * (-vel.y)         + 4.5 * SQ(-vel.y)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+        w[5] * rho * ( 1 + 3 * X_P_Y + XPY_2 - V_D_V ), // w[5] * rho * (1 + 3 * ( vel.x + vel.y) + 4.5 * SQ( vel.x + vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+        w[6] * rho * ( 1 - 3 * X_M_Y + XMY_2 - V_D_V ), // w[6] * rho * (1 + 3 * (-vel.x + vel.y) + 4.5 * SQ(-vel.x + vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+        w[7] * rho * ( 1 - 3 * X_P_Y + XPY_2 - V_D_V ), // w[7] * rho * (1 + 3 * (-vel.x - vel.y) + 4.5 * SQ(-vel.x - vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+        w[8] * rho * ( 1 + 3 * X_M_Y + XMY_2 - V_D_V )  // w[8] * rho * (1 + 3 * ( vel.x - vel.y) + 4.5 * SQ( vel.x - vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y)))
+    };
+
+
+    
     // Collide
-    for( int p = 0; p < 9; ++p ) {
-        float v_dot_vel = dot( v[p], vel );
-        float f0 = w[ p ] * rho * ( 1
-                        - 1.5 * dot( vel, vel )
-                        + 3.0 * v_dot_vel
-                        + 4.5 * v_dot_vel * v_dot_vel );
+    f[0] = f[0] * ( 1 - omega ) + f_eq[0] * omega;
+    f[1] = f[1] * ( 1 - omega ) + f_eq[1] * omega;
+    f[2] = f[2] * ( 1 - omega ) + f_eq[2] * omega;
+    f[3] = f[3] * ( 1 - omega ) + f_eq[3] * omega;
+    f[4] = f[4] * ( 1 - omega ) + f_eq[4] * omega;
+    f[5] = f[5] * ( 1 - omega ) + f_eq[5] * omega;
+    f[6] = f[6] * ( 1 - omega ) + f_eq[6] * omega;
+    f[7] = f[7] * ( 1 - omega ) + f_eq[7] * omega;
+    f[8] = f[8] * ( 1 - omega ) + f_eq[8] * omega;
 
-        f[p] = ( 1.0 - tau ) * f[p] + tau * f0;
-    }
 
     // store velocities and densities in image
-    imageStore( vel_rho_img, ivec2( x, y ), vec4( vec3( vel, rho ), 1 ));
+    imageStore( vel_rho_img, ivec2( X, Y ), vec4( vel, rho, 1 ));
 
     // Store new functions
-    imageStore( popul_buf[0], i, vec4( f[0] ));
+    imageStore( popul_buf[0], I, vec4( f[0] ));
 
-    for( int p = 1; p < 9; ++p ) {
-        stream( i, p, f[p] );
-    }
 
-    if( x == d.x - 1 ) bounce( i, 1, f[1] ); else stream( i, 1, f[1] );
-    if( y == d.y - 1 ) bounce( i, 2, f[2] ); else stream( i, 2, f[2] );
-    if( x ==       0 ) bounce( i, 3, f[3] ); else stream( i, 3, f[3] );
-    if( y ==       0 ) bounce( i, 4, f[4] ); else stream( i, 4, f[4] );
+    if( X == D.x - 1 ) bounce( 1, f[1] ); else stream( 1, f[1] );
+    if( Y ==       0 ) bounce( 2, f[2] ); else stream( 2, f[2] );
+    if( X ==       0 ) bounce( 3, f[3] ); else stream( 3, f[3] );
+    if( Y == D.y - 1 ) bounce( 4, f[4] ); else stream( 4, f[4] );
 
-    if( x == d.x - 1 || y == d.y - 1 ) bounce( i, 5, f[5] ); else stream( i, 5, f[5] );
-    if( y == d.y - 1 || x ==       0 ) bounce( i, 6, f[6] ); else stream( i, 6, f[6] );
-    if( x ==       0 || y ==       0 ) bounce( i, 7, f[7] ); else stream( i, 7, f[7] );
-    if( y ==       0 || x == d.x - 1 ) bounce( i, 8, f[8] ); else stream( i, 8, f[8] );
+    if( X == D.x - 1 || Y ==       0 ) bounce( 5, f[5] ); else stream( 5, f[5] );
+    if( Y ==       0 || X ==       0 ) bounce( 6, f[6] ); else stream( 6, f[6] );
+    if( X ==       0 || Y == D.y - 1 ) bounce( 7, f[7] ); else stream( 7, f[7] );
+    if( Y == D.y - 1 || X == D.x - 1 ) bounce( 8, f[8] ); else stream( 8, f[8] );
+ 
 }
 
 
