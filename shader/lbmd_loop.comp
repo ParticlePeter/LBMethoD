@@ -77,6 +77,11 @@ const int[9]  inv = { 0, 3, 4, 1, 2, 7, 8, 5, 6 };
 // U and I are also the index velocity population index
 #define I int( UI )
 
+
+// define access indices for the population buffers
+#define ping (  pc.ping )
+#define pong ( 8 - ping )
+
 // derived total count of nodes
 int node_count = int( GWGS.z * GWGS.y * GWGS.x );
 
@@ -84,8 +89,7 @@ int node_count = int( GWGS.z * GWGS.y * GWGS.x );
 // buffer offsets coresponding streaming ( in 2D so far )
 int[9] buf_offset = { 0, 1, -LWGS.x, -1, LWGS.x, 1 - LWGS.x, -1 - LWGS.x, -1 + LWGS.x, 1 + LWGS.x };
 
-#define ping pc.ping
-#define pong 8 - pc.ping
+
 
 void stream( int p, float f ) {
     int i = ( I + buf_offset[ p ] + node_count ) % node_count;
