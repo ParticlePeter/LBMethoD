@@ -534,7 +534,7 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
 auto ref destroyResources( ref VDrive_Gui_State vg ) {
 
     // forward to appstate destroyResources, this also calls device.vkDeviceWaitIdle;
-    import resources : resources_destroyResources = destroyResources_;
+    import resources : resources_destroyResources = destroyResources;
     vg.resources_destroyResources;
 
     // now destroy all remaining gui resources
