@@ -40,6 +40,121 @@ struct VDrive_Gui_State {
 
 
 
+//////////////////////
+// initialize imgui //
+//////////////////////
+
+auto ref initImgui( ref VDrive_Gui_State vg, bool install_callbacks = true ) {
+
+    // Get static ImGuiIO struct and set the address of our VDrive_Gui_State as user pointer
+    auto io = & ImGui.GetIO();
+    io.UserData = & vg;
+
+    // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array
+    io.KeyMap[ ImGuiKey_Tab ]           = GLFW_KEY_TAB;
+    io.KeyMap[ ImGuiKey_LeftArrow ]     = GLFW_KEY_LEFT;
+    io.KeyMap[ ImGuiKey_RightArrow ]    = GLFW_KEY_RIGHT;
+    io.KeyMap[ ImGuiKey_UpArrow ]       = GLFW_KEY_UP;
+    io.KeyMap[ ImGuiKey_DownArrow ]     = GLFW_KEY_DOWN;
+    io.KeyMap[ ImGuiKey_PageUp ]        = GLFW_KEY_PAGE_UP;
+    io.KeyMap[ ImGuiKey_PageDown ]      = GLFW_KEY_PAGE_DOWN;
+    io.KeyMap[ ImGuiKey_Home ]          = GLFW_KEY_HOME;
+    io.KeyMap[ ImGuiKey_End ]           = GLFW_KEY_END;
+    io.KeyMap[ ImGuiKey_Delete ]        = GLFW_KEY_DELETE;
+    io.KeyMap[ ImGuiKey_Backspace ]     = GLFW_KEY_BACKSPACE;
+    io.KeyMap[ ImGuiKey_Enter ]         = GLFW_KEY_ENTER;
+    io.KeyMap[ ImGuiKey_Escape ]        = GLFW_KEY_ESCAPE;
+    io.KeyMap[ ImGuiKey_A ]             = GLFW_KEY_A;
+    io.KeyMap[ ImGuiKey_C ]             = GLFW_KEY_C;
+    io.KeyMap[ ImGuiKey_V ]             = GLFW_KEY_V;
+    io.KeyMap[ ImGuiKey_X ]             = GLFW_KEY_X;
+    io.KeyMap[ ImGuiKey_Y ]             = GLFW_KEY_Y;
+    io.KeyMap[ ImGuiKey_Z ]             = GLFW_KEY_Z;
+
+    // specify gui font
+    io.Fonts.AddFontFromFileTTF( "fonts/consola.ttf", 14 ); // size_pixels
+
+    // set ImGui function pointer
+    io.RenderDrawListsFn    = & drawGuiData;    // called of ImGui.Render. Alternatively can be set this to null and call ImGui.GetDrawData() after ImGui.Render() to get the same ImDrawData pointer.
+    io.SetClipboardTextFn   = & ImGui_ImplGlfwVulkan_SetClipboardText;
+    io.GetClipboardTextFn   = & ImGui_ImplGlfwVulkan_GetClipboardText;
+    io.ClipboardUserData    = vg.vd.window;
+
+    // specify display size from vulkan data
+    io.DisplaySize.x = vg.vd.windowWidth;
+    io.DisplaySize.y = vg.vd.windowHeight;
+
+    //version( Windows )
+        //io.ImeWindowHandle = glfwGetWin32Window( g_Window );
+
+
+    if( install_callbacks ) {
+        // set glfw callbacks, currently module input defines them, these callbacks should be handled there 
+        glfwSetMouseButtonCallback( vg.vd.window, & ImGui_ImplGlfwVulkan_MouseButtonCallback );
+        glfwSetScrollCallback(      vg.vd.window, & ImGui_ImplGlfwVulkan_ScrollCallback );
+        glfwSetCharCallback(        vg.vd.window, & ImGui_ImplGlfwVulkan_CharCallback );
+        glfwSetKeyCallback(         vg.vd.window, & ImGui_ImplGlfwVulkan_KeyCallback );
+    }
+
+    // define style
+    auto style                  = & ImGui.GetStyle();
+    style.GrabMinSize           = 7;
+    style.WindowRounding        = 0; //5;
+    style.ChildWindowRounding   = 4;
+    style.ScrollbarRounding     = 3;
+    style.FrameRounding         = 3;
+    style.GrabRounding          = 2;
+    style.ItemSpacing           = ImVec2( 4, 4 );
+
+    style.Colors[ ImGuiCol_Text ]                   = ImVec4( 0.90f, 0.90f, 0.90f, 1.00f ); //ImVec4( 0.90f, 0.90f, 0.90f, 1.00f );
+    style.Colors[ ImGuiCol_TextDisabled ]           = ImVec4( 0.60f, 0.60f, 0.60f, 1.00f ); //ImVec4( 0.60f, 0.60f, 0.60f, 1.00f );
+    style.Colors[ ImGuiCol_WindowBg ]               = ImVec4( 0.00f, 0.00f, 0.00f, 0.50f ); //ImVec4( 0.00f, 0.00f, 0.00f, 0.50f );
+    style.Colors[ ImGuiCol_ChildWindowBg ]          = ImVec4( 0.00f, 0.00f, 0.00f, 0.50f ); //ImVec4( 0.00f, 0.00f, 0.00f, 0.50f );
+    style.Colors[ ImGuiCol_PopupBg ]                = ImVec4( 0.05f, 0.05f, 0.10f, 1.00f ); //ImVec4( 0.05f, 0.05f, 0.10f, 1.00f );
+    style.Colors[ ImGuiCol_Border ]                 = ImVec4( 0.37f, 0.37f, 0.37f, 0.25f ); //ImVec4( 0.37f, 0.37f, 0.37f, 0.25f );
+    style.Colors[ ImGuiCol_BorderShadow ]           = ImVec4( 0.00f, 0.00f, 0.00f, 0.00f ); //ImVec4( 0.00f, 0.00f, 0.00f, 0.00f );
+    style.Colors[ ImGuiCol_FrameBg ]                = ImVec4( 0.25f, 0.25f, 0.25f, 1.00f ); //ImVec4( 0.25f, 0.25f, 0.25f, 1.00f );
+    style.Colors[ ImGuiCol_FrameBgHovered ]         = ImVec4( 0.50f, 0.50f, 0.50f, 1.00f ); //ImVec4( 0.50f, 0.50f, 0.50f, 1.00f );
+    style.Colors[ ImGuiCol_FrameBgActive ]          = ImVec4( 0.65f, 0.65f, 0.65f, 1.00f ); //ImVec4( 0.65f, 0.65f, 0.65f, 1.00f );
+    style.Colors[ ImGuiCol_TitleBg ]                = ImVec4( 0.16f, 0.26f, 0.38f, 1.00f ); //ImVec4( 0.27f, 0.27f, 0.54f, 0.83f );
+    style.Colors[ ImGuiCol_TitleBgCollapsed ]       = ImVec4( 0.16f, 0.26f, 0.38f, 1.00f ); //ImVec4( 0.40f, 0.40f, 0.80f, 0.20f );
+    style.Colors[ ImGuiCol_TitleBgActive ]          = ImVec4( 0.19f, 0.30f, 0.41f, 1.00f ); //ImVec4( 0.22f, 0.35f, 0.50f, 1.00f );
+    style.Colors[ ImGuiCol_MenuBarBg ]              = ImVec4( 0.16f, 0.26f, 0.38f, 0.50f ); //ImVec4( 0.40f, 0.40f, 0.55f, 0.80f );
+    style.Colors[ ImGuiCol_ScrollbarBg ]            = ImVec4( 0.25f, 0.25f, 0.25f, 0.60f ); //ImVec4( 0.25f, 0.25f, 0.25f, 0.60f );
+    style.Colors[ ImGuiCol_ScrollbarGrab ]          = ImVec4( 0.40f, 0.40f, 0.40f, 1.00f ); //ImVec4( 0.40f, 0.40f, 0.40f, 1.00f );
+    style.Colors[ ImGuiCol_ScrollbarGrabHovered ]   = ImVec4( 0.22f, 0.35f, 0.50f, 1.00f ); //ImVec4( 0.50f, 0.50f, 0.50f, 1.00f );
+    style.Colors[ ImGuiCol_ScrollbarGrabActive ]    = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.00f, 0.50f, 1.00f, 1.00f );
+    style.Colors[ ImGuiCol_ComboBg ]                = ImVec4( 0.20f, 0.20f, 0.20f, 1.00f ); //ImVec4( 0.20f, 0.20f, 0.20f, 1.00f );
+    style.Colors[ ImGuiCol_CheckMark ]              = ImVec4( 0.90f, 0.90f, 0.90f, 1.00f ); //ImVec4( 0.90f, 0.90f, 0.90f, 1.00f );
+    style.Colors[ ImGuiCol_SliderGrab ]             = ImVec4( 1.00f, 1.00f, 1.00f, 0.25f ); //ImVec4( 1.00f, 1.00f, 1.00f, 0.25f );
+    style.Colors[ ImGuiCol_SliderGrabActive ]       = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.00f, 0.50f, 1.00f, 1.00f );
+    style.Colors[ ImGuiCol_Button ]                 = ImVec4( 0.16f, 0.26f, 0.38f, 1.00f ); //ImVec4( 0.40f, 0.40f, 0.40f, 1.00f );
+    style.Colors[ ImGuiCol_ButtonHovered ]          = ImVec4( 0.22f, 0.35f, 0.50f, 1.00f ); //ImVec4( 0.50f, 0.50f, 0.50f, 1.00f );
+    style.Colors[ ImGuiCol_ButtonActive ]           = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.00f, 0.50f, 1.00f, 1.00f );
+    style.Colors[ ImGuiCol_Header ]                 = ImVec4( 0.16f, 0.26f, 0.38f, 1.00f ); //ImVec4( 0.40f, 0.40f, 0.90f, 1.00f );
+    style.Colors[ ImGuiCol_HeaderHovered ]          = ImVec4( 0.22f, 0.35f, 0.50f, 1.00f ); //ImVec4( 0.45f, 0.45f, 0.90f, 1.00f );
+    style.Colors[ ImGuiCol_HeaderActive ]           = ImVec4( 0.22f, 0.35f, 0.50f, 1.00f ); //ImVec4( 0.53f, 0.53f, 0.87f, 1.00f );
+    style.Colors[ ImGuiCol_Column ]                 = ImVec4( 0.50f, 0.50f, 0.50f, 1.00f ); //ImVec4( 0.50f, 0.50f, 0.50f, 1.00f );
+    style.Colors[ ImGuiCol_ColumnHovered ]          = ImVec4( 0.60f, 0.60f, 0.60f, 1.00f ); //ImVec4( 0.60f, 0.60f, 0.60f, 1.00f );
+    style.Colors[ ImGuiCol_ColumnActive ]           = ImVec4( 0.70f, 0.70f, 0.70f, 1.00f ); //ImVec4( 0.70f, 0.70f, 0.70f, 1.00f );
+    style.Colors[ ImGuiCol_ResizeGrip ]             = ImVec4( 1.00f, 1.00f, 1.00f, 1.00f ); //ImVec4( 1.00f, 1.00f, 1.00f, 1.00f );
+    style.Colors[ ImGuiCol_ResizeGripHovered ]      = ImVec4( 1.00f, 1.00f, 1.00f, 1.00f ); //ImVec4( 1.00f, 1.00f, 1.00f, 1.00f );
+    style.Colors[ ImGuiCol_ResizeGripActive ]       = ImVec4( 1.00f, 1.00f, 1.00f, 1.00f ); //ImVec4( 1.00f, 1.00f, 1.00f, 1.00f );
+    style.Colors[ ImGuiCol_CloseButton ]            = ImVec4( 0.22f, 0.35f, 0.50f, 1.00f ); //ImVec4( 0.50f, 0.50f, 0.90f, 1.00f );
+    style.Colors[ ImGuiCol_CloseButtonHovered ]     = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.70f, 0.70f, 0.90f, 1.00f );
+    style.Colors[ ImGuiCol_CloseButtonActive ]      = ImVec4( 0.70f, 0.70f, 0.70f, 1.00f ); //ImVec4( 0.70f, 0.70f, 0.70f, 1.00f );
+    style.Colors[ ImGuiCol_PlotLines ]              = ImVec4( 1.00f, 1.00f, 1.00f, 1.00f ); //ImVec4( 1.00f, 1.00f, 1.00f, 1.00f );
+    style.Colors[ ImGuiCol_PlotLinesHovered ]       = ImVec4( 0.90f, 0.70f, 0.00f, 1.00f ); //ImVec4( 0.90f, 0.70f, 0.00f, 1.00f );
+    style.Colors[ ImGuiCol_PlotHistogram ]          = ImVec4( 0.90f, 0.70f, 0.00f, 1.00f ); //ImVec4( 0.90f, 0.70f, 0.00f, 1.00f );
+    style.Colors[ ImGuiCol_PlotHistogramHovered ]   = ImVec4( 1.00f, 0.60f, 0.00f, 1.00f ); //ImVec4( 1.00f, 0.60f, 0.00f, 1.00f );
+    style.Colors[ ImGuiCol_TextSelectedBg ]         = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.00f, 0.50f, 1.00f, 1.00f );
+    style.Colors[ ImGuiCol_ModalWindowDarkening ]   = ImVec4( 0.20f, 0.20f, 0.20f, 0.35f ); //ImVec4( 0.20f, 0.20f, 0.20f, 0.35f );  
+
+    return vg;
+}
+
+
+
 auto ref createCommandObjects( ref VDrive_Gui_State vg ) {
     import resources : resources_createCommandObjects = createCommandObjects;    // forward to appstate createRenderResources
     vg.resources_createCommandObjects( VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT );
@@ -50,6 +165,12 @@ auto ref createCommandObjects( ref VDrive_Gui_State vg ) {
 auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
     import resources : resources_createMemoryObjects = createMemoryObjects; // forward to appstate createRenderResources
     vg.resources_createMemoryObjects;
+
+    // Initialize gui draw buffers
+    foreach( i; 0 .. vg.GUI_QUEUED_FRAMES ) {
+        vg.gui_vtx_buffers[ i ] = vg;
+        vg.gui_idx_buffers[ i ] = vg;
+    }
 
     // Todo(pp): memory objects should be created here in such a way that memory could be shared among all
 
@@ -243,96 +364,6 @@ auto ref resizeRenderResources( ref VDrive_Gui_State vg ) {
 
 
 
-
-//bool guiInit( GLFWwindow* window, bool install_callbacks, ImGui_ImplGlfwVulkan_Init_Data *init_data ) {
-auto ref initImgui( ref VDrive_Gui_State vg, bool install_callbacks = true ) {
-
-    //////////////////////////////////////////////////
-    // initialize imgui and create device recources //
-    //////////////////////////////////////////////////
-
-    foreach( i; 0 .. vg.GUI_QUEUED_FRAMES ) {
-        vg.gui_vtx_buffers[ i ] = vg;
-        vg.gui_idx_buffers[ i ] = vg;
-    }
-
-    auto io = & ImGui.GetIO();
-    io.UserData = & vg;
-    io.KeyMap[ ImGuiKey_Tab ]           = GLFW_KEY_TAB;                         // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array.
-    io.KeyMap[ ImGuiKey_LeftArrow ]     = GLFW_KEY_LEFT;
-    io.KeyMap[ ImGuiKey_RightArrow ]    = GLFW_KEY_RIGHT;
-    io.KeyMap[ ImGuiKey_UpArrow ]       = GLFW_KEY_UP;
-    io.KeyMap[ ImGuiKey_DownArrow ]     = GLFW_KEY_DOWN;
-    io.KeyMap[ ImGuiKey_PageUp ]        = GLFW_KEY_PAGE_UP;
-    io.KeyMap[ ImGuiKey_PageDown ]      = GLFW_KEY_PAGE_DOWN;
-    io.KeyMap[ ImGuiKey_Home ]          = GLFW_KEY_HOME;
-    io.KeyMap[ ImGuiKey_End ]           = GLFW_KEY_END;
-    io.KeyMap[ ImGuiKey_Delete ]        = GLFW_KEY_DELETE;
-    io.KeyMap[ ImGuiKey_Backspace ]     = GLFW_KEY_BACKSPACE;
-    io.KeyMap[ ImGuiKey_Enter ]         = GLFW_KEY_ENTER;
-    io.KeyMap[ ImGuiKey_Escape ]        = GLFW_KEY_ESCAPE;
-    io.KeyMap[ ImGuiKey_A ]             = GLFW_KEY_A;
-    io.KeyMap[ ImGuiKey_C ]             = GLFW_KEY_C;
-    io.KeyMap[ ImGuiKey_V ]             = GLFW_KEY_V;
-    io.KeyMap[ ImGuiKey_X ]             = GLFW_KEY_X;
-    io.KeyMap[ ImGuiKey_Y ]             = GLFW_KEY_Y;
-    io.KeyMap[ ImGuiKey_Z ]             = GLFW_KEY_Z;
-
-    io.RenderDrawListsFn    = & renderDrawLists;       // Alternatively you can set this to NULL and call ImGui.GetDrawData() after ImGui.Render() to get the same ImDrawData pointer.
-    io.SetClipboardTextFn   = & ImGui_ImplGlfwVulkan_SetClipboardText;
-    io.GetClipboardTextFn   = & ImGui_ImplGlfwVulkan_GetClipboardText;
-    io.ClipboardUserData    = vg.vd.window;
-
-    io.DisplaySize.x = vg.vd.windowWidth;
-    io.DisplaySize.y = vg.vd.windowHeight;
-
-    //version( Windows )
-        //io.ImeWindowHandle = glfwGetWin32Window( g_Window );
-
-
-    if( install_callbacks ) {
-        glfwSetMouseButtonCallback( vg.vd.window, & ImGui_ImplGlfwVulkan_MouseButtonCallback );
-        glfwSetScrollCallback(      vg.vd.window, & ImGui_ImplGlfwVulkan_ScrollCallback );
-        glfwSetCharCallback(        vg.vd.window, & ImGui_ImplGlfwVulkan_CharCallback );
-        glfwSetKeyCallback(         vg.vd.window, & ImGui_ImplGlfwVulkan_KeyCallback );
-    }
-
-    // define style
-    auto style                  = & ImGui.GetStyle();
-    style.GrabMinSize           = 7;
-    style.WindowRounding        = 0; //5;
-    style.ChildWindowRounding   = 4;
-    style.ScrollbarRounding     = 3;
-    style.FrameRounding         = 3;
-    style.GrabRounding          = 2;
-
-    style.Colors[ ImGuiCol_WindowBg ].w = 0.5f;                                                                     // extract core data into Core_Pipeline struct
-
-    return vg;
-}
-
-
-private {
-    import dlsl.vector;
-    bool show_test_window       = false;
-    bool show_another_window    = false;
-    ImVec4 clear_color = ImColor( 0, 127, 255 );
-
-    int resetFrameMax   = 0;
-    float minFramerate  = 10000, maxFramerate = 0.0001f;
-
-    ImGuiWindowFlags window_flags = 0
-        | ImGuiWindowFlags_NoTitleBar
-    //  | ImGuiWindowFlags_ShowBorders
-        | ImGuiWindowFlags_NoResize
-        | ImGuiWindowFlags_NoMove
-        | ImGuiWindowFlags_NoScrollbar
-        | ImGuiWindowFlags_NoCollapse
-    //  | ImGuiWindowFlags_MenuBar
-        | ImGuiWindowFlags_NoSavedSettings;
-}
-
-
 auto ref drawInit( ref VDrive_Gui_State vg ) {
     // forward to appstate drawInit
     import resources : resources_drawInit = drawInit;
@@ -340,7 +371,7 @@ auto ref drawInit( ref VDrive_Gui_State vg ) {
 }
 
 
-ubyte pp_compute = 1;
+
 void draw( ref VDrive_Gui_State vg ) {
 
     // record next command buffer asynchronous
@@ -349,54 +380,31 @@ void draw( ref VDrive_Gui_State vg ) {
     // forward to appstate drawInit
     import resources : resources_draw = draw;
     vg.resources_draw;
-/+
-/*
-    // submit the current gui command buffer
-    vg.submit_info.pCommandBuffers = & vg.cmd_buffers[ vg.next_image_index ]; //imgui_cmd_buffer;//&cmd_buffers[ next_image_index ];
-    vg.graphics_queue.vkQueueSubmit( 1, & vg.submit_info, vg.submit_fence[ vg.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-
-/*/
-
-    if( vg.sim_step ) {
-        vg.sim_step = false;
-        vg.submit_info.commandBufferCount = 2;
-        pp_compute = cast( ubyte )( 1 - pp_compute );
-    }
-    // submit the current gui command buffer
-    VkCommandBuffer[2] cmd_buffers = [ vg.cmd_buffers[ vg.next_image_index ], vg.compute_cmd_buffers[ pp_compute ]];
-    vg.submit_info.pCommandBuffers = cmd_buffers.ptr;
-    vg.graphics_queue.vkQueueSubmit( 1, &vg.submit_info, vg.submit_fence[ vg.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-    vg.submit_info.commandBufferCount = 1;
-//*/
-
-    // present rendered image
-    vg.present_info.pImageIndices = & vg.next_image_index;
-    vg.surface.present_queue.vkQueuePresentKHR( & vg.present_info );
-
-    // store currently acquired index for later submission
-    //last_image_index = next_image_index;
-
-    // check if window was resized and handle the case
-    if( vg.vd.window_resized ) {
-        vg.vd.window_resized = false;
-        vg.recreateSwapchain;
-    } else if( vg.tb.dirty ) {
-        vg.updateWVPM;  // this happens anyway in recreateSwapchain
-    }
-
-    // acquire next swapchain image
-
-    vg.device.vkAcquireNextImageKHR( vg.surface.swapchain, uint64_t.max, vg.acquired_semaphore, VK_NULL_HANDLE, & vg.next_image_index );
-
-    // wait for finished drawing
-    import vdrive.util.util;
-    vg.device.vkWaitForFences( 1, & vg.submit_fence[ vg.next_image_index ], VK_TRUE, uint64_t.max );
-    vg.device.vkResetFences( 1, & vg.submit_fence[ vg.next_image_index ] ).vkAssert;
-
-+/
 }
 
 
+private {
+    import dlsl.vector;
+    bool show_test_window       = false;
+    bool show_style_editor      = false;
+    bool show_another_window    = false;
+
+    int  button_height = 20;
+    auto button_size = ImVec2( 100, 20 );
+
+    int resetFrameMax   = 0;
+    float minFramerate  = 10000, maxFramerate = 0.0001f;
+
+    ImGuiWindowFlags window_flags = 0
+        | ImGuiWindowFlags_NoTitleBar
+        | ImGuiWindowFlags_ShowBorders
+        | ImGuiWindowFlags_NoResize
+        | ImGuiWindowFlags_NoMove
+        | ImGuiWindowFlags_NoScrollbar
+        | ImGuiWindowFlags_NoCollapse
+    //  | ImGuiWindowFlags_MenuBar
+        | ImGuiWindowFlags_NoSavedSettings;
+}
 
 
 auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
@@ -448,29 +456,51 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
     auto next_win_pos = ImVec2( 0, 0 ); ImGui.SetNextWindowPos( next_win_pos, ImGuiSetCond_Always );
     auto next_win_size = ImVec2( 350, io.DisplaySize.y ); ImGui.SetNextWindowSize( next_win_size, ImGuiSetCond_Always );
     ImGui.Begin( "Debugging", null, window_flags );
-//*
     {
         //static float f = 0.0f;
         ImGui.Text( "Hello, world!" );
-        ImGui.SliderFloat( "float", &style.Colors[ ImGuiCol_WindowBg ].w, 0.0f, 1.0f );
-        //style.Colors[ ImGuiCol_WindowBg ].w = f;
-        ImGui.ColorEdit3( "clear color", cast( float* )( & clear_color ));
+        if( ImGui.SliderFloat( "Gui Window Alpha", &style.Colors[ ImGuiCol_WindowBg ].w, 0.0f, 1.0f ))
+            style.Colors[ ImGuiCol_ChildWindowBg ].w = style.Colors[ ImGuiCol_WindowBg ].w;
+
+        if( ImGui.SliderInt( "Button Height", button_height, 1, 100 ))
+            button_size.y = button_height;
+
+
+        // little hacky, but works - as we know that the corresponding clear value index
+        ImGui.ColorEdit3( "clear color", cast( float* )( & vg.framebuffers.clear_values[ 1 ] ));
+
         //ImGui.ColorEdit3( "clear color", clear_color );
         if( ImGui.Button( "Test Window" )) show_test_window ^= 1;
+        ImGui.SameLine;
+        if( ImGui.Button( "Style Editor", button_size )) show_style_editor ^= 1;
+
         if( ImGui.Button( "Another Window" )) show_another_window ^= 1;
         if( ImGui.ImGui.GetIO().Framerate < minFramerate ) minFramerate = ImGui.ImGui.GetIO().Framerate;
         if( ImGui.ImGui.GetIO().Framerate > maxFramerate ) maxFramerate = ImGui.ImGui.GetIO().Framerate;
         if( resetFrameMax < 100 ) {
             ++resetFrameMax;
             maxFramerate = 0.0001f;
-        }
+        }       
         ImGui.Text( "Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui.ImGui.GetIO().Framerate, ImGui.ImGui.GetIO().Framerate );
         ImGui.Text( "Application minimum %.3f ms/frame (%.1f FPS)", 1000.0f / minFramerate, minFramerate );
         ImGui.Text( "Application maximum %.3f ms/frame (%.1f FPS)", 1000.0f / maxFramerate, maxFramerate );
 
-        if( ImGui.Button( "Step" )) vg.sim_step = true;
+        // Specify Simulation Domain
+        ImGui.DragInt2( "Domain", cast( int* )( vg.sim_domain.ptr ), 1.0f, 4, 4096 );
+
+        if( vg.sim_play ) { if( ImGui.Button( "Pause", button_size )) vg.sim_play = false; }
+        else              { if( ImGui.Button( "Play",  button_size ))  vg.sim_play = true;  }
+        
+        ImGui.SameLine;
+        if( ImGui.Button( "Step", button_size )) vg.sim_step = true;
+
+        ImGui.SameLine;
+        import resources : resetComputePipeline;
+        if( ImGui.Button( "Reset", button_size )) vg.resetComputePipeline;
+        
+
     }
-//*/
+
     ImGui.End();
 
     // 2. Show another simple window, this time using an explicit Begin/End pair
@@ -487,16 +517,12 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
         ImGui.ShowTestWindow( &show_test_window );
     }
 
-    //g_ClearValue.color.float32[0] = clear_color.x;
-    //g_ClearValue.color.float32[1] = clear_color.y;
-    //g_ClearValue.color.float32[2] = clear_color.z;
-    //g_ClearValue.color.float32[3] = clear_color.w;
+    if( show_style_editor ) {
+        ImGui.Begin( "Style Editor", &show_style_editor );
+        ImGui.ShowStyleEditor();
+        ImGui.End();
+    }
 
-    //memcpy( &g_ClearValue.color.float32, &clear_color, 16 );
-
-    //frame_begin();
-    //frame_submit();
-    //frame_present();
 
     ImGui.Render;
 
@@ -508,7 +534,7 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
 auto ref destroyResources( ref VDrive_Gui_State vg ) {
 
     // forward to appstate destroyResources, this also calls device.vkDeviceWaitIdle;
-    import resources : resources_destroyResources = destroyResources;
+    import resources : resources_destroyResources = destroyResources_;
     vg.resources_destroyResources;
 
     // now destroy all remaining gui resources
@@ -535,7 +561,7 @@ auto ref destroyResources( ref VDrive_Gui_State vg ) {
 extern( C++ ):
 
 // This is the main rendering function that you have to implement and provide to ImGui (via setting up 'RenderDrawListsFn' in the ImGuiIO structure)
-void renderDrawLists( ImDrawData* draw_data ) {
+void drawGuiData( ImDrawData* draw_data ) {
 
     // get VDrive_Gui_State pointer from ImGuiIO.UserData
     auto vg = cast( VDrive_Gui_State* )( & ImGui.GetIO()).UserData;
@@ -622,6 +648,9 @@ void renderDrawLists( ImDrawData* draw_data ) {
     // bind graphics lucien pipeline
     cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.graphics_pso.pipeline );
 
+    // push constant the sim display scale 
+    cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vec2.sizeof, vg.sim_display_scale.ptr );
+
     // buffer-less draw with build in gl_VertexIndex exclusively to generate position and texcoord data
     cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count ,instance count ,first vertex ,first instance
 
@@ -639,7 +668,6 @@ void renderDrawLists( ImDrawData* draw_data ) {
     cmd_buffer.vkCmdBindIndexBuffer( vg.gui_idx_buffers[ vg.next_image_index ].buffer, 0, VK_INDEX_TYPE_UINT16 );
 
     // setup scale and translation
-    import dlsl.vector;
     auto scale = 2.0f / vec2( vg.vd.windowWidth, vg.vd.windowHeight );
     auto translate = vec2( -1.0f );
     cmd_buffer.vkCmdPushConstants( vg.gui_graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT,           0, vec2.sizeof, scale.ptr );
@@ -682,7 +710,7 @@ private const( char )* ImGui_ImplGlfwVulkan_GetClipboardText( void* user_data ) 
     return glfwGetClipboardString( cast( GLFWwindow* )user_data );
 }
 
-private void ImGui_ImplGlfwVulkan_SetClipboardText( void* user_data, const char* text ) {
+private void ImGui_ImplGlfwVulkan_SetClipboardText( void* user_data, const( char )* text ) {
     glfwSetClipboardString( cast( GLFWwindow* )user_data, text );
 }
 

@@ -25,29 +25,28 @@ int main() {
 
     static if( IMGUI ) {
         import gui;
-        VDrive_Gui_State vd;                            // VDrive state struct
+        VDrive_Gui_State vd;    // VDrive state struct
+        vd.initImgui( false );  // initialize imgui first, we raster additional fonts but currently don't install its glfw callbacks, they should be treated
     } else {
         import resources;
         VDrive_State vd;
     }
 
-    auto vkResult = vd.initVulkan( 1600, 900 );     // initialize instance and (physical) device
-    if( vkResult ) return vkResult;                 // exit if initialization failed, VK_SUCCESS = 0
+    auto vkResult = vd.initVulkan( 1600, 900 ); // initialize instance and (physical) device
+    if( vkResult ) return vkResult;             // exit if initialization failed, VK_SUCCESS = 0
 
-    vd  .createCommandObjects                       // create command pool and sync primitives
-        .createMemoryObjects                        // create memory objects once used through out programm lifetime
-        .createDescriptorSet                        // create descriptor set
-        .createRenderResources                      // configure swapchain, create renderpass and pipeline state object
-        .resizeRenderResources                      // construct swapchain, create depth buffer and frambuffers
+    vd  .createCommandObjects                   // create command pool and sync primitives
+        .createMemoryObjects                    // create memory objects once used through out programm lifetime
+        .createDescriptorSet                    // create descriptor set
+        .createRenderResources                  // configure swapchain, create renderpass and pipeline state object
+        .resizeRenderResources                  // construct swapchain, create depth buffer and frambuffers
         .initTrackball(
             vd.projection_fovy, vd.windowHeight,
             0, 0, 4 );  // initialize the navigation trackball
 
-    static if( IMGUI ) {
-        vd.initImgui( false );                      // initialize imgui without installing its glfw callbacks, treat them in module input
-    } else {
-        vd.createResizedCommands;                   // create draw loop runtime commands, only used without gui
-    }
+    static if( !IMGUI ) 
+        vd.createResizedCommands;               // create draw loop runtime commands, only used without gui
+
 
     // initial draw
     vd.drawInit;
