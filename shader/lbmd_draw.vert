@@ -1,5 +1,12 @@
 #version 450
 
+// push constants
+layout( push_constant ) uniform Push_Constant {
+    vec2 scale;
+} pc;
+
+
+// uniform buffer(s)
 layout( std140, binding = 0 ) uniform uboViewer {
     mat4 WVPM;                                  // World View Projection Matrix
 };
@@ -17,5 +24,5 @@ out gl_PerVertex {                              // not redifining gl_PerVertex u
 
 void main() {
     vs_texcoord = vec2( VI >> 1, VI & 1 );
-    gl_Position = WVPM * vec4( 2 * vs_texcoord - 1, 0, 1 );
+    gl_Position = WVPM * vec4( pc.scale * ( 2 * vs_texcoord - 1 ), 0, 1 );
 }
