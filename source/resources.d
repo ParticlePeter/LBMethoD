@@ -1,45 +1,23 @@
 module resources;
 
 import erupted;
-import derelict.glfw3;
 
-//import std.stdio;
-
+import vdrive;
 import appstate;
 
-import vdrive.util.info;
-import vdrive.util.util;
-import vdrive.util.array;
+import dlsl.matrix;
+import dlsl.vector;
 
 
 
-// Todo(pp): @nogc nothrow:
 
-auto ref createSwapchain( ref VDrive_State vd ) {
-
-    //////////////////////////////////////////////////
-    // create a swapchain for render result display //
-    //////////////////////////////////////////////////
-
-    import vdrive.surface;
-    vd.surface.construct;
-
-    // set the corresponding present info member to the (re)constructed swapchain
-    vd.present_info.pSwapchains = &vd.surface.swapchain;
-
-    return vd;
-}
-
-
-
-// create resources and vulkan objects for rendering
+/// create resources and vulkan objects for rendering
 auto ref createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags command_pool_create_flags = 0 ) {
 
     //////////////////////////
     // create command pools //
     //////////////////////////
 
-    import vdrive.command;
     // one to process and display graphics, this one is rest on window resize events
     vd.cmd_pool = vd.createCommandPool( vd.graphics_queue_family_index, command_pool_create_flags );
 
@@ -54,7 +32,6 @@ auto ref createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags com
 
     // must create all fences as we don't know the swapchain image count yet
     // but we also don't want to recreate fences in window resize events and keep track how many exist
-    import vdrive.synchronize;
     foreach( ref fence; vd.submit_fence )
         fence = vd.createFence( VK_FENCE_CREATE_SIGNALED_BIT ); // fence to sync CPU and GPU once per frame
 
@@ -82,12 +59,12 @@ auto ref createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags com
 
     // initialize present info for vkQueuePresentKHR
     with( vd.present_info ) {
-        waitSemaphoreCount  = 1;
-        pWaitSemaphores     = &vd.rendered_semaphore;
-        swapchainCount      = 1;
-        pSwapchains         = &vd.surface.swapchain;
-    //  pImageIndices       = &next_image_index;            // set before presentation, using the acquired next_image_index
-    //  pResults            = null;                         // per swapchain prsentation results, redundant when using only one swapchain
+        waitSemaphoreCount      = 1;
+        pWaitSemaphores         = &vd.rendered_semaphore;
+        swapchainCount          = 1;
+        pSwapchains             = &vd.surface.swapchain;
+    //  pImageIndices           = &next_image_index;            // set before presentation, using the acquired next_image_index
+    //  pResults                = null;                         // per swapchain prsentation results, redundant when using only one swapchain
     }
 
     return vd;
@@ -95,15 +72,14 @@ auto ref createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags com
 
 
 
-// create static memory resources which referenced in descriptor set
-// the corresponding createDescriptorSet function might be overwritten somewhere else
+/// create static memory resources which will be referenced in descriptor set
+/// the corresponding createDescriptorSet function might be overwritten somewhere else
 auto ref createMemoryObjects( ref VDrive_State vd ) {
 
-    //////////////////////////////////
-    // create matrix uniform buffer //
-    //////////////////////////////////
+    ////////////////////////////////////////////////
+    // create matrix uniform buffer - called once //
+    ////////////////////////////////////////////////
 
-    import vdrive.memory;
     vd.wvpm_buffer( vd )
         .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 2 * 16 * float.sizeof )
         .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
@@ -162,25 +138,22 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
             population_mem_size );
 
 
-
-
+    return vd;
 }
 
 
 
 // configure descriptor set with required descriptors
 // the descriptor set will be constructed in createRenderRecources
-// immediatelly before creating the first pipeline so that additional
-// descriptors can be added through other means befor finalizing
+// immediately before creating the first pipeline so that additional
+// descriptors can be added through other means before finalizing
 // maybe we even might overwrite it completely in a parent struct
-import vdrive.descriptor : Meta_Descriptor;
 auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_ptr = null ) {
 
     ///////////////////////////
     // create descriptor set //
     ///////////////////////////
 
-    import vdrive.descriptor;
 
     // this is required if no Meta Descriptor has been passed in from the outside
     Meta_Descriptor meta_descriptor = vd;
@@ -223,12 +196,11 @@ auto ref createRenderResources( ref VDrive_State vd ) {
     // We set all required parameters here to avoid configuration at multiple locations
     // additionally configuration needs to happen only once
 
-    // list of prefered formats and modes, the first found will be used, othervise the first available not in lists
+    // list of prefered formats and modes, the first found will be used, otherwise the first available not in lists
     VkFormat[4] request_format = [ VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM ];
     VkPresentModeKHR[3] request_mode = [ VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
     //VkPresentModeKHR[2] request_mode = [ VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
 
-    import vdrive.surface;
 
     vd.surface( vd )
         .selectSurfaceFormat( request_format )
@@ -245,7 +217,6 @@ auto ref createRenderResources( ref VDrive_State vd ) {
     // create render pass //
     ////////////////////////
 
-    import vdrive.renderbuffer, vdrive.surface;
     vd.render_pass( vd )
         .renderPassAttachment_Clear_None(  vd.depth_image_format,  vd.sample_count, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ).subpassRefDepthStencil
         .renderPassAttachment_Clear_Store( vd.surface.imageFormat, vd.sample_count, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ).subpassRefColor( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL )
@@ -457,7 +428,6 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
     // create depth image //
     ////////////////////////
 
-    import vdrive.memory;
 
     // prefer getting the depth image into a device local heap
     // first we need to find out if such a heap exist on the current device
@@ -482,7 +452,6 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
     // record ransition of depth image from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL //
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    import vdrive.command;
     // Note: allocate one command buffer
     // cmd_buffer is an Array!VkCommandBuffer
     // the array itself will be destroyd after this scope
@@ -492,7 +461,6 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
         flags : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, };
     vkBeginCommandBuffer( cmd_buffer, &cmd_buffer_begin_info );
 
-    import vdrive.memory;
     cmd_buffer.recordTransition(
         vd.depth_image.image,
         vd.depth_image.image_view_create_info.subresourceRange,
@@ -506,7 +474,6 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
     cmd_buffer.vkEndCommandBuffer;
 
     // submit the command buffer
-    import vdrive.util.util : vkAssert;
     auto submit_info = cmd_buffer.queueSubmitInfo;
     vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
 
@@ -517,7 +484,6 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
     // create framebuffers //
     /////////////////////////
 
-    import vdrive.renderbuffer;
     VkImageView[1] render_targets = [ vd.depth_image.image_view ];  // compose render targets into an array
     vd.framebuffers( vd )
         .create(                                        // create the vulkan object directly with following params
@@ -561,7 +527,6 @@ auto ref createResizedCommands( ref VDrive_State vd ) nothrow {
 
 
     // if we know how many command buffers are required we can use this static array function
-    import vdrive.command : allocateCommandBuffers;
     vd.allocateCommandBuffers( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vd.cmd_buffers[ 0 .. vd.surface.imageCount ] );
 
 
@@ -569,7 +534,6 @@ auto ref createResizedCommands( ref VDrive_State vd ) nothrow {
     VkCommandBufferBeginInfo cmd_buffer_begin_info;
 
 
-    import vdrive.renderbuffer : attachFramebuffer;
     // record command buffer for each swapchain image
     foreach( uint32_t i, ref cmd_buffer; vd.cmd_buffers[ 0 .. vd.surface.imageCount ] ) {    // remove .data if using static array
 
