@@ -44,7 +44,7 @@ struct VDrive_State {
     Meta_Image                  lbmd_image;
     Meta_Buffer                 lbmd_buffer;
     Meta_Memory                 lbmd_memory;
-    VkBufferView[ 1 + 2 * 8 ]   lbmd_buffer_views;
+    Array!VkBufferView          lbmd_buffer_views;  // most probably has to be come dynamic
 
 
     // command and related
@@ -65,20 +65,28 @@ struct VDrive_State {
     // render setup
     Meta_Renderpass             render_pass;
     Core_Descriptor             descriptor;
+    Meta_Descriptor_Update      sim_descriptor_update;
     Core_Pipeline               graphics_pso;
     Core_Pipeline               compute_pso;
     Meta_Framebuffers           framebuffers;
 
     // dynamic state
     import dlsl.vector;
-    uvec2                       sim_dim = uvec2( 256 );
+
+    uvec3                       sim_domain          = uvec3( 256, 256, 1 );
+    uint32_t                    sim_layers          = 17;
+    uvec3                       sim_work_group_size = uvec3( 256, 1, 1 );
+    vec3                        sim_display_scale   = vec3( 1 );
+    ubyte                       sim_ping_pong       = 1;
+
     VkViewport                  viewport;
     VkRect2D                    scissors;
 
     // window resize callback result
     bool                        window_resized = false;
-    bool                        sim_step = false;
 
+    bool                        sim_step = false;
+    bool                        sim_play = false;   
 
 }
 
@@ -154,7 +162,7 @@ void drawInit( ref VDrive_State vd ) {
 }
 
 
-ubyte pp_compute = 1;
+
 void draw( ref VDrive_State vd ) {
 
 /*
@@ -163,13 +171,13 @@ void draw( ref VDrive_State vd ) {
     vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
 /*/
     // react to sim step event
-    if( vd.sim_step ) {
-        //vd.sim_step = false;
+    if( vd.sim_play || vd.sim_step ) {
+        vd.sim_step = false;
         vd.submit_info.commandBufferCount = 2;
-        pp_compute = cast( ubyte )( 1 - pp_compute );
+        vd.sim_ping_pong = cast( ubyte )( 1 - vd.sim_ping_pong );
     }
 
-    VkCommandBuffer[2] cmd_buffers = [ vd.cmd_buffers[ vd.next_image_index ], vd.compute_cmd_buffers[ pp_compute ]];
+    VkCommandBuffer[2] cmd_buffers = [ vd.cmd_buffers[ vd.next_image_index ], vd.compute_cmd_buffers[ vd.sim_ping_pong ]];
     vd.submit_info.pCommandBuffers = cmd_buffers.ptr;
     vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
     vd.submit_info.commandBufferCount = 1;
