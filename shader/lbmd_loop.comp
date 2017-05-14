@@ -6,13 +6,7 @@ layout( push_constant ) uniform Push_Constant {
     int ping;
 } pc;
 
-// Inject definition for:
-//  cls(X/Y) = computeLocalSize divisions
-//  div(X/Y) = divisions of the simulation grid
-//  typ(X/Y) = divisions of the cell type grid (typ = div + 2)
-// --- DEFINE ---
-
-// spetialization constants for local work group size
+// specialization constants for local work group size
 layout( local_size_x_id = 0 ) in;
 layout( local_size_y_id = 1 ) in;
 layout( local_size_z_id = 2 ) in;
@@ -22,14 +16,14 @@ layout( local_size_x = 256 ) in;
 layout( local_size_y =   1 ) in;
 layout( local_size_z =   1 ) in;
 
+// specialization constants for init or loop phase
+layout( constant_id = 3 ) const uint INIT_OR_LOOP = 0;
+
 // populations 1 single buffered rest velocity, 8 double buffered link velocities
 layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buf[17];
 
 // velocity and density write target, will be rendered as texture in next pass
 layout( binding = 3, rgba16f ) uniform restrict writeonly image2D vel_rho_img;
-
-// boundary and force definitions texture/array
-//layout( binding = 1 ) uniform writeonly iimage2D imgCellType;
 
 
 // population indices
@@ -53,8 +47,24 @@ const int[9]  inv = { 0, 3, 4, 1, 2, 7, 8, 5, 6 };
 //#define FORCE 2
 
 
-// indices for 2D velocity and density image
+////////////////////////////////////////////////////////
+// Common Indices and Counts for VkImage and VkBuffer //
+////////////////////////////////////////////////////////
 
+// shortcut to imageSize, the Domain of the computation, same as Global Size
+//#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
+#define D imageSize( vel_rho_img )
+
+// define access indices for the population buffers
+#define ping (  pc.ping )
+#define pong ( 8 - ping )
+
+
+
+/////////////////////////////////////////
+// Indices and Counts if using VkImage //
+/////////////////////////////////////////
+/*
 // indices velocity and density
 #define UX gl_GlobalInvocationID.x
 #define UY gl_GlobalInvocationID.y
@@ -64,47 +74,81 @@ const int[9]  inv = { 0, 3, 4, 1, 2, 7, 8, 5, 6 };
 #define Y int( UY )
 #define Z int( UZ )
 
-
-// define global equivalent to local gl_WorkGroupSize
-#define GWGS ( gl_WorkGroupSize * gl_NumWorkGroups )
-#define D ivec3( GWGS )
-#define LWGS ivec3( gl_WorkGroupSize )
-
-
-// define global equivalent for gl_LocalInvocationIndex
-#define UI ( UZ * GWGS.x * GWGS.y + UY * GWGS.x + UX )
-
-// U and I are also the index velocity population index
-#define I int( UI )
-
-
-// define access indices for the population buffers
-#define ping (  pc.ping )
-#define pong ( 8 - ping )
-
-// derived total count of nodes
-int node_count = int( GWGS.z * GWGS.y * GWGS.x );
-
-
 // buffer offsets coresponding streaming ( in 2D so far )
-int[9] buf_offset = { 0, 1, -LWGS.x, -1, LWGS.x, 1 - LWGS.x, -1 - LWGS.x, -1 + LWGS.x, 1 + LWGS.x };
+int[9] buf_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
 
-
-
+// stream function if not near boundary
 void stream( int p, float f ) {
     int i = ( I + buf_offset[ p ] + node_count ) % node_count;
     imageStore( popul_buf[ pong + p ], i, vec4( f ));
 }
 
+// bounce function if next to boundary and velocity is pointing towards it
 void bounce( int p, float f ) {
-    //int index = ( i + buf_offset[ p ] + node_count ) % node_count;
+    imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
+}
+*/
+
+
+
+//////////////////////////////////////////
+// Indices and Counts if using VkBuffer //
+//////////////////////////////////////////
+
+// define global equivalent for gl_LocalInvocationIndex
+#define UI gl_GlobalInvocationID.x
+
+// U and I are also the index velocity population index
+#define I int( UI )
+
+#define X ( I % imageSize( vel_rho_img ).x )
+#define Y ( I / imageSize( vel_rho_img ).x )
+//#define Z ( I / ( imageSize( vel_rho_img ).x * imageSize( vel_rho_img ).y )
+
+// derived total count of nodes
+int node_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
+#define N node_count
+
+// buffer offsets coresponding streaming ( in 2D so far )
+int[9] buf_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
+
+// stream function if not near boundary
+void stream( int p, float f ) {
+    int i = ( I + buf_offset[ p ] + node_count ) % node_count;
+    imageStore( popul_buf[ pong + p ], i, vec4( f ));
+}
+
+// bounce function if next to boundary and velocity is pointing towards it
+void bounce( int p, float f ) {
     imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
 }
 
 
 
+
+
+
+
+
+
+
 // main simulation function
 void main( void ) {
+
+switch( INIT_OR_LOOP ) {
+    case 0: // INIT
+
+    // Init velocities and densities
+    imageStore( vel_rho_img, ivec2( X, Y ), vec4( 0, 0, 0, 1 ));
+
+    // init all distribution f(unctions) with equilibrium, p = population
+    for( int p = 0; p < 9; ++p )  {
+        imageStore( popul_buf[ p     ], I, vec4( w[ p ] ));
+        //if( p > 0 ) imageStore( popul_buf[ p + 8 ], I, vec4( w[ p ] ));
+    }
+    break;
+
+    case 1: // LOOP
 
     // Simulate
     float f[9] = {
@@ -152,16 +196,16 @@ void main( void ) {
 
 
     
-    // Collide
-    f[0] = f[0] * ( 1 - omega ) + f_eq[0] * omega;
-    f[1] = f[1] * ( 1 - omega ) + f_eq[1] * omega;
-    f[2] = f[2] * ( 1 - omega ) + f_eq[2] * omega;
-    f[3] = f[3] * ( 1 - omega ) + f_eq[3] * omega;
-    f[4] = f[4] * ( 1 - omega ) + f_eq[4] * omega;
-    f[5] = f[5] * ( 1 - omega ) + f_eq[5] * omega;
-    f[6] = f[6] * ( 1 - omega ) + f_eq[6] * omega;
-    f[7] = f[7] * ( 1 - omega ) + f_eq[7] * omega;
-    f[8] = f[8] * ( 1 - omega ) + f_eq[8] * omega;
+    // Collide - might be optimized if using f0 and 2 * vec4
+    f[0] = mix( f[0], f_eq[0], omega ); //f[0] * ( 1 - omega ) + f_eq[0] * omega;
+    f[1] = mix( f[1], f_eq[1], omega ); //f[1] * ( 1 - omega ) + f_eq[1] * omega;
+    f[2] = mix( f[2], f_eq[2], omega ); //f[2] * ( 1 - omega ) + f_eq[2] * omega;
+    f[3] = mix( f[3], f_eq[3], omega ); //f[3] * ( 1 - omega ) + f_eq[3] * omega;
+    f[4] = mix( f[4], f_eq[4], omega ); //f[4] * ( 1 - omega ) + f_eq[4] * omega;
+    f[5] = mix( f[5], f_eq[5], omega ); //f[5] * ( 1 - omega ) + f_eq[5] * omega;
+    f[6] = mix( f[6], f_eq[6], omega ); //f[6] * ( 1 - omega ) + f_eq[6] * omega;
+    f[7] = mix( f[7], f_eq[7], omega ); //f[7] * ( 1 - omega ) + f_eq[7] * omega;
+    f[8] = mix( f[8], f_eq[8], omega ); //f[8] * ( 1 - omega ) + f_eq[8] * omega;
 
 
     // store velocities and densities in image
@@ -180,8 +224,9 @@ void main( void ) {
     if( Y ==       0 || X ==       0 ) bounce( 6, f[6] ); else stream( 6, f[6] );
     if( X ==       0 || Y == D.y - 1 ) bounce( 7, f[7] ); else stream( 7, f[7] );
     if( Y == D.y - 1 || X == D.x - 1 ) bounce( 8, f[8] ); else stream( 8, f[8] );
- 
-}
+    break;
+}   // switch
+}   // main
 
 
 
