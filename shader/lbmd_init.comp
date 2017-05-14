@@ -18,7 +18,7 @@ layout( local_size_y =   1 ) in;
 layout( local_size_z =   1 ) in;
 
 // populations 1 single buffered rest velocity, 8 double buffered link velocities
-layout( binding = 2, r32f  ) uniform restrict writeonly imageBuffer popul_buf[17];
+layout( binding = 2, r32f ) uniform restrict writeonly imageBuffer popul_buf[17];
 
 // velocity and density write target, will be rendered as texture in next pass
 layout( binding = 3, rgba16f ) uniform restrict writeonly image2D vel_rho_img;
@@ -44,22 +44,16 @@ const int[9]  inv = { 0, 3, 4, 1, 2, 7, 8, 5, 6 };
 //#define NOSLIP 1
 //#define FORCE 2
 
-// indices velocity and density
-#define X gl_GlobalInvocationID.x
-#define Y gl_GlobalInvocationID.y
-#define Z gl_GlobalInvocationID.z
-
-// define global equivalent to local gl_WorkGroupSize
-uvec3 global_work_size = gl_WorkGroupSize * gl_NumWorkGroups;
-#define D global_work_size
-
 // define global equivalent for gl_LocalInvocationIndex
-uint U = 
-    Z * global_work_size.x * global_work_size.y +
-    Y * global_work_size.x +
-    X;
+#define UI gl_GlobalInvocationID.x
 
-int I = int( U );
+// U and I are also the index velocity population index
+#define I int( UI )
+
+#define X ( I % imageSize( vel_rho_img ).x )
+#define Y ( I / imageSize( vel_rho_img ).x )
+//#define Z ( I / ( imageSize( vel_rho_img ).x * imageSize( vel_rho_img ).y )
+
 
 
 void main( void )  {
@@ -68,16 +62,8 @@ void main( void )  {
     imageStore( vel_rho_img, ivec2( X, Y ), vec4( 0, 0, 0, 1 ));
 
     // init all distribution f(unctions) with equilibrium, p = population
-    //imageStore( popul_buf[ 0 ], I, vec4( w[ 0 ] ));
     for( int p = 0; p < 9; ++p )  {
-        //imageStore( popul_buf[ p     ], I, vec4( w[ p ] ) );
-        //imageStore( popul_buf[ p + 8 ], I, vec4( w[ p ] ) );
-
-//        if( X == D.x / 4 && Y == D.y / 3 ) {
-        	imageStore( popul_buf[ p     ], I, vec4( w[ p ] ));
-            imageStore( vel_rho_img, ivec2( X, Y ), vec4( 1, 0, 0, 1 ));
-        	//if( p > 0 )
-            //    imageStore( popul_buf[ p + 8 ], I, vec4( w[ p ] ));
-//        }
+        imageStore( popul_buf[ p     ], I, vec4( w[ p ] ));
+        //if( p > 0 ) imageStore( popul_buf[ p + 8 ], I, vec4( w[ p ] ));
     }
 }
