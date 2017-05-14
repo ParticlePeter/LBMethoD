@@ -101,36 +101,95 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
     vd.updateWVPM;
 
 
-    // For D2Q9 we need 1 + 2 * 8 Shader Storage Buffers with DIM_X * DIM_Y floats each
+
+    /////////////////////////////////////////////////////////////
+    // create simulation memory objects - called several times //
+    /////////////////////////////////////////////////////////////
+    return vd.createSimMemoryObjects;
+}
+
+
+
+/// create or recreate simulation memory, buffers and images
+auto ref createSimMemoryObjects( ref VDrive_State vd ) {
+
+    // 1.) check if the last layer and dim settings differ from the recently used, if not return from this function
+    // 2.) If they do recreate VkImage(s) and or VkBuffers without attaching memory
+    // 3.) check if the memory requirement for the objects above has increased, if not goto 5.)
+    // 4.) if it has recreate the memory object
+    // 5.) re-register resources
+    // 6.) recreate VkImageView and VkBufferView(s)
+
+
+
+    // 1.) check if the last layer and dim settings differ from the recently used, if not return from this function
+    import dlsl.vector;
+    //if( uvec4( sim_dim.x, sim_dim.y, sim_dim.z, layers ) == vd.sim_domain )
+    //    return vd;
+
+
+
+    // 2.) If they do recreate VkImage(s) and VkBuffers without attaching memory
+    if( vd.lbmd_image.image     != VK_NULL_HANDLE ) vd.lbmd_image.destroyResources;     // destroy old image and its view
+    if( vd.lbmd_buffer.buffer   != VK_NULL_HANDLE ) vd.lbmd_buffer.destroyResources;    // destroy old buffer
+    foreach( ref view; vd.lbmd_buffer_views )
+        if( view                != VK_NULL_HANDLE ) vd.destroy( view );                 // destroy old buffer views
+    
+    vd.lbmd_buffer_views.length = vd.sim_layers;            // resize dynamic buffer views array
+    //vd.sim_domain = uvec4( sim_dim.x, sim_dim.y, sim_dim.z, layers );      // store the memory object specification
+    vd.sim_display_scale = vec3( 1 );                       // following bellow should difer for 3D lbm
+    if( vd.sim_domain.x > vd.sim_domain.y ) vd.sim_display_scale.x = cast( float )vd.sim_domain.x / vd.sim_domain.y;
+    if( vd.sim_domain.y > vd.sim_domain.x ) vd.sim_display_scale.y = cast( float )vd.sim_domain.y / vd.sim_domain.x;
+
+
+    // For D2Q9 we need 1 + 2 * 8 Shader Storage Buffers with sim_dim.x * sim_dim.y floats each
     // for 512 ^ 2 cells this means ( 1 + 2 * 8 ) * 4 * 512 * 512 = 17_825_792 bytes
     // create one buffer 1 + 2 * 8 buffer views into that buffer
-    uint32_t population_mem_size = vd.sim_dim.x * vd.sim_dim.y * float.sizeof.toUint;
-    uint32_t buffer_size = ( 1 + 2 * 8 ) * population_mem_size;
+    uint32_t population_mem_size = vd.sim_domain.x * vd.sim_domain.y * vd.sim_domain.z * float.sizeof.toUint;
+    uint32_t buffer_size = vd.sim_layers * population_mem_size;
 
-    // Todo(pp): here checks are required if this image format is available for VK_IMAGE_USAGE_STORAGE_BIT 
+    // Todo(pp): the format should be choose-able
+    // Todo(pp): here checks are required if this image format is available for VK_IMAGE_USAGE_STORAGE_BIT
     vd.lbmd_image( vd )
-        .create( VK_FORMAT_R16G16B16A16_SFLOAT, vd.sim_dim.x, vd.sim_dim.y, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT );
-        //.createMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT )
-        //.createView;
+        .create( VK_FORMAT_R16G16B16A16_SFLOAT, vd.sim_domain.x, vd.sim_domain.y, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT );
 
     vd.lbmd_buffer( vd )
         .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_size );
-        //.createMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 
-    // share memory
+
+
+    // 3.) check if the memory requirement for the objects above has increased, if not goto 5.)   
+    VkDeviceSize required_mem_size = 0;     // here we will store the required memory
     vd.lbmd_memory( vd )
         .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
-        .addRange( vd.lbmd_buffer )
-        .addRange( vd.lbmd_image )
-        .allocate
+        .addRange( vd.lbmd_buffer, & required_mem_size )    // with the optional second parametet
+        .addRange( vd.lbmd_image,  & required_mem_size );   // the meta memory struct does not mutate
+
+
+
+    // 4.) if it has recreate the memory object
+    //if( vd.lbmd_memory.memSize < required_mem_size )
+    {
+        vd.lbmd_memory.destroyResources;
+        vd.lbmd_memory( vd )
+            .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
+            .addRange( vd.lbmd_buffer )
+            .addRange( vd.lbmd_image )
+            .allocate;     
+    }
+
+
+
+    // 5.) re-register resources
+    vd.lbmd_memory
         .bind( vd.lbmd_buffer )
         .bind( vd.lbmd_image );
 
-    // After we created memory for the image we can create the view
-    vd.lbmd_image.createView;
 
-    import vdrive.descriptor : createBufferView;
-    foreach( i, ref view; vd.lbmd_buffer_views )
+
+    // 6.) recreate VkImageView and VkBufferView(s)
+    vd.lbmd_image.createView;
+    foreach( i, ref view; vd.lbmd_buffer_views.data )
         view = vd.createBufferView(
             vd.lbmd_buffer.buffer,
             VK_FORMAT_R32_SFLOAT,
@@ -167,22 +226,59 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
             .addBufferInfo( vd.wvpm_buffer.buffer )
         .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
-            .addTexelBufferViews( vd.lbmd_buffer_views )
+            .addTexelBufferViews( vd.lbmd_buffer_views.data )
         .addLayoutBinding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT )
             .addImageInfo( vd.lbmd_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
         .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT ) // immutable does not filter properly, either driver bug or module descriptor bug
             .addImageInfo( vd.lbmd_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.lbmd_sampler )
         .construct
         .reset;
+
+    // prepare simumaltion data descriptor update
+    vd.sim_descriptor_update( vd )
+        .addBindingUpdate( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
+        //    .addTexelBufferViews( vd.lbmd_buffer_views.data )     // we will directly set the array pointer when updating
+        .addBindingUpdate( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE )
+            .addImageInfo( vd.lbmd_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
+        .addBindingUpdate/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ) // immutable does not filter properly, either driver bug or module descriptor bug
+            .addImageInfo( vd.lbmd_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.lbmd_sampler )
+        .attachSet( vd.descriptor.descriptor_set );
+
+}
+
+
+auto ref resetComputePipeline( ref VDrive_State vd ) {
+
+    auto extent = vd.lbmd_image.extent;
+
+     // 1.) check if the last layer and domain settings differ from the recently used, if not return from this function
+    import dlsl.vector;
+    if( vd.sim_layers != vd.lbmd_buffer_views.length
+    ||  vd.sim_domain != uvec3( extent.width, extent.height, extent.depth )) {
+
+        vd.graphics_queue.vkQueueWaitIdle;
+        vd.createSimMemoryObjects;
+
+        // update the descriptor
+        vd.sim_descriptor_update.write_descriptor_sets[0].descriptorCount  = vd.sim_layers; 
+        vd.sim_descriptor_update.write_descriptor_sets[0].pTexelBufferView = vd.lbmd_buffer_views.ptr;
+        vd.sim_descriptor_update.image_infos[0].imageView = vd.lbmd_image.image_view;
+        vd.sim_descriptor_update.image_infos[1].imageView = vd.lbmd_image.image_view;
+        vd.sim_descriptor_update.update;
+
+    }
+
+    vd.createComputeResources;   
+
 }
 
 
 
 auto ref createRenderResources( ref VDrive_State vd ) {
 
-    ////////////////////////////////////////////////////////
-    // select swapchain image format and presntation mode //
-    ////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////
+    // select swapchain image format and presentation mode //
+    /////////////////////////////////////////////////////////
 
     // Note: to get GPU surface capabilities to check for possible image usages
     //VkSurfaceCapabilitiesKHR surface_capabilities;
@@ -243,13 +339,12 @@ auto ref createRenderResources( ref VDrive_State vd ) {
 
     // add shader stages - git repo needs only to keep track of the shader sources,
     // vdrive will compile them into spir-v with glslangValidator (must be in path!)
-    import vdrive.pipeline, vdrive.surface, vdrive.shader;
     Meta_Graphics meta_graphics;
     vd.graphics_pso = meta_graphics( vd )
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_VERTEX_BIT,   "shader/lbmd_draw.vert" ))
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_FRAGMENT_BIT, "shader/lbmd_draw.frag" ))
-//        .addBindingDescription( 0, 2 * float.sizeof, VK_VERTEX_INPUT_RATE_VERTEX )  // add vertex binding and attribute descriptions
-//        .addAttributeDescription( 0, 0, VK_FORMAT_R32G32_SFLOAT, 0 )                // location (per shader), binding (per buffer), type, offset in struct/buffer
+//      .addBindingDescription( 0, 2 * float.sizeof, VK_VERTEX_INPUT_RATE_VERTEX )  // add vertex binding and attribute descriptions
+//      .addAttributeDescription( 0, 0, VK_FORMAT_R32G32_SFLOAT, 0 )                // location (per shader), binding (per buffer), type, offset in struct/buffer
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.surface.imageExtent )       // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
@@ -258,54 +353,94 @@ auto ref createRenderResources( ref VDrive_State vd ) {
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
         .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )              // describe pipeline layout
-        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4 )    // specify push constant range
+        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT , 0, 8 )                  // specify push constant range
         .renderPass( vd.render_pass.render_pass )                                   // describe compatible render pass
         .construct                                                                  // construct the Pipleine Layout and Pipleine State Object (PSO)
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct
 
+    // create all resources for the compute pipeline
+    return vd.createComputeResources;
+}
+
+
+
+auto ref createComputeResources( ref VDrive_State vd ) {
+
+    /////////////////////////////
+    // create compute pipeline //
+    /////////////////////////////
+
 
     // specify spetialization constants of compute shader
-    VkSpecializationMapEntry specialization_map_entry = {
-        constantID  : 0,
-        offset      : 0,
-        size        : uint32_t.sizeof,
-    };
+    VkSpecializationMapEntry[4] specialization_map_entry = [
+        {
+            constantID  : 0,
+            offset      : 0 * uint32_t.sizeof,
+            size        : uint32_t.sizeof,
+        },{
+            constantID  : 1,
+            offset      : 1 * uint32_t.sizeof,
+            size        : uint32_t.sizeof,
+        },{
+            constantID  : 2,
+            offset      : 2 * uint32_t.sizeof,
+            size        : uint32_t.sizeof,
+        },{
+            constantID  : 3,
+            offset      : 3 * uint32_t.sizeof,
+            size        : uint32_t.sizeof,
+        }
+    ];
 
-    //uint comp_x = 256;
+    uint32_t[4] specialization_constants = [
+        vd.sim_work_group_size.x, vd.sim_work_group_size.y, vd.sim_work_group_size.z, 0 ];
+
     VkSpecializationInfo specialization_info = {
-        mapEntryCount   : 1,
-        pMapEntries     : & specialization_map_entry,
-        dataSize        : vd.sim_dim.x.sizeof,
-        pData           : vd.sim_dim.ptr,
+        mapEntryCount   : specialization_constants.length.toUint,
+        pMapEntries     : specialization_map_entry.ptr,
+        dataSize        : specialization_constants.sizeof,
+        pData           : specialization_constants.ptr,
     };
 
-    // create initial compute pso with specialization
+
+    // create initial compute pso with specialization, if we are recreating we r
     Meta_Compute meta_compute;
-    vd.compute_pso = meta_compute( vd )
-        .shaderStageCreateInfo(
-            vd.createPipelineShaderStage(
-                VK_SHADER_STAGE_COMPUTE_BIT,
-                "shader/lbmd_init.comp",
-                & specialization_info ))
+    void createComputePSO() {
+        vd.graphics_queue.vkQueueWaitIdle;  // wait for queue idle as we need to destroy the pipeline
+        auto old_pso = vd.compute_pso;      // store old pipeline to inproove new pipeline construction speed
+        vd.compute_pso = meta_compute( vd )
+            //.basePipeline( old_pso.pipeline )
+            .shaderStageCreateInfo(
+                vd.createPipelineShaderStage(
+                    VK_SHADER_STAGE_COMPUTE_BIT,
+                    "shader/lbmd_loop.comp",
+                    & specialization_info ))
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
+        .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 4 )
         .construct
         .destroyShaderModule
         .reset;
 
-    //////////////////////////////////////////////////////////////////////////////////////////////
-    // record ransition of lbmd image from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_GENERAL //
-    //////////////////////////////////////////////////////////////////////////////////////////////
+        // destroy old compute pipeline and layout
+        if( old_pso.pipeline != VK_NULL_HANDLE )
+            vd.destroy( old_pso );
+    }
+
+    createComputePSO();
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // record transition of lbmd image from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_GENERAL //
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
 
     // use one command buffer for device resource initialization
-    import vdrive.command : allocateCommandBuffer, commandBufferBeginInfo;
     auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
     auto init_cmd_buffer_bi = commandBufferBeginInfo( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
     init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
 
     // record image layout transition to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-    import vdrive.memory : recordTransition;
     init_cmd_buffer.recordTransition(
         vd.lbmd_image.image,
         vd.lbmd_image.subresourceRange,
@@ -322,11 +457,14 @@ auto ref createRenderResources( ref VDrive_State vd ) {
     // initialize populations with compute pipeline //
     //////////////////////////////////////////////////
 
-    // bind compute vd.compute_pso
-    init_cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.compute_pso.pipeline );
-
-    // bind descriptor set
-    init_cmd_buffer.vkCmdBindDescriptorSets(// VkCommandBuffer              commandBuffer
+    // determine dispatch group count based on VkBufferView or VkImage pupulation approach
+    // and from simulation domain vd.sim_domain and compute work group size vd.sim_work_group_size
+    auto dispatch_group_count = vd.lbmd_buffer_views.length
+        ? uvec3(( vd.sim_domain.x * vd.sim_domain.y * vd.sim_domain.z ) / vd.sim_work_group_size.x, 1, 1 ) 
+        : vd.sim_domain.xyz / vd.sim_work_group_size;
+    
+    init_cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.compute_pso.pipeline );   // bind compute vd.compute_pso
+    init_cmd_buffer.vkCmdBindDescriptorSets(// VkCommandBuffer              commandBuffer           // bind descriptor set
         VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
         vd.compute_pso.pipeline_layout,     // VkPipelineLayout             layout
         0,                                  // uint32_t                     firstSet
@@ -336,17 +474,10 @@ auto ref createRenderResources( ref VDrive_State vd ) {
         null                                // const( uint32_t )*           pDynamicOffsets
     );
 
-    // dispatch compute command
-    init_cmd_buffer.vkCmdDispatch( 1, vd.sim_dim.y, 1 );
-
-    // finish recording and submit the command
-    init_cmd_buffer.vkEndCommandBuffer;
-
-    // submit the command buffer and wait for queue idle as we need to destroy the pipeline
-    import vdrive.command : queueSubmitInfo;
-    auto submit_info = init_cmd_buffer.queueSubmitInfo;
+    init_cmd_buffer.cmdDispatch( dispatch_group_count );    // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+    init_cmd_buffer.vkEndCommandBuffer;                     // finish recording and submit the command
+    auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
     vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
-    vd.graphics_queue.vkQueueWaitIdle;
 
 
 
@@ -355,31 +486,16 @@ auto ref createRenderResources( ref VDrive_State vd ) {
     ////////////////////////////////////////////////
 
     // reuse meta_compute to create loop compute pso with specialization
-    auto old_pso = vd.compute_pso;
-    vd.compute_pso = meta_compute( vd )
-        .shaderStageCreateInfo(
-            vd.createPipelineShaderStage(
-                VK_SHADER_STAGE_COMPUTE_BIT,
-                "shader/lbmd_loop.comp",
-                & specialization_info ))
-        .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
-        .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 4 )
-        .basePipeline( old_pso.pipeline )
-        .construct
-        .destroyShaderModule
-        .reset;
-
-    // destroy old compute pipeline and layout
-    vd.destroy( old_pso );
+    specialization_constants[3] = 1;    // select compute loop branch
+    createComputePSO;                   // reuse code from above
 
 
 
-    //////////////////////////////////////////////////
-    // create two reusable commpute command buffers //
-    //////////////////////////////////////////////////
+    /////////////////////////////////////////////////
+    // create two reusable compute command buffers //
+    /////////////////////////////////////////////////
 
     // two command buffers for compute loop, one ping and one pong buffer
-    import vdrive.command : allocateCommandBuffers;
     vd.allocateCommandBuffers( vd.compute_cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vd.compute_cmd_buffers );
     auto compute_cmd_buffers_bi = commandBufferBeginInfo;
 
@@ -398,15 +514,17 @@ auto ref createRenderResources( ref VDrive_State vd ) {
             null                                // const( uint32_t )*           pDynamicOffsets
         );
         cmd_buffer.vkCmdPushConstants( vd.compute_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 4, &push_constant ); // push constant
-        cmd_buffer.vkCmdDispatch( 1, vd.sim_dim.y, 1 );  // dispatch compute command
-        cmd_buffer.vkEndCommandBuffer;          // finish recording and submit the command
+        cmd_buffer.cmdDispatch( dispatch_group_count );     // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+        cmd_buffer.vkEndCommandBuffer;                      // finish recording and submit the command
     }
 
-    // we will submit two command buffers now
-    //vd.submit_info.commandBufferCount = 2;
+    // initiaize ping pong variable to 1
+    // it will be switched to 0 ( pp = 1 - pp ) befor submitting compute commands
+    vd.sim_ping_pong = 1;
 
     return vd;
 }
+
 
 
 
@@ -416,7 +534,6 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
     // (re)construct the already parametrized swapchain //
     //////////////////////////////////////////////////////
 
-    import vdrive.surface;
     vd.surface.construct;
 
     // set the corresponding present info member to the (re)constructed swapchain
