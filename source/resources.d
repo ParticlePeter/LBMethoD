@@ -130,10 +130,10 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
 
 
     // 2.) If they do recreate VkImage(s) and VkBuffers without attaching memory
-    if( vd.sim_image.image     != VK_NULL_HANDLE ) vd.sim_image.destroyResources;     // destroy old image and its view
-    if( vd.sim_buffer.buffer   != VK_NULL_HANDLE ) vd.sim_buffer.destroyResources;    // destroy old buffer
+    if( vd.sim_image.image     != VK_NULL_HANDLE ) vd.sim_image.destroyResources( false );  // destroy old image and its view, keeping the sampler
+    if( vd.sim_buffer.buffer   != VK_NULL_HANDLE ) vd.sim_buffer.destroyResources;          // destroy old buffer
     foreach( ref view; vd.sim_buffer_views )
-        if( view                != VK_NULL_HANDLE ) vd.destroy( view );                 // destroy old buffer views
+        if( view                != VK_NULL_HANDLE ) vd.destroy( view );                     // destroy old buffer views
     
     vd.sim_buffer_views.length = vd.sim_layers;            // resize dynamic buffer views array
     //vd.sim_domain = uvec4( sim_dim.x, sim_dim.y, sim_dim.z, layers );      // store the memory object specification
@@ -220,7 +220,7 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         meta_descriptor_ptr = & meta_descriptor;
     }
 
-    vd.sim_sampler = vd.createSampler( VK_FILTER_NEAREST, VK_FILTER_NEAREST );
+    vd.sim_image.sampler = vd.createSampler( VK_FILTER_NEAREST, VK_FILTER_NEAREST );
 
     vd.descriptor = ( *meta_descriptor_ptr )    // VDrive_State.descriptor is a Core_Descriptor
         .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
@@ -230,7 +230,7 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         .addLayoutBinding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT )
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
         .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT ) // immutable does not filter properly, either driver bug or module descriptor bug
-            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_sampler )
+            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
         .construct
         .reset;
 
@@ -241,7 +241,7 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         .addBindingUpdate( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE )
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
         .addBindingUpdate/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ) // immutable does not filter properly, either driver bug or module descriptor bug
-            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_sampler )
+            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
         .attachSet( vd.descriptor.descriptor_set );
 
 }
@@ -719,7 +719,6 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.sim_buffer.destroyResources;
     vd.sim_memory.destroyResources;
     vd.sim_image.destroyResources;
-    vd.destroy( vd.sim_sampler );
 
     // render setup
     vd.render_pass.destroyResources;

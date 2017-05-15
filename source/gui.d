@@ -27,7 +27,6 @@ struct VDrive_Gui_State {
     // gui resources
     Core_Pipeline               gui_graphics_pso;
     Meta_Image                  gui_font_tex;
-    VkSampler                   gui_font_sampler;
 
     alias                               GUI_QUEUED_FRAMES = vd.MAX_FRAMES;
     Meta_Buffer[ GUI_QUEUED_FRAMES ]    gui_vtx_buffers;
@@ -181,10 +180,13 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
     io.Fonts.GetTexDataAsRGBA32( &pixels, &width, &height );
     size_t upload_size = width * height * 4 * ubyte.sizeof;
 
-    vg.gui_font_tex( vg )
+    // create sampler to sample the textures
+    import vdrive.descriptor : createSampler;
+    vg.gui_font_tex.sampler = vg.gui_font_tex( vg )
         .create( VK_FORMAT_R8G8B8A8_UNORM, width, height, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT )
         .createMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT )
-        .createView;
+        .createView
+        .createSampler; // create a sampler and store it in the internal Meta_Image sampler member
 
     return vg;
 }
@@ -196,14 +198,11 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
 // vd.descriptor of type Core_Descriptor
 auto ref createDescriptorSet( ref VDrive_Gui_State vg ) {
 
-    // create sampler to sample the textures
     import vdrive.descriptor;
-    vg.gui_font_sampler = vg.createSampler;
-
     Meta_Descriptor meta_descriptor;    // temporary
     meta_descriptor( vg )
         .addLayoutBindingImmutable( 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT )
-            .addImageInfo( vg.gui_font_tex.image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, vg.gui_font_sampler );
+            .addImageInfo( vg.gui_font_tex.image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, vg.gui_font_tex.sampler );
 
     // forward to appstate createDescriptorSet with the currently being configured meta_descriptor
     import resources : resources_createDescriptorSet = createDescriptorSet;
@@ -547,7 +546,6 @@ auto ref destroyResources( ref VDrive_Gui_State vg ) {
     import vdrive.state, vdrive.pipeline;
     vg.destroy( vg.cmd_pool );
     vg.destroy( vg.gui_graphics_pso );
-    vg.destroy( vg.gui_font_sampler );
     vg.gui_font_tex.destroyResources;
 
     ImGui.Shutdown;

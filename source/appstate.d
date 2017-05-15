@@ -40,7 +40,6 @@ struct VDrive_State {
     Meta_Image                  depth_image;
     Meta_Buffer                 wvpm_buffer;
     VkMappedMemoryRange         wvpm_flush;
-    VkSampler                   sim_sampler;
 
     // command and related
     VkCommandPool               cmd_pool;
