@@ -40,28 +40,28 @@
             "path"                      : "../V-Drive",
             "name"                      : "V-Drive",
             "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
-            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release", "source", "example" ]
         },
 
         {
             "path"                      : "../V-Drive-Develop",
             "name"                      : "V-Drive-Develop",
             "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
-            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release", "source" ]
         },
 
         {
             "path"                      : "../../DLang/engineProjectsDSA/lbm",
             "name"                      : "Engine LBM",
             "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
-            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release", "source", "shader" ]
         },
 
         {
             "path"                      : ".",
             "name"                      : "LBMethoD",
             "file_exclude_patterns"     : [ "*.spv", "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
-            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release", "source", "shader" ]
         },
 
         {
