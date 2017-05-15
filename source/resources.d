@@ -22,7 +22,7 @@ auto ref createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags com
     vd.cmd_pool = vd.createCommandPool( vd.graphics_queue_family_index, command_pool_create_flags );
 
     // one for compute operations, not reset on window resize events
-    vd.compute_cmd_pool = vd.createCommandPool( vd.graphics_queue_family_index );
+    vd.sim_cmd_pool = vd.createCommandPool( vd.graphics_queue_family_index );
 
 
 
@@ -130,12 +130,12 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
 
 
     // 2.) If they do recreate VkImage(s) and VkBuffers without attaching memory
-    if( vd.lbmd_image.image     != VK_NULL_HANDLE ) vd.lbmd_image.destroyResources;     // destroy old image and its view
-    if( vd.lbmd_buffer.buffer   != VK_NULL_HANDLE ) vd.lbmd_buffer.destroyResources;    // destroy old buffer
-    foreach( ref view; vd.lbmd_buffer_views )
+    if( vd.sim_image.image     != VK_NULL_HANDLE ) vd.sim_image.destroyResources;     // destroy old image and its view
+    if( vd.sim_buffer.buffer   != VK_NULL_HANDLE ) vd.sim_buffer.destroyResources;    // destroy old buffer
+    foreach( ref view; vd.sim_buffer_views )
         if( view                != VK_NULL_HANDLE ) vd.destroy( view );                 // destroy old buffer views
     
-    vd.lbmd_buffer_views.length = vd.sim_layers;            // resize dynamic buffer views array
+    vd.sim_buffer_views.length = vd.sim_layers;            // resize dynamic buffer views array
     //vd.sim_domain = uvec4( sim_dim.x, sim_dim.y, sim_dim.z, layers );      // store the memory object specification
     vd.sim_display_scale = vec3( 1 );                       // following bellow should difer for 3D lbm
     if( vd.sim_domain.x > vd.sim_domain.y ) vd.sim_display_scale.x = cast( float )vd.sim_domain.x / vd.sim_domain.y;
@@ -150,48 +150,48 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
 
     // Todo(pp): the format should be choose-able
     // Todo(pp): here checks are required if this image format is available for VK_IMAGE_USAGE_STORAGE_BIT
-    vd.lbmd_image( vd )
+    vd.sim_image( vd )
         .create( VK_FORMAT_R16G16B16A16_SFLOAT, vd.sim_domain.x, vd.sim_domain.y, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT );
 
-    vd.lbmd_buffer( vd )
+    vd.sim_buffer( vd )
         .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_size );
 
 
 
     // 3.) check if the memory requirement for the objects above has increased, if not goto 5.)   
     VkDeviceSize required_mem_size = 0;     // here we will store the required memory
-    vd.lbmd_memory( vd )
+    vd.sim_memory( vd )
         .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
-        .addRange( vd.lbmd_buffer, & required_mem_size )    // with the optional second parametet
-        .addRange( vd.lbmd_image,  & required_mem_size );   // the meta memory struct does not mutate
+        .addRange( vd.sim_buffer, & required_mem_size )    // with the optional second parametet
+        .addRange( vd.sim_image,  & required_mem_size );   // the meta memory struct does not mutate
 
 
 
     // 4.) if it has recreate the memory object
-    //if( vd.lbmd_memory.memSize < required_mem_size )
+    //if( vd.sim_memory.memSize < required_mem_size )
     {
-        vd.lbmd_memory.destroyResources;
-        vd.lbmd_memory( vd )
+        vd.sim_memory.destroyResources;
+        vd.sim_memory( vd )
             .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
-            .addRange( vd.lbmd_buffer )
-            .addRange( vd.lbmd_image )
+            .addRange( vd.sim_buffer )
+            .addRange( vd.sim_image )
             .allocate;     
     }
 
 
 
     // 5.) re-register resources
-    vd.lbmd_memory
-        .bind( vd.lbmd_buffer )
-        .bind( vd.lbmd_image );
+    vd.sim_memory
+        .bind( vd.sim_buffer )
+        .bind( vd.sim_image );
 
 
 
     // 6.) recreate VkImageView and VkBufferView(s)
-    vd.lbmd_image.createView;
-    foreach( i, ref view; vd.lbmd_buffer_views.data )
+    vd.sim_image.createView;
+    foreach( i, ref view; vd.sim_buffer_views.data )
         view = vd.createBufferView(
-            vd.lbmd_buffer.buffer,
+            vd.sim_buffer.buffer,
             VK_FORMAT_R32_SFLOAT,
             i.toUint * population_mem_size,
             population_mem_size );
@@ -220,28 +220,28 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         meta_descriptor_ptr = & meta_descriptor;
     }
 
-    vd.lbmd_sampler = vd.createSampler( VK_FILTER_NEAREST, VK_FILTER_NEAREST );
+    vd.sim_sampler = vd.createSampler( VK_FILTER_NEAREST, VK_FILTER_NEAREST );
 
     vd.descriptor = ( *meta_descriptor_ptr )    // VDrive_State.descriptor is a Core_Descriptor
         .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
             .addBufferInfo( vd.wvpm_buffer.buffer )
         .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
-            .addTexelBufferViews( vd.lbmd_buffer_views.data )
+            .addTexelBufferViews( vd.sim_buffer_views.data )
         .addLayoutBinding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT )
-            .addImageInfo( vd.lbmd_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
+            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
         .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT ) // immutable does not filter properly, either driver bug or module descriptor bug
-            .addImageInfo( vd.lbmd_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.lbmd_sampler )
+            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_sampler )
         .construct
         .reset;
 
     // prepare simumaltion data descriptor update
     vd.sim_descriptor_update( vd )
         .addBindingUpdate( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
-        //    .addTexelBufferViews( vd.lbmd_buffer_views.data )     // we will directly set the array pointer when updating
+        //    .addTexelBufferViews( vd.sim_buffer_views.data )     // we will directly set the array pointer when updating
         .addBindingUpdate( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE )
-            .addImageInfo( vd.lbmd_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
+            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
         .addBindingUpdate/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ) // immutable does not filter properly, either driver bug or module descriptor bug
-            .addImageInfo( vd.lbmd_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.lbmd_sampler )
+            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_sampler )
         .attachSet( vd.descriptor.descriptor_set );
 
 }
@@ -249,11 +249,11 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
 
 auto ref resetComputePipeline( ref VDrive_State vd ) {
 
-    auto extent = vd.lbmd_image.extent;
+    auto extent = vd.sim_image.extent;
 
      // 1.) check if the last layer and domain settings differ from the recently used, if not return from this function
     import dlsl.vector;
-    if( vd.sim_layers != vd.lbmd_buffer_views.length
+    if( vd.sim_layers != vd.sim_buffer_views.length
     ||  vd.sim_domain != uvec3( extent.width, extent.height, extent.depth )) {
 
         vd.graphics_queue.vkQueueWaitIdle;
@@ -261,9 +261,9 @@ auto ref resetComputePipeline( ref VDrive_State vd ) {
 
         // update the descriptor
         vd.sim_descriptor_update.write_descriptor_sets[0].descriptorCount  = vd.sim_layers; 
-        vd.sim_descriptor_update.write_descriptor_sets[0].pTexelBufferView = vd.lbmd_buffer_views.ptr;
-        vd.sim_descriptor_update.image_infos[0].imageView = vd.lbmd_image.image_view;
-        vd.sim_descriptor_update.image_infos[1].imageView = vd.lbmd_image.image_view;
+        vd.sim_descriptor_update.write_descriptor_sets[0].pTexelBufferView = vd.sim_buffer_views.ptr;
+        vd.sim_descriptor_update.image_infos[0].imageView = vd.sim_image.image_view;
+        vd.sim_descriptor_update.image_infos[1].imageView = vd.sim_image.image_view;
         vd.sim_descriptor_update.update;
 
     }
@@ -442,8 +442,8 @@ auto ref createComputeResources( ref VDrive_State vd ) {
 
     // record image layout transition to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
     init_cmd_buffer.recordTransition(
-        vd.lbmd_image.image,
-        vd.lbmd_image.subresourceRange,
+        vd.sim_image.image,
+        vd.sim_image.subresourceRange,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL,
         0,  // no access mask required here
@@ -459,7 +459,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
 
     // determine dispatch group count based on VkBufferView or VkImage pupulation approach
     // and from simulation domain vd.sim_domain and compute work group size vd.sim_work_group_size
-    auto dispatch_group_count = vd.lbmd_buffer_views.length
+    auto dispatch_group_count = vd.sim_buffer_views.length
         ? uvec3(( vd.sim_domain.x * vd.sim_domain.y * vd.sim_domain.z ) / vd.sim_work_group_size.x, 1, 1 ) 
         : vd.sim_domain.xyz / vd.sim_work_group_size;
     
@@ -496,13 +496,13 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     /////////////////////////////////////////////////
 
     // two command buffers for compute loop, one ping and one pong buffer
-    vd.allocateCommandBuffers( vd.compute_cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vd.compute_cmd_buffers );
-    auto compute_cmd_buffers_bi = commandBufferBeginInfo;
+    vd.allocateCommandBuffers( vd.sim_cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vd.sim_cmd_buffers );
+    auto sim_cmd_buffers_bi = commandBufferBeginInfo;
 
     // record commands in loop, only difference is the push constant
-    foreach( i, ref cmd_buffer; vd.compute_cmd_buffers ) {
+    foreach( i, ref cmd_buffer; vd.sim_cmd_buffers ) {
         uint push_constant = ( i * 8 ).toUint;
-        cmd_buffer.vkBeginCommandBuffer( &compute_cmd_buffers_bi );  // begin command buffer recording
+        cmd_buffer.vkBeginCommandBuffer( &sim_cmd_buffers_bi );  // begin command buffer recording
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.compute_pso.pipeline );    // bind compute vd.compute_pso.pipeline
         cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
             VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
@@ -715,11 +715,11 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.depth_image.destroyResources;
     vd.wvpm_buffer.unmapMemory.destroyResources;
 
-    foreach( ref buffer_view; vd.lbmd_buffer_views ) vd.destroy( buffer_view );
-    vd.lbmd_buffer.destroyResources;
-    vd.lbmd_memory.destroyResources;
-    vd.lbmd_image.destroyResources;
-    vd.destroy( vd.lbmd_sampler );
+    foreach( ref buffer_view; vd.sim_buffer_views ) vd.destroy( buffer_view );
+    vd.sim_buffer.destroyResources;
+    vd.sim_memory.destroyResources;
+    vd.sim_image.destroyResources;
+    vd.destroy( vd.sim_sampler );
 
     // render setup
     vd.render_pass.destroyResources;
@@ -730,7 +730,7 @@ auto ref destroyResources( ref VDrive_State vd ) {
 
     // command and synchronize
     vd.destroy( vd.cmd_pool );
-    vd.destroy( vd.compute_cmd_pool );
+    vd.destroy( vd.sim_cmd_pool );
     vd.destroy( vd.acquired_semaphore );
     vd.destroy( vd.rendered_semaphore );
     foreach( ref fence; vd.submit_fence )

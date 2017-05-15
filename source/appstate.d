@@ -40,12 +40,7 @@ struct VDrive_State {
     Meta_Image                  depth_image;
     Meta_Buffer                 wvpm_buffer;
     VkMappedMemoryRange         wvpm_flush;
-    VkSampler                   lbmd_sampler;
-    Meta_Image                  lbmd_image;
-    Meta_Buffer                 lbmd_buffer;
-    Meta_Memory                 lbmd_memory;
-    Array!VkBufferView          lbmd_buffer_views;  // most probably has to be come dynamic
-
+    VkSampler                   sim_sampler;
 
     // command and related
     VkCommandPool               cmd_pool;
@@ -53,8 +48,6 @@ struct VDrive_State {
     VkPipelineStageFlags        submit_wait_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;//VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
     VkPresentInfoKHR            present_info;
     VkSubmitInfo                submit_info;
-    VkCommandPool               compute_cmd_pool;   // we do not reset this on window resize events
-    VkCommandBuffer[2]          compute_cmd_buffers;
 
     // synchronize
     VkFence[MAX_FRAMES]         submit_fence;
@@ -65,7 +58,6 @@ struct VDrive_State {
     // render setup
     Meta_Renderpass             render_pass;
     Core_Descriptor             descriptor;
-    Meta_Descriptor_Update      sim_descriptor_update;
     Core_Pipeline               graphics_pso;
     Core_Pipeline               compute_pso;
     Meta_Framebuffers           framebuffers;
@@ -73,6 +65,16 @@ struct VDrive_State {
     // dynamic state
     import dlsl.vector;
 
+    // simulation resources
+    VkCommandPool               sim_cmd_pool;           // we do not reset this on window resize events
+    VkCommandBuffer[2]          sim_cmd_buffers;        // using ping pong approach for now
+    Meta_Image                  sim_image;              // output macroscopic moments density and velocity
+    Meta_Buffer                 sim_buffer;             // mesoscopic velocity populations
+    Meta_Memory                 sim_memory;             // memory backing image and buffer
+    Array!VkBufferView          sim_buffer_views;       // arbitrary count of buffer views, dynamic resizing is not that easy as we would have to recreate the descriptor set each time
+    Meta_Descriptor_Update      sim_descriptor_update;  // updating the descriptor in the case of reconstructed sim resources
+
+    // simulation configuration and auxiliary data
     uvec3                       sim_domain          = uvec3( 256, 256, 1 );
     uint32_t                    sim_layers          = 17;
     uvec3                       sim_work_group_size = uvec3( 256, 1, 1 );
@@ -177,7 +179,7 @@ void draw( ref VDrive_State vd ) {
         vd.sim_ping_pong = cast( ubyte )( 1 - vd.sim_ping_pong );
     }
 
-    VkCommandBuffer[2] cmd_buffers = [ vd.cmd_buffers[ vd.next_image_index ], vd.compute_cmd_buffers[ vd.sim_ping_pong ]];
+    VkCommandBuffer[2] cmd_buffers = [ vd.cmd_buffers[ vd.next_image_index ], vd.sim_cmd_buffers[ vd.sim_ping_pong ]];
     vd.submit_info.pCommandBuffers = cmd_buffers.ptr;
     vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
     vd.submit_info.commandBufferCount = 1;
