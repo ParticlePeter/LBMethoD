@@ -209,7 +209,9 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         meta_descriptor_ptr = & meta_descriptor;
     }
 
-    vd.sim_image.sampler = vd.createSampler( VK_FILTER_NEAREST, VK_FILTER_NEAREST );
+    
+    vd.sim_image.sampler    = vd.createSampler;
+    vd.sim_sampler_nearest  = vd.createSampler( VK_FILTER_NEAREST, VK_FILTER_NEAREST );
 
     vd.descriptor = ( *meta_descriptor_ptr )    // VDrive_State.descriptor is a Core_Descriptor
         .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
@@ -220,6 +222,9 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
         .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT ) // immutable does not filter properly, either driver bug or module descriptor bug
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
+            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_sampler_nearest )
+        .addLayoutBinding( 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT )
+            .addBufferInfo( vd.sim_ubo_buffer.buffer )
         .construct
         .reset;
 
@@ -231,6 +236,7 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
         .addBindingUpdate/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ) // immutable does not filter properly, either driver bug or module descriptor bug
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
+            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_sampler_nearest )
         .attachSet( vd.descriptor.descriptor_set );
 
 }
@@ -252,6 +258,7 @@ auto ref resetComputePipeline( ref VDrive_State vd ) {
         vd.sim_descriptor_update.texel_buffer_views[0]    = vd.sim_buffer_view;
         vd.sim_descriptor_update.image_infos[0].imageView = vd.sim_image.image_view;
         vd.sim_descriptor_update.image_infos[1].imageView = vd.sim_image.image_view;
+        vd.sim_descriptor_update.image_infos[2].imageView = vd.sim_image.image_view;
         vd.sim_descriptor_update.update;
 
     }
@@ -704,6 +711,7 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.wvpm_buffer.unmapMemory.destroyResources;
 
     // compute resources
+    vd.destroy( vd.sim_sampler_nearest );
     vd.destroy( vd.sim_buffer_view );
     vd.sim_buffer.destroyResources;
     vd.sim_memory.destroyResources;

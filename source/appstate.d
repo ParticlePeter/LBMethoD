@@ -72,6 +72,7 @@ struct VDrive_State {
     Meta_Memory                 sim_memory;             // memory backing image and buffer
     VkBufferView                sim_buffer_view;        // arbitrary count of buffer views, dynamic resizing is not that easy as we would have to recreate the descriptor set each time
     Meta_Descriptor_Update      sim_descriptor_update;  // updating the descriptor in the case of reconstructed sim resources
+    VkSampler                   sim_sampler_nearest;
 
     // simulation configuration and auxiliary data
     uvec3                       sim_domain          = uvec3( 256, 256, 1 );
