@@ -24,6 +24,14 @@ struct VDrive_Gui_State {
     VDrive_State    vd;
     alias           vd this;
 
+    enum Sim_Impl : ubyte {
+        Buffer,
+        Image2D,
+        Image3D,
+    }
+
+    Sim_Impl                    sim_impl = Sim_Impl.Buffer;
+
     // gui resources
     Core_Pipeline               gui_graphics_pso;
     Meta_Image                  gui_font_tex;
@@ -492,14 +500,20 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
         ImGui.Text( "Application minimum %.3f ms/frame (%.1f FPS)", 1000.0f / minFramerate, minFramerate );
         ImGui.Text( "Application maximum %.3f ms/frame (%.1f FPS)", 1000.0f / maxFramerate, maxFramerate );
 
-        // Specify Simulation Domain
-        ImGui.DragInt2( "Domain", cast( int* )( vg.sim_domain.ptr ), 1.0f, 4, 4096 );
+        //ImGui.Spacing();
+        float drag_step = 16;
+        if( ImGui.CollapsingHeader( "Compute Parameter" )) {
 
-        if( vg.sim_play ) { if( ImGui.Button( "Pause", button_size )) vg.sim_play = false; }
-        else              { if( ImGui.Button( "Play",  button_size ))  vg.sim_play = true;  }
-        
-        ImGui.SameLine;
-        if( ImGui.Button( "Step", button_size )) vg.sim_step = true;
+            // Specify Simulation Domain
+            ImGui.DragInt2( "Sim Domain", cast( int* )( vg.sim_domain.ptr ), drag_step, 4, 4096 );
+
+            switch( vg.sim_impl ) {
+                case vg.Sim_Impl.Buffer  : ImGui.DragInt(  "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
+                case vg.Sim_Impl.Image2D : ImGui.DragInt2( "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
+                case vg.Sim_Impl.Image3D : ImGui.DragInt3( "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
+                default : break;
+            }
+        }
 
         ImGui.SameLine;
         import resources : resetComputePipeline;
