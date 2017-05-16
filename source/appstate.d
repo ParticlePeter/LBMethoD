@@ -79,6 +79,7 @@ struct VDrive_State {
     uvec3                       sim_work_group_size = uvec3( 256, 1, 1 );
     vec3                        sim_display_scale   = vec3( 1 );
     ubyte                       sim_ping_pong       = 1;
+    ubyte                       sim_ping_pong_scale = 8;
 
     VkViewport                  viewport;
     VkRect2D                    scissors;

@@ -489,7 +489,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
 
     // record commands in loop, only difference is the push constant
     foreach( i, ref cmd_buffer; vd.sim_cmd_buffers ) {
-        uint push_constant = ( i * 8 ).toUint;
+        uint push_constant = ( i * vd.sim_ping_pong_scale ).toUint;
         cmd_buffer.vkBeginCommandBuffer( &sim_cmd_buffers_bi );  // begin command buffer recording
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.compute_pso.pipeline );    // bind compute vd.compute_pso.pipeline
         cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
