@@ -81,6 +81,9 @@ struct VDrive_State {
     uint32_t                    sim_layers          = 17;
     uvec3                       sim_work_group_size = uvec3( 256, 1, 1 );
     vec3                        sim_display_scale   = vec3( 1 );
+    float                       sim_unit_spatial    = 1;
+    float                       sim_unit_temporal   = 1;
+
     struct Sim_UBO {
         float omega = 1;
         float speed = 1;

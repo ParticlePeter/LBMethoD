@@ -505,14 +505,18 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
         import resources : resetComputePipeline;
         if( ImGui.Button( "Reset", button_size )) vg.resetComputePipeline;
         
+        //ImGui.Spacing();
+        if( ImGui.CollapsingHeader( "Simulation Parameter" )) {
+            // Specify omega and speed
+            ImGui.DragFloat( "Spatial Unit",  vg.sim_unit_spatial,  0.01f );
+            ImGui.DragFloat( "Temporal Unit", vg.sim_unit_temporal, 0.01f );
             float tau = 1 / vg.sim_ubo.omega;
             if( ImGui.DragFloat( "Tau", tau, 0.01f, 0, 2 )) { vg.sim_ubo.omega = 1 / tau; }
             if( ImGui.DragFloat( "Omega", vg.sim_ubo.omega, 0.01f, 0, 2 ))  vg.updateSimUBO;
             if( ImGui.DragFloat( "Speed", vg.sim_ubo.speed, 1.0f, 0, 256 )) vg.updateSimUBO;
 
-    }
-
-    ImGui.End();
+        }
+    } ImGui.End();
 
     // 2. Show another simple window, this time using an explicit Begin/End pair
     if( show_another_window ) {
