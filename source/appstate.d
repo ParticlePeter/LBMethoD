@@ -117,6 +117,11 @@ void updateWVPM( ref VDrive_State vd ) {
 }
 
 
+void updateSimUBO( ref VDrive_State vd ) {
+    // data will be updated elsewhere
+    vd.device.vkFlushMappedMemoryRanges( 1, &vd.sim_ubo_flush );
+}
+
 void recreateSwapchain( ref VDrive_State vd ) {
     // swapchain might not have the same extent as the window dimension
     // the data we use for projection computation is the glfw window extent at this place

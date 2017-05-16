@@ -497,6 +497,10 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
         import resources : resetComputePipeline;
         if( ImGui.Button( "Reset", button_size )) vg.resetComputePipeline;
         
+            float tau = 1 / vg.sim_ubo.omega;
+            if( ImGui.DragFloat( "Tau", tau, 0.01f, 0, 2 )) { vg.sim_ubo.omega = 1 / tau; }
+            if( ImGui.DragFloat( "Omega", vg.sim_ubo.omega, 0.01f, 0, 2 ))  vg.updateSimUBO;
+            if( ImGui.DragFloat( "Speed", vg.sim_ubo.speed, 1.0f, 0, 256 )) vg.updateSimUBO;
 
     }
 
