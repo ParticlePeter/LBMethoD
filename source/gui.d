@@ -796,6 +796,11 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
     // forward to input.guiKeyCallback
     import input : inputKeyCallback = keyCallback;
     inputKeyCallback( window, key, scancode, val, mod );
+
+    // if window fullscreen event happened we will not be notified, we must catch the key itself
+    auto vg = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData
+    if( key == GLFW_KEY_KP_ENTER && mod == GLFW_MOD_ALT )
+        io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
 }
 
 
