@@ -780,10 +780,12 @@ void guiCharCallback( GLFWwindow*, uint c ) {
 
 void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod ) {
     auto io = & ImGui.GetIO();
+    io.KeysDown[ key ] = val > 0;
+
     //if( action == GLFW_PRESS )
-        io.KeysDown[ key ] = val > 0;
+        //io.KeysDown[ key ] = true;
     //if( action == GLFW_RELEASE )
-        //io.KeysDown[ key ] = GLFW_RELEASE;
+        //io.KeysDown[ key ] = false;
 
     //( void )mods; // Modifiers are not reliable across systems
     io.KeyCtrl  = io.KeysDown[ GLFW_KEY_LEFT_CONTROL    ] || io.KeysDown[ GLFW_KEY_RIGHT_CONTROL    ];
