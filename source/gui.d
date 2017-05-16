@@ -362,6 +362,10 @@ auto ref resizeRenderResources( ref VDrive_Gui_State vg ) {
     import vdrive.command : allocateCommandBuffers;
     vg.allocateCommandBuffers( vg.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vg.cmd_buffers[ 0 .. vg.surface.imageCount ] );
 
+    // gui io display size from surface extent
+    auto io = & ImGui.GetIO();
+    io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
+
     return vg;
 }
 
@@ -420,7 +424,7 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
     //int fb_w, fb_h;
     //glfwGetWindowSize( g_Window, &w, &h );
     //glfwGetFramebufferSize( g_Window, &fb_w, &fb_h );
-    io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
+    //io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );     // set in guiWindowSizeCallback
     //io.DisplayFramebufferScale = ImVec2( w > 0 ? (( float )fb_w / w ) : 0, h > 0 ? (( float )fb_h / h ) : 0 );
 
     // Setup time step
