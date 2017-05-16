@@ -411,7 +411,7 @@ private {
 
     ImGuiWindowFlags window_flags = 0
         | ImGuiWindowFlags_NoTitleBar
-        | ImGuiWindowFlags_ShowBorders
+    //  | ImGuiWindowFlags_ShowBorders
         | ImGuiWindowFlags_NoResize
         | ImGuiWindowFlags_NoMove
         | ImGuiWindowFlags_NoScrollbar
