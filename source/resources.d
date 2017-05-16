@@ -156,6 +156,7 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
     uint32_t population_mem_size = vd.sim_domain.x * vd.sim_domain.y * vd.sim_domain.z * float.sizeof.toUint;
     uint32_t buffer_size = vd.sim_layers * population_mem_size;
 
+
     // Todo(pp): the format should be choose-able
     // Todo(pp): here checks are required if this image format is available for VK_IMAGE_USAGE_STORAGE_BIT
     vd.sim_image( vd )
@@ -165,14 +166,12 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
         .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_size );
 
 
-
     // 3.) check if the memory requirement for the objects above has increased, if not goto 5.)   
     VkDeviceSize required_mem_size = 0;     // here we will store the required memory
     vd.sim_memory( vd )
         .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
         .addRange( vd.sim_buffer, & required_mem_size )    // with the optional second parametet
         .addRange( vd.sim_image,  & required_mem_size );   // the meta memory struct does not mutate
-
 
 
     // 4.) if it has recreate the memory object

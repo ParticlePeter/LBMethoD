@@ -392,7 +392,7 @@ void draw( ref VDrive_Gui_State vg ) {
     // record next command buffer asynchronous
     vg.newGuiFrame;
 
-    // forward to appstate drawInit
+    // forward to appstate draw
     import resources : resources_draw = draw;
     vg.resources_draw;
 }

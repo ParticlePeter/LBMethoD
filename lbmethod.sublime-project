@@ -89,7 +89,7 @@
             "path"                      : "../V-Drive-Develop/source",
             "name"                      : "vd develop",
             "file_exclude_patterns"     : [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
-            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release" ]
+            "folder_exclude_patterns"   : [ ".dub", "lib", "Debug", "Release", "imgui" ]
         },
 
         {

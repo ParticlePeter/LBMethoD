@@ -32,17 +32,17 @@ int main() {
         VDrive_State vd;
     }
 
-    auto vkResult = vd.initVulkan( 1600, 900 ); // initialize instance and (physical) device
-    if( vkResult ) return vkResult;             // exit if initialization failed, VK_SUCCESS = 0
+    auto vkResult = vd.initVulkan( 1600, 900 );     // initialize instance and (physical) device
+    if( vkResult ) return vkResult;                 // exit if initialization failed, VK_SUCCESS = 0
 
-    vd  .createCommandObjects                   // create command pool and sync primitives
-        .createMemoryObjects                    // create memory objects once used through out programm lifetime
-        .createDescriptorSet                    // create descriptor set
-        .createRenderResources                  // configure swapchain, create renderpass and pipeline state object
-        .resizeRenderResources                  // construct swapchain, create depth buffer and frambuffers
-        .initTrackball(
+    vd  .createCommandObjects                       // create command pool and sync primitives
+        .createMemoryObjects                        // create memory objects once used through out programm lifetime
+        .createDescriptorSet                        // create descriptor set
+        .createRenderResources                      // configure swapchain, create renderpass and pipeline state object
+        .resizeRenderResources                      // construct swapchain, create depth buffer and frambuffers
+        .initTrackball(                             // initialize the navigation trackball
             vd.projection_fovy, vd.windowHeight,
-            0, 0, 4 );  // initialize the navigation trackball
+            0, 0, 4 );
 
     static if( IMGUI )  vd.resetGlfwCallbacks;      // override callbacks set in module input when initTrackball was called
     else                vd.createResizedCommands;   // create draw loop runtime commands, only used without gui

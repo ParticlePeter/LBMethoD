@@ -60,6 +60,8 @@ struct VDrive_State {
     Core_Pipeline               graphics_pso;
     Core_Pipeline               compute_pso;
     Meta_Framebuffers           framebuffers;
+    VkViewport                  viewport;
+    VkRect2D                    scissors;
 
     // dynamic state
     import dlsl.vector;
@@ -93,15 +95,15 @@ struct VDrive_State {
 
     ubyte                       sim_ping_pong       = 1;
     ubyte                       sim_ping_pong_scale = 8;
+    bool                        sim_step            = false;
+    bool                        sim_play            = false; 
 
-    VkViewport                  viewport;
-    VkRect2D                    scissors;
+
 
     // window resize callback result
-    bool                        window_resized = false;
+    bool                        window_resized      = false;
 
-    bool                        sim_step = false;
-    bool                        sim_play = false;   
+  
 
 }
 
@@ -180,7 +182,6 @@ void drawInit( ref VDrive_State vd ) {
     vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );
     vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
 }
-
 
 
 void draw( ref VDrive_State vd ) {

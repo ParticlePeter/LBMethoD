@@ -6,7 +6,7 @@ layout( push_constant ) uniform Push_Constant {
 } pc;
 
 
-// uniform buffer(s)
+// uniform buffer
 layout( std140, binding = 0 ) uniform uboViewer {
     mat4 WVPM;                                  // World View Projection Matrix
 };

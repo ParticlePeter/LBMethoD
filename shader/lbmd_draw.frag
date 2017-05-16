@@ -14,7 +14,7 @@ layout( std140, binding = 5 ) uniform Sim_UBO {
 
 // Blue : 0.0 - 0.25 - 0.5
 // Green: 0.0 - 0.25 -  -  - 0.75 - 1.0
-// Red  :              0.5 - 0.75 - 1.0
+// Red  :                    0.5  - 0.75 - 1.0
 
 vec3 ramp( float t ) {
     return 4 * vec3(
