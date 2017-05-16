@@ -43,7 +43,7 @@ struct VDrive_Gui_State {
 // initialize imgui //
 //////////////////////
 
-auto ref initImgui( ref VDrive_Gui_State vg, bool install_callbacks = true ) {
+auto ref initImgui( ref VDrive_Gui_State vg ) {
 
     // Get static ImGuiIO struct and set the address of our VDrive_Gui_State as user pointer
     auto io = & ImGui.GetIO();
@@ -75,8 +75,8 @@ auto ref initImgui( ref VDrive_Gui_State vg, bool install_callbacks = true ) {
 
     // set ImGui function pointer
     io.RenderDrawListsFn    = & drawGuiData;    // called of ImGui.Render. Alternatively can be set this to null and call ImGui.GetDrawData() after ImGui.Render() to get the same ImDrawData pointer.
-    io.SetClipboardTextFn   = & ImGui_ImplGlfwVulkan_SetClipboardText;
-    io.GetClipboardTextFn   = & ImGui_ImplGlfwVulkan_GetClipboardText;
+    io.SetClipboardTextFn   = & setClipboardString;
+    io.GetClipboardTextFn   = & getClipboardString;
     io.ClipboardUserData    = vg.vd.window;
 
     // specify display size from vulkan data
@@ -85,15 +85,6 @@ auto ref initImgui( ref VDrive_Gui_State vg, bool install_callbacks = true ) {
 
     //version( Windows )
         //io.ImeWindowHandle = glfwGetWin32Window( g_Window );
-
-
-    if( install_callbacks ) {
-        // set glfw callbacks, currently module input defines them, these callbacks should be handled there 
-        glfwSetMouseButtonCallback( vg.vd.window, & ImGui_ImplGlfwVulkan_MouseButtonCallback );
-        glfwSetScrollCallback(      vg.vd.window, & ImGui_ImplGlfwVulkan_ScrollCallback );
-        glfwSetCharCallback(        vg.vd.window, & ImGui_ImplGlfwVulkan_CharCallback );
-        glfwSetKeyCallback(         vg.vd.window, & ImGui_ImplGlfwVulkan_KeyCallback );
-    }
 
     // define style
     auto style                  = & ImGui.GetStyle();
@@ -339,6 +330,19 @@ auto ref createRenderResources( ref VDrive_Gui_State vg ) {
 
     // command pool will be reset in resources.resizeRenderResources
     //vg.device.vkResetCommandPool( vg.cmd_pool, 0 ); // second argument is VkCommandPoolResetFlags
+
+    return vg;
+}
+
+
+
+auto ref resetGlfwCallbacks( ref VDrive_Gui_State vg ) {
+    // set glfw callbacks, these here wrap the callbacks in module input  
+    glfwSetWindowSizeCallback(      vg.window, & guiWindowSizeCallback );
+    glfwSetMouseButtonCallback(     vg.window, & guiMouseButtonCallback );
+    glfwSetScrollCallback(          vg.window, &guiScrollCallback );
+    glfwSetCharCallback(            vg.window, &guiCharCallback );
+    glfwSetKeyCallback(             vg.window, & guiKeyCallback );
 
     return vg;
 }
@@ -708,41 +712,63 @@ void drawGuiData( ImDrawData* draw_data ) {
 }
 
 
-private const( char )* ImGui_ImplGlfwVulkan_GetClipboardText( void* user_data ) {
+private const( char )* getClipboardString( void* user_data ) {
     return glfwGetClipboardString( cast( GLFWwindow* )user_data );
 }
 
-private void ImGui_ImplGlfwVulkan_SetClipboardText( void* user_data, const( char )* text ) {
+private void setClipboardString( void* user_data, const( char )* text ) {
     glfwSetClipboardString( cast( GLFWwindow* )user_data, text );
 }
 
 
 extern( C ) nothrow:
-void ImGui_ImplGlfwVulkan_MouseButtonCallback( GLFWwindow*, int button, int action, int /*mods*/ ) {
-    if( action == GLFW_PRESS && button >= 0 && button < 3 )
+void guiMouseButtonCallback( GLFWwindow* window, int button, int val, int mod ) {
+    if( val == GLFW_PRESS && button >= 0 && button < 3 )
         g_MousePressed[ button ] = true;
+
+    // forward to input.guiKeyCallback
+    import input : inputMouseButtonCallback = mouseButtonCallback;
+    inputMouseButtonCallback( window, button, val, mod );
 }
 
-void ImGui_ImplGlfwVulkan_ScrollCallback( GLFWwindow*, double /*xoffset*/, double yoffset ) {
+void guiScrollCallback( GLFWwindow*, double /*xoffset*/, double yoffset ) {
     g_MouseWheel += cast( float )yoffset; // Use fractional mouse wheel, 1.0 unit 5 lines.
 }
 
-void ImGui_ImplGlfwVulkan_CharCallback( GLFWwindow*, uint c ) {
+
+void guiCharCallback( GLFWwindow*, uint c ) {
     auto io = & ImGui.GetIO();
     if( c > 0 && c < 0x10000 )
         io.AddInputCharacter( cast( ImWchar )c );
 }
 
-void ImGui_ImplGlfwVulkan_KeyCallback( GLFWwindow*, int key, int, int action, int mods ) {
+
+void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod ) {
     auto io = & ImGui.GetIO();
-    if( action == GLFW_PRESS )
-        io.KeysDown[ key ] = true;
-    if( action == GLFW_RELEASE )
-        io.KeysDown[ key ] = false;
+    //if( action == GLFW_PRESS )
+        io.KeysDown[ key ] = val > 0;
+    //if( action == GLFW_RELEASE )
+        //io.KeysDown[ key ] = GLFW_RELEASE;
 
     //( void )mods; // Modifiers are not reliable across systems
-    io.KeyCtrl = io.KeysDown[ GLFW_KEY_LEFT_CONTROL ] || io.KeysDown[ GLFW_KEY_RIGHT_CONTROL ];
-    io.KeyShift = io.KeysDown[ GLFW_KEY_LEFT_SHIFT ] || io.KeysDown[ GLFW_KEY_RIGHT_SHIFT ];
-    io.KeyAlt = io.KeysDown[ GLFW_KEY_LEFT_ALT ] || io.KeysDown[ GLFW_KEY_RIGHT_ALT ];
-    io.KeySuper = io.KeysDown[ GLFW_KEY_LEFT_SUPER ] || io.KeysDown[ GLFW_KEY_RIGHT_SUPER ];
+    io.KeyCtrl  = io.KeysDown[ GLFW_KEY_LEFT_CONTROL    ] || io.KeysDown[ GLFW_KEY_RIGHT_CONTROL    ];
+    io.KeyShift = io.KeysDown[ GLFW_KEY_LEFT_SHIFT      ] || io.KeysDown[ GLFW_KEY_RIGHT_SHIFT      ];
+    io.KeyAlt   = io.KeysDown[ GLFW_KEY_LEFT_ALT        ] || io.KeysDown[ GLFW_KEY_RIGHT_ALT        ];
+    io.KeySuper = io.KeysDown[ GLFW_KEY_LEFT_SUPER      ] || io.KeysDown[ GLFW_KEY_RIGHT_SUPER      ];
+
+    // forward to input.guiKeyCallback
+    import input : inputKeyCallback = keyCallback;
+    inputKeyCallback( window, key, scancode, val, mod );
+}
+
+
+/// Callback Function for capturing window resize events
+void guiWindowSizeCallback( GLFWwindow * window, int w, int h ) {
+    auto io = & ImGui.GetIO();  
+    auto vg = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData
+    io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
+
+    // the extent might change at swapchain creation when the specified extent is not usable
+    swapchainExtent( &vg.vd, w, h );
+    vg.vd.window_resized = true;
 }
