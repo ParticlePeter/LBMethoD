@@ -73,12 +73,21 @@ struct VDrive_State {
     VkBufferView                sim_buffer_view;        // arbitrary count of buffer views, dynamic resizing is not that easy as we would have to recreate the descriptor set each time
     Meta_Descriptor_Update      sim_descriptor_update;  // updating the descriptor in the case of reconstructed sim resources
     VkSampler                   sim_sampler_nearest;
+    Meta_Buffer                 sim_ubo_buffer;
+    VkMappedMemoryRange         sim_ubo_flush;
 
     // simulation configuration and auxiliary data
     uvec3                       sim_domain          = uvec3( 256, 256, 1 );
     uint32_t                    sim_layers          = 17;
     uvec3                       sim_work_group_size = uvec3( 256, 1, 1 );
     vec3                        sim_display_scale   = vec3( 1 );
+    struct Sim_UBO {
+        float omega = 1;
+        float speed = 1;
+    }
+
+    Sim_UBO*                    sim_ubo;
+
     ubyte                       sim_ping_pong       = 1;
     ubyte                       sim_ping_pong_scale = 8;
 

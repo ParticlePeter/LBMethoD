@@ -101,10 +101,23 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
     vd.updateWVPM;
 
 
+    vd.sim_ubo_flush = vd.sim_ubo_buffer( vd )
+        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vd.Sim_UBO.sizeof )
+        .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
+        .createMappedMemoryRange;
+
+    vd.sim_ubo = cast( vd.Sim_UBO* )vd.sim_ubo_buffer.mapMemory;
+    vd.sim_ubo.speed = vd.sim_ubo.omega = 1;
+    vd.updateSimUBO;
+
+
+
 
     /////////////////////////////////////////////////////////////
     // create simulation memory objects - called several times //
     /////////////////////////////////////////////////////////////
+
+
     return vd.createSimMemoryObjects;
 }
 
@@ -716,6 +729,7 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.sim_buffer.destroyResources;
     vd.sim_memory.destroyResources;
     vd.sim_image.destroyResources;
+    vd.sim_ubo_buffer.destroyResources;
 
     // render setup
     vd.render_pass.destroyResources;
