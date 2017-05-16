@@ -121,23 +121,18 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
     // 6.) recreate VkImageView and VkBufferView(s)
 
 
-
     // 1.) check if the last layer and dim settings differ from the recently used, if not return from this function
     import dlsl.vector;
     //if( uvec4( sim_dim.x, sim_dim.y, sim_dim.z, layers ) == vd.sim_domain )
     //    return vd;
 
 
-
     // 2.) If they do recreate VkImage(s) and VkBuffers without attaching memory
     if( vd.sim_image.image     != VK_NULL_HANDLE ) vd.sim_image.destroyResources( false );  // destroy old image and its view, keeping the sampler
     if( vd.sim_buffer.buffer   != VK_NULL_HANDLE ) vd.sim_buffer.destroyResources;          // destroy old buffer
-    foreach( ref view; vd.sim_buffer_views )
-        if( view                != VK_NULL_HANDLE ) vd.destroy( view );                     // destroy old buffer views
-    
-    vd.sim_buffer_views.length = vd.sim_layers;            // resize dynamic buffer views array
-    //vd.sim_domain = uvec4( sim_dim.x, sim_dim.y, sim_dim.z, layers );      // store the memory object specification
-    vd.sim_display_scale = vec3( 1 );                       // following bellow should difer for 3D lbm
+    if( vd.sim_buffer_view     != VK_NULL_HANDLE ) vd.destroy( vd.sim_buffer_view );        // destroy old buffer view
+
+    vd.sim_display_scale = vec3( 1 );                       // compute display scale, this should difer for 3D lbm
     if( vd.sim_domain.x > vd.sim_domain.y ) vd.sim_display_scale.x = cast( float )vd.sim_domain.x / vd.sim_domain.y;
     if( vd.sim_domain.y > vd.sim_domain.x ) vd.sim_display_scale.y = cast( float )vd.sim_domain.y / vd.sim_domain.x;
 
@@ -179,22 +174,16 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
     }
 
 
-
     // 5.) re-register resources
     vd.sim_memory
         .bind( vd.sim_buffer )
         .bind( vd.sim_image );
 
 
-
     // 6.) recreate VkImageView and VkBufferView(s)
     vd.sim_image.createView;
-    foreach( i, ref view; vd.sim_buffer_views.data )
-        view = vd.createBufferView(
-            vd.sim_buffer.buffer,
-            VK_FORMAT_R32_SFLOAT,
-            i.toUint * population_mem_size,
-            population_mem_size );
+    vd.sim_buffer_view = vd.createBufferView(
+        vd.sim_buffer.buffer, VK_FORMAT_R32_SFLOAT, 0, buffer_size );
 
 
     return vd;
@@ -226,7 +215,7 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
             .addBufferInfo( vd.wvpm_buffer.buffer )
         .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
-            .addTexelBufferViews( vd.sim_buffer_views.data )
+            .addTexelBufferView( vd.sim_buffer_view )
         .addLayoutBinding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT )
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
         .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT ) // immutable does not filter properly, either driver bug or module descriptor bug
@@ -237,7 +226,7 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
     // prepare simumaltion data descriptor update
     vd.sim_descriptor_update( vd )
         .addBindingUpdate( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
-        //    .addTexelBufferViews( vd.sim_buffer_views.data )     // we will directly set the array pointer when updating
+            .addTexelBufferView( vd.sim_buffer_view )
         .addBindingUpdate( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE )
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
         .addBindingUpdate/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ) // immutable does not filter properly, either driver bug or module descriptor bug
@@ -253,15 +242,14 @@ auto ref resetComputePipeline( ref VDrive_State vd ) {
 
      // 1.) check if the last layer and domain settings differ from the recently used, if not return from this function
     import dlsl.vector;
-    if( vd.sim_layers != vd.sim_buffer_views.length
-    ||  vd.sim_domain != uvec3( extent.width, extent.height, extent.depth )) {
+    if( vd.sim_domain != uvec3( extent.width, extent.height, extent.depth )) {
+    // || vd.sim_layers != vd.sim_buffer_views.length   // Todo(pp): fix this logic
 
         vd.graphics_queue.vkQueueWaitIdle;
         vd.createSimMemoryObjects;
 
         // update the descriptor
-        vd.sim_descriptor_update.write_descriptor_sets[0].descriptorCount  = vd.sim_layers; 
-        vd.sim_descriptor_update.write_descriptor_sets[0].pTexelBufferView = vd.sim_buffer_views.ptr;
+        vd.sim_descriptor_update.texel_buffer_views[0]    = vd.sim_buffer_view;
         vd.sim_descriptor_update.image_infos[0].imageView = vd.sim_image.image_view;
         vd.sim_descriptor_update.image_infos[1].imageView = vd.sim_image.image_view;
         vd.sim_descriptor_update.update;
@@ -459,7 +447,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
 
     // determine dispatch group count based on VkBufferView or VkImage pupulation approach
     // and from simulation domain vd.sim_domain and compute work group size vd.sim_work_group_size
-    auto dispatch_group_count = vd.sim_buffer_views.length
+    auto dispatch_group_count = vd.sim_buffer_view != VK_NULL_HANDLE
         ? uvec3(( vd.sim_domain.x * vd.sim_domain.y * vd.sim_domain.z ) / vd.sim_work_group_size.x, 1, 1 ) 
         : vd.sim_domain.xyz / vd.sim_work_group_size;
     
@@ -715,7 +703,8 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.depth_image.destroyResources;
     vd.wvpm_buffer.unmapMemory.destroyResources;
 
-    foreach( ref buffer_view; vd.sim_buffer_views ) vd.destroy( buffer_view );
+    // compute resources
+    vd.destroy( vd.sim_buffer_view );
     vd.sim_buffer.destroyResources;
     vd.sim_memory.destroyResources;
     vd.sim_image.destroyResources;

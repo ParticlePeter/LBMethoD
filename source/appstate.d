@@ -70,7 +70,7 @@ struct VDrive_State {
     Meta_Image                  sim_image;              // output macroscopic moments density and velocity
     Meta_Buffer                 sim_buffer;             // mesoscopic velocity populations
     Meta_Memory                 sim_memory;             // memory backing image and buffer
-    Array!VkBufferView          sim_buffer_views;       // arbitrary count of buffer views, dynamic resizing is not that easy as we would have to recreate the descriptor set each time
+    VkBufferView                sim_buffer_view;        // arbitrary count of buffer views, dynamic resizing is not that easy as we would have to recreate the descriptor set each time
     Meta_Descriptor_Update      sim_descriptor_update;  // updating the descriptor in the case of reconstructed sim resources
 
     // simulation configuration and auxiliary data

@@ -20,7 +20,7 @@ layout( local_size_z =   1 ) in;
 layout( constant_id = 3 ) const uint INIT_OR_LOOP = 0;
 
 // populations 1 single buffered rest velocity, 8 double buffered link velocities
-layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buf[17];
+layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 
 // velocity and density write target, will be rendered as texture in next pass
 layout( binding = 3, rgba16f ) uniform restrict writeonly image2D vel_rho_img;
@@ -35,11 +35,11 @@ layout( binding = 3, rgba16f ) uniform restrict writeonly image2D vel_rho_img;
 
 
 // LBM constants
-const float   tau = 1.2;        // collision frequency
+const float   tau = 1.0;        // collision frequency
 const float omega = 1.0 / tau;  // rate of relaxation
-// Directions:       R      E       N       W       S       NE      NW      SW      SE
-const float[9]  w = { 4.0/9,    1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 };
-const int[9]  inv = { 0, 3, 4, 1, 2, 7, 8, 5, 6 };
+// Directions:          R       E       N       W       S       NE      NW      SW      SE
+const float[9]  w = {   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 };
+const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
 
 
 // Cell Type Attributes
@@ -75,11 +75,11 @@ const int[9]  inv = { 0, 3, 4, 1, 2, 7, 8, 5, 6 };
 #define Z int( UZ )
 
 // buffer offsets coresponding streaming ( in 2D so far )
-int[9] buf_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
+int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
 
 // stream function if not near boundary
 void stream( int p, float f ) {
-    int i = ( I + buf_offset[ p ] + node_count ) % node_count;
+    int i = ( I + buffer_offset[ p ] + node_count ) % node_count;
     imageStore( popul_buf[ pong + p ], i, vec4( f ));
 }
 
@@ -95,6 +95,14 @@ void bounce( int p, float f ) {
 // Indices and Counts if using VkBuffer //
 //////////////////////////////////////////
 
+// We use one rest position and two times the other velocities due to double buffering
+// loading populations p with variable ping = 0 V 8 and storing with pong = 8 V 0
+// All populations are stored in one contignuous float array/buffer
+// first come N rest populations then N east, etc.,
+// With the index variable I = [0..N) we can reach individual velocities of population intervall at p
+// We load with ( ping + 1 ) * N + I and store with ( pong + 1 ) * N + I
+// to reach the population of any node 
+
 // define global equivalent for gl_LocalInvocationIndex
 #define UI gl_GlobalInvocationID.x
 
@@ -108,27 +116,21 @@ void bounce( int p, float f ) {
 // derived total count of nodes
 int node_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
 #define N node_count
+#define buffer_size ( 17 * N )  // count of elements in the passed in buffer, required for periodic boundary conditions
 
 // buffer offsets coresponding streaming ( in 2D so far )
-int[9] buf_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
+int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
 
 // stream function if not near boundary
 void stream( int p, float f ) {
-    int i = ( I + buf_offset[ p ] + node_count ) % node_count;
-    imageStore( popul_buf[ pong + p ], i, vec4( f ));
+    int i = (( pong + p ) * N + I + buffer_offset[ p ] );// + buffer_size ) % buffer_size; // latter for periodic bondary conditions
+    imageStore( popul_buffer, i, vec4( f ));
 }
 
 // bounce function if next to boundary and velocity is pointing towards it
 void bounce( int p, float f ) {
-    imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
+    imageStore( popul_buffer, ( pong + inv[ p ] ) * N + I, vec4( f ));
 }
-
-
-
-
-
-
-
 
 
 
@@ -143,24 +145,24 @@ switch( INIT_OR_LOOP ) {
 
     // init all distribution f(unctions) with equilibrium, p = population
     for( int p = 0; p < 9; ++p )  {
-        imageStore( popul_buf[ p     ], I, vec4( w[ p ] ));
-        //if( p > 0 ) imageStore( popul_buf[ p + 8 ], I, vec4( w[ p ] ));
-    }
+        imageStore( popul_buffer, p * N + I, vec4( w[ p ] ));
+        //if( p > 0 ) imageStore( popul_buffer, ( p + 8 ) * N + I, vec4( w[ p ] ));
+    }   
     break;
 
     case 1: // LOOP
 
-    // Simulate
+    // load populations
     float f[9] = {
-        imageLoad( popul_buf[ 0        ], I ).r,
-        imageLoad( popul_buf[ 1 + ping ], I ).r,
-        imageLoad( popul_buf[ 2 + ping ], I ).r,
-        imageLoad( popul_buf[ 3 + ping ], I ).r,
-        imageLoad( popul_buf[ 4 + ping ], I ).r,
-        imageLoad( popul_buf[ 5 + ping ], I ).r,
-        imageLoad( popul_buf[ 6 + ping ], I ).r,
-        imageLoad( popul_buf[ 7 + ping ], I ).r,
-        imageLoad( popul_buf[ 8 + ping ], I ).r
+        imageLoad( popul_buffer,/* ping + 0 ) * N*/ I ).r,
+        imageLoad( popul_buffer, ( ping + 1 ) * N + I ).r,
+        imageLoad( popul_buffer, ( ping + 2 ) * N + I ).r,
+        imageLoad( popul_buffer, ( ping + 3 ) * N + I ).r,
+        imageLoad( popul_buffer, ( ping + 4 ) * N + I ).r,
+        imageLoad( popul_buffer, ( ping + 5 ) * N + I ).r,
+        imageLoad( popul_buffer, ( ping + 6 ) * N + I ).r,
+        imageLoad( popul_buffer, ( ping + 7 ) * N + I ).r,
+        imageLoad( popul_buffer, ( ping + 8 ) * N + I ).r 
     };
 
     float rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
@@ -168,12 +170,18 @@ switch( INIT_OR_LOOP ) {
     //vec2  vel = vec2(   f[1] - f[3] + f[5] - f[7] + f[8] - f[6],
     //                    f[2] - f[4] + f[5] - f[7] + f[6] - f[8] ) / rho;
 
+
     // pseudo force
     if( Y == D.y - 1 ) {
         vel.x = 0.5;
     }
 
-    
+
+    // store velocities and densities in image
+    imageStore( vel_rho_img, ivec2( X, Y ), vec4( vel, rho, 1 ));
+
+
+    // compute equilibrium
     #define X_P_Y ( vel.x + vel.y )
     #define X_M_Y ( vel.x - vel.y )
     #define V_X_2 ( 4.5 * vel.x * vel.x )
@@ -194,7 +202,6 @@ switch( INIT_OR_LOOP ) {
         w[8] * rho * ( 1 + 3 * X_M_Y + XMY_2 - V_D_V )  // w[8] * rho * (1 + 3 * ( vel.x - vel.y) + 4.5 * SQ( vel.x - vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y)))
     };
 
-
     
     // Collide - might be optimized if using f0 and 2 * vec4
     f[0] = mix( f[0], f_eq[0], omega ); //f[0] * ( 1 - omega ) + f_eq[0] * omega;
@@ -208,11 +215,9 @@ switch( INIT_OR_LOOP ) {
     f[8] = mix( f[8], f_eq[8], omega ); //f[8] * ( 1 - omega ) + f_eq[8] * omega;
 
 
-    // store velocities and densities in image
-    imageStore( vel_rho_img, ivec2( X, Y ), vec4( vel, rho, 1 ));
-
     // Store new functions
-    imageStore( popul_buf[0], I, vec4( f[0] ));
+    //imageStore( popul_buf[0], I, vec4( f[0] ));
+    imageStore( popul_buffer, I, vec4( f[0] ));
 
 
     if( X == D.x - 1 ) bounce( 1, f[1] ); else stream( 1, f[1] );
