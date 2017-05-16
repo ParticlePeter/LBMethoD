@@ -4,7 +4,6 @@ import dlsl.vector;
 import dlsl.trackball;
 import derelict.glfw3.glfw3;
 
-import gui;
 import appstate;
 
 private VDrive_State* vd;
@@ -15,8 +14,6 @@ void registerCallbacks( GLFWwindow* window, void* user_pointer = null ) {
     glfwSetWindowSizeCallback( window, &windowSizeCallback );
     glfwSetMouseButtonCallback( window, &mouseButtonCallback );
     glfwSetCursorPosCallback( window, &cursorPosCallback );
-    glfwSetScrollCallback( window, &ImGui_ImplGlfwVulkan_ScrollCallback ); //&scrollCallback );
-    glfwSetCharCallback( window, &ImGui_ImplGlfwVulkan_CharCallback );
     glfwSetKeyCallback( window, &keyCallback );
 }
 
@@ -74,9 +71,9 @@ extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) no
 
 
 /// Callback Function for capturing mouse motion events
-extern( C ) void mouseButtonCallback( GLFWwindow * window, int key, int val, int mod ) nothrow {
+extern( C ) void mouseButtonCallback( GLFWwindow * window, int button, int val, int mod ) nothrow {
     // compute mouse button bittfield flags
-    switch( key ) {
+    switch( button ) {
         case 0  : vd.tb.button += 2 * val - 1; break;
         case 1  : vd.tb.button += 8 * val - 4; break;
         case 2  : vd.tb.button += 4 * val - 2; break;
@@ -89,10 +86,6 @@ extern( C ) void mouseButtonCallback( GLFWwindow * window, int key, int val, int
     double xpos, ypos;
     glfwGetCursorPos( window, &xpos, &ypos );
     vd.tb.reference( xpos, ypos );
-
-    // forward to imgui
-    ImGui_ImplGlfwVulkan_MouseButtonCallback( window, key, val, mod );
-
 }
 
 
@@ -104,9 +97,6 @@ extern( C ) void scrollCallback( GLFWwindow * window, double x, double y ) nothr
 
 /// Callback Function for capturing keyboard events
 extern( C ) void keyCallback( GLFWwindow * window, int key, int scancode, int val, int mod ) nothrow {
-
-    // forward to imgui
-    ImGui_ImplGlfwVulkan_KeyCallback( window, key, scancode, val, mod );
 
     // use key press results only
     if( val != GLFW_PRESS ) return;
