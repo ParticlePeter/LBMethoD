@@ -404,7 +404,6 @@ private {
     bool show_style_editor      = false;
     bool show_another_window    = false;
 
-    int  button_height = 20;
     auto button_size = ImVec2( 100, 20 );
 
     int resetFrameMax   = 0;
@@ -468,18 +467,27 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
     // 1. Show a simple window
     // Tip: if we don't call ImGui.Begin()/ImGui.End() the widgets appears in a window automatically called "Debug"
 
-    auto next_win_pos = ImVec2( 0, 0 ); ImGui.SetNextWindowPos( next_win_pos, ImGuiSetCond_Always );
-    auto next_win_size = ImVec2( 350, io.DisplaySize.y ); ImGui.SetNextWindowSize( next_win_size, ImGuiSetCond_Always );
-    ImGui.Begin( "Debugging", null, window_flags );
-    {
+    void transportControls() {
+        if( vg.sim_play ) { if( ImGui.Button( "Pause", button_size )) vg.sim_play = false; }
+        else              { if( ImGui.Button( "Play",  button_size ))  vg.sim_play = true;  }
+        ImGui.SameLine;
+        if( ImGui.Button( "Step", button_size )) vg.sim_step = true;
+        ImGui.SameLine;
+        import resources : resetComputePipeline;
+        if( ImGui.Button( "Reset", button_size )) vg.resetComputePipeline;
+    }
+
+    auto next_win_pos = ImVec2( 0, 0 );
+    auto next_win_size = ImVec2( 350, io.DisplaySize.y - 40 );
+    ImGui.SetNextWindowPos( next_win_pos, ImGuiSetCond_Always );
+    ImGui.SetNextWindowSize( next_win_size, ImGuiSetCond_Always );
+    ImGui.Begin( "Parameter", null, window_flags ); {
+        // create transport controls at top of window
+        transportControls;
         //static float f = 0.0f;
-        ImGui.Text( "Hello, world!" );
-        if( ImGui.SliderFloat( "Gui Window Alpha", &style.Colors[ ImGuiCol_WindowBg ].w, 0.0f, 1.0f ))
+        //ImGui.Text( "Hello, world!" );
+        if( ImGui.SliderFloat( "Gui Alpha", &style.Colors[ ImGuiCol_WindowBg ].w, 0.0f, 1.0f ))
             style.Colors[ ImGuiCol_ChildWindowBg ].w = style.Colors[ ImGuiCol_WindowBg ].w;
-
-        if( ImGui.SliderInt( "Button Height", button_height, 1, 100 ))
-            button_size.y = button_height;
-
 
         // little hacky, but works - as we know that the corresponding clear value index
         ImGui.ColorEdit3( "clear color", cast( float* )( & vg.framebuffers.clear_values[ 1 ] ));
@@ -496,9 +504,9 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
             ++resetFrameMax;
             maxFramerate = 0.0001f;
         }       
-        ImGui.Text( "Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui.ImGui.GetIO().Framerate, ImGui.ImGui.GetIO().Framerate );
-        ImGui.Text( "Application minimum %.3f ms/frame (%.1f FPS)", 1000.0f / minFramerate, minFramerate );
-        ImGui.Text( "Application maximum %.3f ms/frame (%.1f FPS)", 1000.0f / maxFramerate, maxFramerate );
+        ImGui.Text( "Refresh average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui.ImGui.GetIO().Framerate, ImGui.ImGui.GetIO().Framerate );
+        ImGui.Text( "Refresh minimum %.3f ms/frame (%.1f FPS)", 1000.0f / minFramerate, minFramerate );
+        ImGui.Text( "Refresh maximum %.3f ms/frame (%.1f FPS)", 1000.0f / maxFramerate, maxFramerate );
 
         //ImGui.Spacing();
         float drag_step = 16;
@@ -515,10 +523,6 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
             }
         }
 
-        ImGui.SameLine;
-        import resources : resetComputePipeline;
-        if( ImGui.Button( "Reset", button_size )) vg.resetComputePipeline;
-        
         //ImGui.Spacing();
         if( ImGui.CollapsingHeader( "Simulation Parameter" )) {
             // Specify omega and speed
@@ -530,6 +534,15 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
             if( ImGui.DragFloat( "Speed", vg.sim_ubo.speed, 1.0f, 0, 256 )) vg.updateSimUBO;
 
         }
+    } ImGui.End();
+
+    next_win_pos = ImVec2( 0, io.DisplaySize.y - 40 );
+    next_win_size = ImVec2( 350, 40 );
+    ImGui.SetNextWindowPos( next_win_pos, ImGuiSetCond_Always );
+    ImGui.SetNextWindowSize( next_win_size, ImGuiSetCond_Always );
+    ImGui.Begin( "Control", null, window_flags ); {
+        // create transport controls at bottom of window
+        transportControls;
     } ImGui.End();
 
     // 2. Show another simple window, this time using an explicit Begin/End pair
