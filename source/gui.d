@@ -43,6 +43,11 @@ struct VDrive_Gui_State {
     VkCommandBufferBeginInfo    gui_cmd_buffer_bi = {
         flags : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
     };
+
+    // gui helper and cache sim settings
+    float   sim_relaxation_rate = 1;                    // tau
+    float   sim_viscosity       = 0.1666666666666667;   // at a relaxation rate of 1 and lattice units x, t = 1
+    float   sim_wall_velocity   = 0;
 }
 
 
@@ -95,19 +100,35 @@ auto ref initImgui( ref VDrive_Gui_State vg ) {
         //io.ImeWindowHandle = glfwGetWin32Window( g_Window );
 
     // define style
-    auto style                  = & ImGui.GetStyle();
-    style.GrabMinSize           = 7;
-    style.WindowRounding        = 0; //5;
-    style.ChildWindowRounding   = 4;
-    style.ScrollbarRounding     = 3;
-    style.FrameRounding         = 3;
-    style.GrabRounding          = 2;
-    style.ItemSpacing           = ImVec2( 4, 4 );
+    auto style                      = & ImGui.GetStyle();
+//  style.Alpha                     = 1;    // Global Alpah                     
+    style.WindowPadding             = ImVec2( 4, 4 );             
+//  style.WindowMinSize
+    style.WindowRounding            = 0;            
+//  style.WindowTitleAlign
+    style.ChildWindowRounding       = 4;      
+//  style.FramePadding
+    style.FrameRounding             = 3;             
+    style.ItemSpacing               = ImVec2( 4, 4 );
+//  style.ItemInnerSpacing
+//  style.TouchExtraPadding
+//  style.IndentSpacing
+//  style.ColumnsMinSpacing
+//  style.ScrollbarSize
+    style.ScrollbarRounding         = 3;         
+    style.GrabMinSize               = 7;
+    style.GrabRounding              = 2;              
+//  style.ButtonTextAlign
+//  style.DisplayWindowPadding
+//  style.DisplaySafeAreaPadding
+//  style.AntiAliasedLines
+//  style.AntiAliasedShapes
+//  style.CurveTessellationTol
 
     style.Colors[ ImGuiCol_Text ]                   = ImVec4( 0.90f, 0.90f, 0.90f, 1.00f ); //ImVec4( 0.90f, 0.90f, 0.90f, 1.00f );
     style.Colors[ ImGuiCol_TextDisabled ]           = ImVec4( 0.60f, 0.60f, 0.60f, 1.00f ); //ImVec4( 0.60f, 0.60f, 0.60f, 1.00f );
     style.Colors[ ImGuiCol_WindowBg ]               = ImVec4( 0.00f, 0.00f, 0.00f, 0.50f ); //ImVec4( 0.00f, 0.00f, 0.00f, 0.50f );
-    style.Colors[ ImGuiCol_ChildWindowBg ]          = ImVec4( 0.00f, 0.00f, 0.00f, 0.50f ); //ImVec4( 0.00f, 0.00f, 0.00f, 0.50f );
+    style.Colors[ ImGuiCol_ChildWindowBg ]          = ImVec4( 0.00f, 0.00f, 0.00f, 0.00f ); //ImVec4( 0.00f, 0.00f, 0.00f, 0.50f );
     style.Colors[ ImGuiCol_PopupBg ]                = ImVec4( 0.05f, 0.05f, 0.10f, 1.00f ); //ImVec4( 0.05f, 0.05f, 0.10f, 1.00f );
     style.Colors[ ImGuiCol_Border ]                 = ImVec4( 0.37f, 0.37f, 0.37f, 0.25f ); //ImVec4( 0.37f, 0.37f, 0.37f, 0.25f );
     style.Colors[ ImGuiCol_BorderShadow ]           = ImVec4( 0.00f, 0.00f, 0.00f, 0.00f ); //ImVec4( 0.00f, 0.00f, 0.00f, 0.00f );
@@ -163,6 +184,11 @@ auto ref createCommandObjects( ref VDrive_Gui_State vg ) {
 auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
     import resources : resources_createMemoryObjects = createMemoryObjects; // forward to appstate createRenderResources
     vg.resources_createMemoryObjects;
+
+    // initialize VDrive_Gui_State member from VDrive_State member
+    vg.sim_wall_velocity = vg.sim_ubo.wall_velocity * vg.sim_speed_of_sound * vg.sim_speed_of_sound;
+    vg.sim_relaxation_rate = 1 / vg.sim_ubo.collision_frequency;
+    vg.sim_viscosity = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
 
     // Initialize gui draw buffers
     foreach( i; 0 .. vg.GUI_QUEUED_FRAMES ) {
@@ -400,11 +426,24 @@ void draw( ref VDrive_Gui_State vg ) {
 
 private {
     import dlsl.vector;
-    bool show_test_window       = false;
-    bool show_style_editor      = false;
-    bool show_another_window    = false;
+    bool show_test_window           = false;
+    bool show_style_editor          = false;
+    bool show_another_window        = false;
 
-    auto button_size = ImVec2( 100, 20 );
+    immutable auto button_size      = ImVec2( 112, 20 );
+    immutable auto child_size       = ImVec2( 0, -24 );
+    immutable auto main_win_pos     = ImVec2( 0, 0 );
+    auto main_win_size              = ImVec2( 352, 900 );
+    
+    void updateTauOmega( ref VDrive_Gui_State vg ) {
+        float speed_of_sound_squared = vg.sim_speed_of_sound * vg.sim_speed_of_sound;
+        vg.sim_ubo.collision_frequency = 
+            2 * speed_of_sound_squared /
+            ( vg.sim_unit_temporal * ( 2 * vg.sim_viscosity + speed_of_sound_squared ));
+        vg.sim_relaxation_rate = 1 / vg.sim_ubo.collision_frequency;
+        vg.updateSimUBO;
+    }   
+     
 
     int resetFrameMax   = 0;
     float minFramerate  = 10000, maxFramerate = 0.0001f;
@@ -425,14 +464,6 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
 
     auto io = & ImGui.GetIO();
     auto style = & ImGui.GetStyle();
-
-    // Setup display size (every frame to accommodate for window resizing)
-    //int w, h;
-    //int fb_w, fb_h;
-    //glfwGetWindowSize( g_Window, &w, &h );
-    //glfwGetFramebufferSize( g_Window, &fb_w, &fb_h );
-    //io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );     // set in guiWindowSizeCallback
-    //io.DisplayFramebufferScale = ImVec2( w > 0 ? (( float )fb_w / w ) : 0, h > 0 ? (( float )fb_h / h ) : 0 );
 
     // Setup time step
     auto current_time = cast( float )glfwGetTime();
@@ -469,7 +500,7 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
 
     void transportControls() {
         if( vg.sim_play ) { if( ImGui.Button( "Pause", button_size )) vg.sim_play = false; }
-        else              { if( ImGui.Button( "Play",  button_size ))  vg.sim_play = true;  }
+        else              { if( ImGui.Button( "Play",  button_size )) vg.sim_play = true;  }
         ImGui.SameLine;
         if( ImGui.Button( "Step", button_size )) vg.sim_step = true;
         ImGui.SameLine;
@@ -477,77 +508,155 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
         if( ImGui.Button( "Reset", button_size )) vg.resetComputePipeline;
     }
 
-    auto next_win_pos = ImVec2( 0, 0 );
-    auto next_win_size = ImVec2( 350, io.DisplaySize.y - 40 );
-    ImGui.SetNextWindowPos( next_win_pos, ImGuiSetCond_Always );
-    ImGui.SetNextWindowSize( next_win_size, ImGuiSetCond_Always );
-    ImGui.Begin( "Parameter", null, window_flags ); {
+
+
+
+
+    ImGui.SetNextWindowPos(  main_win_pos,  ImGuiSetCond_Always );
+    ImGui.SetNextWindowSize( main_win_size, ImGuiSetCond_Always );
+    ImGui.Begin( "Main Window", null, window_flags ); {
+
         // create transport controls at top of window
         transportControls;
-        //static float f = 0.0f;
+
         //ImGui.Text( "Hello, world!" );
-        if( ImGui.SliderFloat( "Gui Alpha", &style.Colors[ ImGuiCol_WindowBg ].w, 0.0f, 1.0f ))
-            style.Colors[ ImGuiCol_ChildWindowBg ].w = style.Colors[ ImGuiCol_WindowBg ].w;
 
-        // little hacky, but works - as we know that the corresponding clear value index
-        ImGui.ColorEdit3( "clear color", cast( float* )( & vg.framebuffers.clear_values[ 1 ] ));
+        ImGui.BeginChild( "Child Window", child_size ); {
 
-        //ImGui.ColorEdit3( "clear color", clear_color );
-        if( ImGui.Button( "Test Window" )) show_test_window ^= 1;
-        ImGui.SameLine;
-        if( ImGui.Button( "Style Editor", button_size )) show_style_editor ^= 1;
+            // set width of items and their label
+            ImGui.PushItemWidth( main_win_size.x / 2 );
 
-        if( ImGui.Button( "Another Window" )) show_another_window ^= 1;
-        if( ImGui.ImGui.GetIO().Framerate < minFramerate ) minFramerate = ImGui.ImGui.GetIO().Framerate;
-        if( ImGui.ImGui.GetIO().Framerate > maxFramerate ) maxFramerate = ImGui.ImGui.GetIO().Framerate;
-        if( resetFrameMax < 100 ) {
-            ++resetFrameMax;
-            maxFramerate = 0.0001f;
-        }       
-        ImGui.Text( "Refresh average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui.ImGui.GetIO().Framerate, ImGui.ImGui.GetIO().Framerate );
-        ImGui.Text( "Refresh minimum %.3f ms/frame (%.1f FPS)", 1000.0f / minFramerate, minFramerate );
-        ImGui.Text( "Refresh maximum %.3f ms/frame (%.1f FPS)", 1000.0f / maxFramerate, maxFramerate );
+            ImGui.SliderFloat( "Gui Alpha", &style.Colors[ ImGuiCol_WindowBg ].w, 0.0f, 1.0f );
 
-        //ImGui.Spacing();
-        float drag_step = 16;
-        if( ImGui.CollapsingHeader( "Compute Parameter" )) {
+            // little hacky, but works - as we know that the corresponding clear value index
+            ImGui.ColorEdit3( "clear color", cast( float* )( & vg.framebuffers.clear_values[ 1 ] ));
 
-            // Specify Simulation Domain
-            ImGui.DragInt2( "Sim Domain", cast( int* )( vg.sim_domain.ptr ), drag_step, 4, 4096 );
+            //ImGui.ColorEdit3( "clear color", clear_color );
+            if( ImGui.Button( "Test Window" )) show_test_window ^= 1;
+            ImGui.SameLine;
+            if( ImGui.Button( "Style Editor", button_size )) show_style_editor ^= 1;
 
-            switch( vg.sim_impl ) {
-                case vg.Sim_Impl.Buffer  : ImGui.DragInt(  "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
-                case vg.Sim_Impl.Image2D : ImGui.DragInt2( "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
-                case vg.Sim_Impl.Image3D : ImGui.DragInt3( "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
-                default : break;
+            if( ImGui.Button( "Another Window" )) show_another_window ^= 1;
+            if( ImGui.ImGui.GetIO().Framerate < minFramerate ) minFramerate = ImGui.ImGui.GetIO().Framerate;
+            if( ImGui.ImGui.GetIO().Framerate > maxFramerate ) maxFramerate = ImGui.ImGui.GetIO().Framerate;
+            if( resetFrameMax < 100 ) {
+                ++resetFrameMax;
+                maxFramerate = 0.0001f;
+            }       
+            ImGui.Text( "Refresh average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui.ImGui.GetIO().Framerate, ImGui.ImGui.GetIO().Framerate );
+            ImGui.Text( "Refresh minimum %.3f ms/frame (%.1f FPS)", 1000.0f / minFramerate, minFramerate );
+            ImGui.Text( "Refresh maximum %.3f ms/frame (%.1f FPS)", 1000.0f / maxFramerate, maxFramerate );
+
+
+
+            ////////////////////////
+            // Compute Parameters //
+            ////////////////////////
+
+            float drag_step = 16;
+            if( ImGui.CollapsingHeader( "Compute Parameter" )) {
+
+                // Specify Simulation Domain
+                ImGui.DragInt2( "Sim Domain", cast( int* )( vg.sim_domain.ptr ), drag_step, 4, 4096 );
+
+                switch( vg.sim_impl ) {
+                    case vg.Sim_Impl.Buffer  : ImGui.DragInt(  "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
+                    case vg.Sim_Impl.Image2D : ImGui.DragInt2( "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
+                    case vg.Sim_Impl.Image3D : ImGui.DragInt3( "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
+                    default : break;
+                }
             }
-        }
 
-        //ImGui.Spacing();
-        if( ImGui.CollapsingHeader( "Simulation Parameter" )) {
-            // Specify omega and speed
-            ImGui.DragFloat( "Spatial Unit",  vg.sim_unit_spatial,  0.01f );
-            ImGui.DragFloat( "Temporal Unit", vg.sim_unit_temporal, 0.01f );
-            float tau = 1 / vg.sim_ubo.omega;
-            if( ImGui.DragFloat( "Tau", tau, 0.01f, 0, 2 )) { vg.sim_ubo.omega = 1 / tau; }
-            if( ImGui.DragFloat( "Omega", vg.sim_ubo.omega, 0.01f, 0, 2 ))  vg.updateSimUBO;
-            if( ImGui.DragFloat( "Speed", vg.sim_ubo.speed, 1.0f, 0, 256 )) vg.updateSimUBO;
 
-        }
-    } ImGui.End();
 
-    next_win_pos = ImVec2( 0, io.DisplaySize.y - 40 );
-    next_win_size = ImVec2( 350, 40 );
-    ImGui.SetNextWindowPos( next_win_pos, ImGuiSetCond_Always );
-    ImGui.SetNextWindowSize( next_win_size, ImGuiSetCond_Always );
-    ImGui.Begin( "Control", null, window_flags ); {
-        // create transport controls at bottom of window
+            ///////////////////////////
+            // Simulation Parameters //
+            ///////////////////////////
+
+            if( ImGui.CollapsingHeader( "Simulation Parameter" )) {
+
+                if( ImGui.DragFloat( "Wall Velocity", vg.sim_wall_velocity, 0.001f )) {
+                    float speed_of_sound_squared = vg.sim_speed_of_sound * vg.sim_speed_of_sound;
+                    vg.sim_ubo.wall_velocity = vg.sim_wall_velocity / speed_of_sound_squared;
+                    vg.updateSimUBO;
+                }
+
+                // Specify simulation parameter
+                if( ImGui.DragFloat( "Viscosity", vg.sim_viscosity, 0.001f )) {
+                    vg.updateTauOmega;
+                }
+
+
+                ImGui.Combo(
+                    "Algorithm", cast( int* )( & vg.sim_algorithm ),
+                    "SRT-LBGK\0TRT\0MRT\0Cascaded\0\0" 
+                );  // Combo using values packed in a single constant string (for really quick combo)
+
+
+                //ImGui.Separator();
+
+                if( ImGui.TreeNode( "Simulation Details" )) {
+                //if( ImGui.CollapsingHeader( "Simulation Details" )) {
+
+                    if( ImGui.DragFloat2( "Spatial/Temporal Unit", & vg.sim_unit_spatial, 0.001f )) {  // next value in struct is vg.sim_unit_temporal
+                        vg.sim_speed_of_sound = vg.sim_unit_speed_of_sound * vg.sim_unit_spatial / vg.sim_unit_temporal;
+                        vg.updateTauOmega;
+
+                    }
+     
+                    if( ImGui.DragFloat( "Relaxation Rate Tau",  vg.sim_relaxation_rate, 0.001f, 0, 2 )) {
+                        vg.sim_ubo.collision_frequency = 1 / vg.sim_relaxation_rate;
+                        vg.sim_viscosity = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
+                        vg.updateSimUBO;
+                    }
+
+                    if( ImGui.DragFloat( "Collison Frequency", vg.sim_ubo.collision_frequency, 0.001f, 0, 2 )) {
+                        vg.sim_relaxation_rate = 1 / vg.sim_ubo.collision_frequency;
+                        vg.sim_viscosity = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
+                        vg.updateSimUBO;
+                    }
+                    ImGui.TreePop();
+                }
+
+                if( ImGui.TreeNode( "Reynolds Number" )) {
+                //if( ImGui.CollapsingHeader( "Simulation Details" )) {
+
+                    float vel = vg.sim_wall_velocity;
+                    float len = vg.sim_domain.x;
+                    ImGui.DragFloat( "Velocity L", vel, 0.001f );
+                    ImGui.DragFloat( "Length L", len, 0.001f );
+
+                    float re = vel * len / vg.sim_viscosity;
+                    ImGui.DragFloat( "Re", re, 0.001f );
+
+                    ImGui.TreePop();
+                }
+            }
+
+
+
+            ////////////////////////
+            // Display Parameters //
+            ////////////////////////
+
+            if( ImGui.CollapsingHeader( "Display Parameter" )) {
+                // specify display parameter
+                if( ImGui.Combo(
+                    "Property", cast( int* )( & vg.sim_ubo.display_property ),
+                    "Density\0Velocity Magnitude\0Velocity Gradient\0Velocity Curl\0\0" 
+                ))  vg.updateSimUBO; 
+                if( ImGui.DragFloat( "Amp Display Property", vg.sim_ubo.amplify_property, 0.001f, 0, 256 )) vg.updateSimUBO;
+            }
+        } ImGui.EndChild();
+
+        // Bottom Transport Controls
         transportControls;
+
     } ImGui.End();
 
     // 2. Show another simple window, this time using an explicit Begin/End pair
     if( show_another_window ) {
-        next_win_size = ImVec2( 200, 100 ); ImGui.SetNextWindowSize( next_win_size, ImGuiSetCond_FirstUseEver );
+        auto next_win_size = ImVec2( 200, 100 ); ImGui.SetNextWindowSize( next_win_size, ImGuiSetCond_FirstUseEver );
         ImGui.Begin( "Another Window", &show_another_window );
         ImGui.Text( "Hello" );
         ImGui.End();
@@ -555,7 +664,7 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
 
     // 3. Show the ImGui test window. Most of the sample code is in ImGui.ShowTestWindow()
     if( show_test_window ) {
-        next_win_pos = ImVec2( 650, 20 ); ImGui.SetNextWindowPos( next_win_pos, ImGuiSetCond_FirstUseEver );
+        auto next_win_pos = ImVec2( 650, 20 ); ImGui.SetNextWindowPos( next_win_pos, ImGuiSetCond_FirstUseEver );
         ImGui.ShowTestWindow( &show_test_window );
     }
 
@@ -782,6 +891,10 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
     auto io = & ImGui.GetIO();
     io.KeysDown[ key ] = val > 0;
 
+    // interpret KP Enter as Ky Enter
+    if( key == GLFW_KEY_KP_ENTER )
+        io.KeysDown[ GLFW_KEY_ENTER ] = val > 0;
+
     //if( action == GLFW_PRESS )
         //io.KeysDown[ key ] = true;
     //if( action == GLFW_RELEASE )
@@ -799,8 +912,10 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
 
     // if window fullscreen event happened we will not be notified, we must catch the key itself
     auto vg = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData
-    if( key == GLFW_KEY_KP_ENTER && mod == GLFW_MOD_ALT )
+    if( key == GLFW_KEY_KP_ENTER && mod == GLFW_MOD_ALT ) {
         io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
+        main_win_size.y = vg.vd.windowHeight;       // this sets the window gui height to the window height
+    }
 }
 
 
@@ -808,7 +923,8 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
 void guiWindowSizeCallback( GLFWwindow * window, int w, int h ) {
     auto io = & ImGui.GetIO();  
     auto vg = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData
-    io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
+    io.DisplaySize  = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
+    main_win_size.y = vg.vd.windowHeight;           // this sets the window gui height to the window height
 
     // the extent might change at swapchain creation when the specified extent is not usable
     swapchainExtent( &vg.vd, w, h );
