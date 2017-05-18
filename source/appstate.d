@@ -87,9 +87,6 @@ struct VDrive_State {
     uint32_t    sim_layers                  = 17;
     uvec3       sim_work_group_size         = uvec3( 256, 1, 1 );
 
-    // display parameters
-    vec3        sim_display_scale           = vec3( 1 );
-
     // simulation parameters
     immutable float sim_unit_speed_of_sound = 0.5773502691896258; // 1 / sqrt( 3 );
     float       sim_speed_of_sound          = sim_unit_speed_of_sound;
@@ -139,6 +136,17 @@ void updateSimUBO( ref VDrive_State vd ) {
     // data will be updated elsewhere
     vd.device.vkFlushMappedMemoryRanges( 1, &vd.sim_ubo_flush );
 }
+
+
+float[3] simDisplayScale(  ref VDrive_State vd , int dim ) {
+    float factor = vd.sim_domain[0] < vd.sim_domain[1] ? vd.sim_domain[0] : vd.sim_domain[1];
+    if( dim == 3 && vd.sim_domain[2] < vd.sim_domain[0] && vd.sim_domain[2] < vd.sim_domain[1] )
+        factor = vd.sim_domain[2];
+    float[3] result;
+    result[] = vd.sim_domain[] / factor;
+    return result;
+}
+
 
 void recreateSwapchain( ref VDrive_State vd ) {
     // swapchain might not have the same extent as the window dimension

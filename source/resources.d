@@ -149,10 +149,6 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
     if( vd.sim_buffer.buffer   != VK_NULL_HANDLE ) vd.sim_buffer.destroyResources;          // destroy old buffer
     if( vd.sim_buffer_view     != VK_NULL_HANDLE ) vd.destroy( vd.sim_buffer_view );        // destroy old buffer view
 
-    vd.sim_display_scale = vec3( 1 );                       // compute display scale, this should difer for 3D lbm
-    if( vd.sim_domain.x > vd.sim_domain.y ) vd.sim_display_scale.x = cast( float )vd.sim_domain.x / vd.sim_domain.y;
-    if( vd.sim_domain.y > vd.sim_domain.x ) vd.sim_display_scale.y = cast( float )vd.sim_domain.y / vd.sim_domain.x;
-
 
     // For D2Q9 we need 1 + 2 * 8 Shader Storage Buffers with sim_dim.x * sim_dim.y floats each
     // for 512 ^ 2 cells this means ( 1 + 2 * 8 ) * 4 * 512 * 512 = 17_825_792 bytes
