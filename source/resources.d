@@ -421,7 +421,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
             .shaderStageCreateInfo(
                 vd.createPipelineShaderStage(
                     VK_SHADER_STAGE_COMPUTE_BIT,
-                    "shader/lbmd_loop.comp",
+                    "shader/lbmd_cascaded.comp",
                     & specialization_info ))
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
         .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 4 )
@@ -669,22 +669,17 @@ auto ref createResizedCommands( ref VDrive_State vd ) nothrow {
         // attach one of the framebuffers to the render pass
         vd.render_pass.attachFramebuffer( vd.framebuffers( i ));
 
-
         // begin command buffer recording
         cmd_buffer.vkBeginCommandBuffer( &cmd_buffer_begin_info );
-
 
         // begin the render_pass
         cmd_buffer.vkCmdBeginRenderPass( &vd.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
 
-
-        // bind graphics vd.geom_pipeline
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.graphics_pso.pipeline );
-
-
         // take care of dynamic state
         cmd_buffer.vkCmdSetViewport( 0, 1, &vd.viewport );
         cmd_buffer.vkCmdSetScissor(  0, 1, &vd.scissors );
+
+        // bind descriptor set
         cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
             VK_PIPELINE_BIND_POINT_GRAPHICS,    // VkPipelineBindPoint          pipelineBindPoint
             vd.graphics_pso.pipeline_layout,    // VkPipelineLayout             layout
@@ -695,14 +690,18 @@ auto ref createResizedCommands( ref VDrive_State vd ) nothrow {
             null                                // const( uint32_t )*           pDynamicOffsets
         );
 
+        // bind graphics vd.geom_pipeline
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.graphics_pso.pipeline );
+
+        // push constant the sim display scale
+        auto sim_display_scale = vd.simDisplayScale( 2 ); 
+        cmd_buffer.vkCmdPushConstants( vd.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, sim_display_scale.ptr );
 
         // buffer-less draw with build in gl_VertexIndex exclusively to generate position and texcoord data
         cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count ,instance count ,first vertex ,first instance
 
-
         // end the render pass
         cmd_buffer.vkCmdEndRenderPass;
-
 
         // end command buffer recording
         cmd_buffer.vkEndCommandBuffer;

@@ -420,7 +420,7 @@ auto ref drawInit( ref VDrive_Gui_State vg ) {
 void draw( ref VDrive_Gui_State vg ) {
 
     // record next command buffer asynchronous
-    vg.newGuiFrame;
+    if( vg.draw_gui ) vg.newGuiFrame;
 
     // forward to appstate draw
     import resources : resources_draw = draw;
@@ -915,15 +915,29 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
     io.KeyAlt   = io.KeysDown[ GLFW_KEY_LEFT_ALT        ] || io.KeysDown[ GLFW_KEY_RIGHT_ALT        ];
     io.KeySuper = io.KeysDown[ GLFW_KEY_LEFT_SUPER      ] || io.KeysDown[ GLFW_KEY_RIGHT_SUPER      ];
 
+    // return here on key up events, all functionality bellow requires key up events only
+    if( val == 0 ) return;
+
     // forward to input.guiKeyCallback
     import input : inputKeyCallback = keyCallback;
     inputKeyCallback( window, key, scancode, val, mod );
 
     // if window fullscreen event happened we will not be notified, we must catch the key itself
     auto vg = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData
+
     if( key == GLFW_KEY_KP_ENTER && mod == GLFW_MOD_ALT ) {
         io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
         main_win_size.y = vg.vd.windowHeight;       // this sets the window gui height to the window height
+    } else 
+
+    // turn gui on or off with tab key
+    // Todo(pp): this should work only if not in text edit mode
+    if( key == GLFW_KEY_TAB ) {
+        vg.draw_gui = !vg.draw_gui;
+        if( !vg.draw_gui ) {
+            import resources : createResizedCommands;
+            vg.vd.createResizedCommands;   // create draw loop runtime commands, only used without gui
+        }
     }
 }
 
