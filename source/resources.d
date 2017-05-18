@@ -618,9 +618,14 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
             vd.render_pass.render_pass,                 // specify render pass COMPATIBILITY
             vd.surface.imageExtent,                     // extent of the framebuffer
             render_targets,                             // first ( static ) attachments which will not change ( here only )
-            vd.surface.present_image_views.data )       // next one dynamic attachment ( swapchain ) which changes per command buffer
-        .addClearValue( 1.0f )                          // add depth clear value
-        .addClearValue( 0.3f, 0.3f, 0.3f, 1.0f );       // add color clear value
+            vd.surface.present_image_views.data,        // next one dynamic attachment ( swapchain ) which changes per command buffer
+            [], false );                                // if we are recreating we do not want to destroy clear values ...
+
+    // ... we should keep the clear values, they might have been edited by the gui
+    if( vd.framebuffers.clear_values_length == 0 )
+        vd.framebuffers
+            .addClearValue( 1.0f )                      // add depth clear value
+            .addClearValue( 0.3f, 0.3f, 0.3f, 1.0f );   // add color clear value
 
     // attach one of the framebuffers, the render area and clear values to the render pass begin info
     // Note: attaching the framebuffer also sets the clear values and render area extent into the render pass begin info
