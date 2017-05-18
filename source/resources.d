@@ -106,8 +106,12 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
         .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
         .createMappedMemoryRange;
 
+    immutable float wall_velocity = 0.001; // 0.05;
     vd.sim_ubo = cast( vd.Sim_UBO* )vd.sim_ubo_buffer.mapMemory;
-    vd.sim_ubo.speed = vd.sim_ubo.omega = 1;
+    vd.sim_ubo.amplify_property = 1;
+    vd.sim_ubo.collision_frequency = 2;
+    vd.sim_ubo.wall_velocity = wall_velocity / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
+    vd.sim_ubo.display_property = 1;
     vd.updateSimUBO;
 
 
