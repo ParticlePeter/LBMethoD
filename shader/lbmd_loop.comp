@@ -8,8 +8,9 @@ layout( push_constant ) uniform Push_Constant {
 
 // uniform buffer
 layout( std140, binding = 5 ) uniform Sim_UBO {
-    float omega;
-    float speed;
+    float amplify_property;
+    float omega;            // collision frequency
+    float wall_velocity;
 };
 
 // specialization constants for local work group size
