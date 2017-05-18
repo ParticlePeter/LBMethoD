@@ -45,9 +45,12 @@ struct VDrive_Gui_State {
     };
 
     // gui helper and cache sim settings
-    float   sim_relaxation_rate = 1;                    // tau
-    float   sim_viscosity       = 0.1666666666666667;   // at a relaxation rate of 1 and lattice units x, t = 1
-    float   sim_wall_velocity   = 0;
+    float       sim_relaxation_rate = 1;                    // tau
+    float       sim_viscosity       = 0.1666666666666667;   // at a relaxation rate of 1 and lattice units x, t = 1
+    float       sim_wall_velocity   = 0;
+    float[3]    sim_display_scale = [ 1, 1, 1 ];
+
+    bool        draw_gui = true;
 }
 
 
@@ -189,6 +192,7 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
     vg.sim_wall_velocity = vg.sim_ubo.wall_velocity * vg.sim_speed_of_sound * vg.sim_speed_of_sound;
     vg.sim_relaxation_rate = 1 / vg.sim_ubo.collision_frequency;
     vg.sim_viscosity = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
+    vg.sim_display_scale = vg.simDisplayScale( 2 );
 
     // Initialize gui draw buffers
     foreach( i; 0 .. vg.GUI_QUEUED_FRAMES ) {
@@ -505,7 +509,10 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
         if( ImGui.Button( "Step", button_size )) vg.sim_step = true;
         ImGui.SameLine;
         import resources : resetComputePipeline;
-        if( ImGui.Button( "Reset", button_size )) vg.resetComputePipeline;
+        if( ImGui.Button( "Reset", button_size )) { 
+            vg.sim_display_scale = vg.vd.simDisplayScale( 2 );
+            vg.resetComputePipeline; 
+        }
     }
 
 
@@ -759,6 +766,8 @@ void drawGuiData( ImDrawData* draw_data ) {
     vg.gui_vtx_buffers[ vg.next_image_index ].unmapMemory;
     vg.gui_idx_buffers[ vg.next_image_index ].unmapMemory;
 
+
+
     ////////////////////////////////////
     // begin command buffer recording //
     ////////////////////////////////////
@@ -798,8 +807,8 @@ void drawGuiData( ImDrawData* draw_data ) {
     // bind graphics lucien pipeline
     cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.graphics_pso.pipeline );
 
-    // push constant the sim display scale 
-    cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vec2.sizeof, vg.sim_display_scale.ptr );
+    // push constant the sim display scale
+    cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, vg.sim_display_scale.ptr );
 
     // buffer-less draw with build in gl_VertexIndex exclusively to generate position and texcoord data
     cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count ,instance count ,first vertex ,first instance
