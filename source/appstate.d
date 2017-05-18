@@ -78,30 +78,43 @@ struct VDrive_State {
     Meta_Buffer                 sim_ubo_buffer;
     VkMappedMemoryRange         sim_ubo_flush;
 
+
+
     // simulation configuration and auxiliary data
-    uvec3                       sim_domain          = uvec3( 256, 256, 1 );
-    uint32_t                    sim_layers          = 17;
-    uvec3                       sim_work_group_size = uvec3( 256, 1, 1 );
-    vec3                        sim_display_scale   = vec3( 1 );
-    float                       sim_unit_spatial    = 1;
-    float                       sim_unit_temporal   = 1;
+
+    // compute parameters
+    uvec3       sim_domain                  = uvec3( 256, 256, 1 );
+    uint32_t    sim_layers                  = 17;
+    uvec3       sim_work_group_size         = uvec3( 256, 1, 1 );
+
+    // display parameters
+    vec3        sim_display_scale           = vec3( 1 );
+
+    // simulation parameters
+    immutable float sim_unit_speed_of_sound = 0.5773502691896258; // 1 / sqrt( 3 );
+    float       sim_speed_of_sound          = sim_unit_speed_of_sound;
+    float       sim_unit_spatial            = 1;
+    float       sim_unit_temporal           = 1;
+    uint32_t    sim_algorithm               = 0;      
 
     struct Sim_UBO {
-        float omega = 1;
-        float speed = 1;
+        float       amplify_property        = 1;    // display param amplify param
+        float       collision_frequency     = 1;    // sim param omega 
+        float       wall_velocity           = 0;    // sim param for lid driven cavity
+        uint32_t    display_property        = 0;    // display param display
     }
 
-    Sim_UBO*                    sim_ubo;
+    Sim_UBO*    sim_ubo;
 
-    ubyte                       sim_ping_pong       = 1;
-    ubyte                       sim_ping_pong_scale = 8;
-    bool                        sim_step            = false;
-    bool                        sim_play            = false; 
+    ubyte       sim_ping_pong               = 1;
+    ubyte       sim_ping_pong_scale         = 8;
+    bool        sim_step                    = false;
+    bool        sim_play                    = false; 
 
 
 
     // window resize callback result
-    bool                        window_resized      = false;
+    bool        window_resized              = false;
 
   
 
@@ -139,7 +152,7 @@ void recreateSwapchain( ref VDrive_State vd ) {
     // wait till device is idle
     vd.device.vkDeviceWaitIdle;
 
-    // recreate swapchain
+    // recreate swapchain and other dependent resources
     try {
         //surface.create_info.imageExtent  = VkExtent2D( win_w, win_h );  // Set the desired surface extent, this might change at swapchain creation
         import resources : resizeRenderResources;
