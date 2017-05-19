@@ -59,7 +59,8 @@ struct VDrive_State {
     Core_Descriptor             descriptor;
     Core_Pipeline               graphics_pso;
     Core_Pipeline               compute_pso;
-    Meta_Framebuffers           framebuffers;
+    //Meta_Framebuffers         framebuffers;
+    Meta_FB!( 4, 2 )            framebuffers;
     VkViewport                  viewport;
     VkRect2D                    scissors;
 
