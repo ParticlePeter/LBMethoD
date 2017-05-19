@@ -275,7 +275,7 @@ auto ref resetComputePipeline( ref VDrive_State vd ) {
 
     }
 
-    vd.createComputeResources;   
+    vd.createComputeResources( vd.sim_algorithm );   
 
 }
 
@@ -367,12 +367,12 @@ auto ref createRenderResources( ref VDrive_State vd ) {
         .reset;                                                                     // extract core data into Core_Pipeline struct
 
     // create all resources for the compute pipeline
-    return vd.createComputeResources;
+    return vd.createComputeResources( vd.sim_algorithm );
 }
 
 
 
-auto ref createComputeResources( ref VDrive_State vd ) {
+auto ref createComputeResources( ref VDrive_State vd, uint32_t collision_algorithm ) {
 
     /////////////////////////////
     // create compute pipeline //
@@ -398,7 +398,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
             .shaderStageCreateInfo(
                 vd.createPipelineShaderStage(
                     VK_SHADER_STAGE_COMPUTE_BIT,
-                    "shader/lbmd_cascaded.comp",
+                    "shader/lbmd_loop.comp",
                     & meta_sc.specialization_info ))
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
         .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 4 )
