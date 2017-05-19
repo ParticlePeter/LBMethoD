@@ -378,37 +378,14 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     // create compute pipeline //
     /////////////////////////////
 
-
-    // specify spetialization constants of compute shader
-    VkSpecializationMapEntry[4] specialization_map_entry = [
-        {
-            constantID  : 0,
-            offset      : 0 * uint32_t.sizeof,
-            size        : uint32_t.sizeof,
-        },{
-            constantID  : 1,
-            offset      : 1 * uint32_t.sizeof,
-            size        : uint32_t.sizeof,
-        },{
-            constantID  : 2,
-            offset      : 2 * uint32_t.sizeof,
-            size        : uint32_t.sizeof,
-        },{
-            constantID  : 3,
-            offset      : 3 * uint32_t.sizeof,
-            size        : uint32_t.sizeof,
-        }
-    ];
-
-    uint32_t[4] specialization_constants = [
-        vd.sim_work_group_size.x, vd.sim_work_group_size.y, vd.sim_work_group_size.z, 0 ];
-
-    VkSpecializationInfo specialization_info = {
-        mapEntryCount   : specialization_constants.length.toUint,
-        pMapEntries     : specialization_map_entry.ptr,
-        dataSize        : specialization_constants.sizeof,
-        pData           : specialization_constants.ptr,
-    };
+    //Meta_Specialization meta_sc;
+    Meta_SC!( 4 ) meta_sc;
+    meta_sc
+        .addMapEntry( MapEntry32( vd.sim_work_group_size.x ))
+        .addMapEntry( MapEntry32( vd.sim_work_group_size.y ))
+        .addMapEntry( MapEntry32( vd.sim_work_group_size.z ))
+        .addMapEntry( MapEntry32( 0 ))
+        .construct;
 
 
     // create initial compute pso with specialization, if we are recreating we r
@@ -422,7 +399,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
                 vd.createPipelineShaderStage(
                     VK_SHADER_STAGE_COMPUTE_BIT,
                     "shader/lbmd_cascaded.comp",
-                    & specialization_info ))
+                    & meta_sc.specialization_info ))
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
         .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 4 )
         .construct
@@ -437,10 +414,10 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     createComputePSO();
 
 
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
     // record transition of lbmd image from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_GENERAL //
     ///////////////////////////////////////////////////////////////////////////////////////////////
-
 
     // use one command buffer for device resource initialization
     auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
@@ -492,9 +469,9 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     // recreate compute pipeline for runtime loop //
     ////////////////////////////////////////////////
 
-    // reuse meta_compute to create loop compute pso with specialization
-    specialization_constants[3] = 1;    // select compute loop branch
-    createComputePSO;                   // reuse code from above
+    // reuse meta_compute to create loop compute pso with collision algorithm specialization
+    meta_sc.specialization_data[3] = MapEntry32( collision_algorithm + 8 ); // all settings higher 0 are loop algorithms
+    createComputePSO;                                                       // reuse code from above
 
 
 
@@ -610,7 +587,10 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
 
     VkImageView[1] render_targets = [ vd.depth_image.image_view ];  // compose render targets into an array
     vd.framebuffers( vd )
-        .create(                                        // create the vulkan object directly with following params
+        .initFramebuffers!(
+            typeof( vd.framebuffers ),
+            vd.framebuffers.fb_count + render_targets.length.toUint
+            )(
             vd.render_pass.render_pass,                 // specify render pass COMPATIBILITY
             vd.surface.imageExtent,                     // extent of the framebuffer
             render_targets,                             // first ( static ) attachments which will not change ( here only )
@@ -618,7 +598,7 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
             [], false );                                // if we are recreating we do not want to destroy clear values ...
 
     // ... we should keep the clear values, they might have been edited by the gui
-    if( vd.framebuffers.clear_values_length == 0 )
+    if( vd.framebuffers.clear_values.empty )
         vd.framebuffers
             .addClearValue( 1.0f )                      // add depth clear value
             .addClearValue( 0.3f, 0.3f, 0.3f, 1.0f );   // add color clear value
