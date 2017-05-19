@@ -589,15 +589,18 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                 }
 
                 // Specify simulation parameter
-                if( ImGui.DragFloat( "Viscosity", vg.sim_viscosity, 0.001f )) {
+                if( ImGui.DragFloat( "Kinematic Viscosity", vg.sim_viscosity, 0.001f )) {
                     vg.updateTauOmega;
                 }
 
 
-                ImGui.Combo(
-                    "Algorithm", cast( int* )( & vg.sim_algorithm ),
-                    "SRT-LBGK\0TRT\0MRT\0Cascaded\0\0" 
-                );  // Combo using values packed in a single constant string (for really quick combo)
+                if( ImGui.Combo(    // Combo Collision Algorithms
+                    "Collision Algorithm", cast( int* )( & vg.sim_algorithm ),
+                    "SRT-LBGK\0TRT\0MRT\0Cascaded\0\0" )
+                ) {
+                    import resources : createComputeResources;
+                    vg.createComputeResources( vg.sim_algorithm );
+                }  
 
 
                 //ImGui.Separator();
