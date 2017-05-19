@@ -12,9 +12,9 @@ dependency          "dlsl"              version   = "~>0.1.2"
 //dependency          "erupted"           version = "~>1.6.0"
 dependency          "erupted"           path    = "../ErupteD"
 dependency          "vdrive"            path    = "../V-Drive"
-dependency			"imgui_lib"			path	= "../../Lib_CPP/imgui_lib"
+dependency          "imgui_lib"         path    = "../../Lib_CPP/imgui_lib"
 
-libs                "../../Lib_CPP/imgui_lib/lib/imgui"		// this should not be required or should simply be "imgui_lib"
+libs                "../../Lib_CPP/imgui_lib/lib/imgui"     // this should not be required or should simply be "imgui_lib"
 
 //buildOptions      "profile"
 //buildOptions      "profileGC"
