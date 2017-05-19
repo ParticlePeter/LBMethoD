@@ -93,7 +93,7 @@ struct VDrive_State {
     float       sim_speed_of_sound          = sim_unit_speed_of_sound;
     float       sim_unit_spatial            = 1;
     float       sim_unit_temporal           = 1;
-    uint32_t    sim_algorithm               = 0;      
+    uint32_t    sim_algorithm               = 3;      
 
     struct Sim_UBO {
         float       amplify_property        = 1;    // display param amplify param
