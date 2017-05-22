@@ -764,6 +764,12 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                     "Property", cast( int* )( & vg.sim_ubo.display_property ),
                     "Density\0Velocity Magnitude\0Velocity Gradient\0Velocity Curl\0\0" 
                 ))  vg.updateSimUBO; 
+                if( ImGui.BeginPopupContextItem( "Display Property Context Menu" )) {
+                    import resources : createGraphicsPipeline;
+                    if( ImGui.Selectable( "Parse Display Shader" )) vg.createGraphicsPipeline;
+                    ImGui.EndPopup();
+                }
+
                 if( ImGui.DragFloat( "Amp Display Property", vg.sim_ubo.amplify_property, 0.001f, 0, 256 )) vg.updateSimUBO;
 
                 if( ImGui.BeginPopupContextItem( "Amp Display Property Context Menu" )) {
