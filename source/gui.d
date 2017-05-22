@@ -575,7 +575,8 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
             if( ImGui.CollapsingHeader( "Compute Parameter" )) {
 
                 // Specify Simulation Domain
-                ImGui.DragInt2( "Sim Domain", cast( int* )( vg.sim_domain.ptr ), drag_step, 4, 4096 );
+                ImGui.DragInt2( "Lattice Resolution", cast( int* )( vg.sim_domain.ptr ), drag_step, 4, 4096 );
+
                 import resources : resetComputePipeline;
                 if( ImGui.BeginPopupContextItem( "Sim Domain Context Menu" )) {
                     import core.stdc.stdio : sprintf;
@@ -623,9 +624,9 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                 }
 
                 switch( vg.sim_impl ) {
-                    case vg.Sim_Impl.Buffer  : ImGui.DragInt(  "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
-                    case vg.Sim_Impl.Image2D : ImGui.DragInt2( "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
-                    case vg.Sim_Impl.Image3D : ImGui.DragInt3( "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
+                    case vg.Sim_Impl.Buffer  : ImGui.DragInt(  "Work Group Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
+                    case vg.Sim_Impl.Image2D : ImGui.DragInt2( "Work Group Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
+                    case vg.Sim_Impl.Image3D : ImGui.DragInt3( "Work Group Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
                     default : break;
                 }
 
@@ -662,12 +663,14 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                         vg.updateViscosity;
                     } ImGui.EndPopup();
                 }
+
+                // wall velocity
                 if( ImGui.DragFloat( "Wall Velocity", vg.sim_wall_velocity, 0.001f )) {
                     vg.updateWallVelocity;
                     vg.updateSimUBO;
                 }
 
-                // Specify simulation parameter
+                // kinematic viscosity
                 if( ImGui.DragFloat( "Kinematic Viscosity", vg.sim_viscosity, 0.001f )) {
                     vg.updateTauOmega;
                 }
@@ -681,15 +684,16 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                     vg.createComputeResources;
                 }
 
-                //ImGui.Separator();
 
+                // simulation details tree node
                 if( ImGui.TreeNode( "Simulation Details" )) {
-                //if( ImGui.CollapsingHeader( "Simulation Details" )) {
+
+                    // set width of items and their label - aligned visually with 8 pixels
+                    ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
 
                     if( ImGui.DragFloat2( "Spatial/Temporal Unit", & vg.sim_unit_spatial, 0.001f )) {  // next value in struct is vg.sim_unit_temporal
                         vg.sim_speed_of_sound = vg.sim_unit_speed_of_sound * vg.sim_unit_spatial / vg.sim_unit_temporal;
                         vg.updateTauOmega;
-
                     }
      
                     if( ImGui.DragFloat( "Relaxation Rate Tau",  vg.sim_relaxation_rate, 0.001f, 0, 2 )) {
@@ -703,16 +707,17 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                         vg.updateViscosity;
                         vg.updateSimUBO;
                     }
-                    ImGui.TreePop();
+                    ImGui.PopItemWidth;
+                    ImGui.TreePop;
                 }
 
-                if( ImGui.TreeNode( "Reynolds Number" )) {
-                //if( ImGui.CollapsingHeader( "Simulation Details" )) {
 
-                    float vel = vg.sim_wall_velocity;
-                    float len = vg.sim_domain.x;
-                    ImGui.DragFloat( "Velocity L", vel, 0.001f );
-                    ImGui.DragFloat( "Length L", len, 0.001f );
+                // reynolds number tree node
+                if( ImGui.TreeNode( "Reynolds Number" )) {
+
+                    // set width of items and their label - aligned visually with 8 pixels
+                    ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
+
                     static float typical_vel = 0.05;
                     ImGui.DragFloat( "Typical Velocity U",  typical_vel, 0.001f );
                     if( ImGui.BeginPopupContextItem( "Typical Velocity Context Menu" )) {
@@ -748,7 +753,8 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                     float re = typical_vel * typical_len / vg.sim_viscosity;
                     ImGui.DragFloat( "Re", re, 0.001f );
 
-                    ImGui.TreePop();
+                    ImGui.PopItemWidth;
+                    ImGui.TreePop;
                 }
             }
 
@@ -761,9 +767,10 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
             if( ImGui.CollapsingHeader( "Display Parameter" )) {
                 // specify display parameter
                 if( ImGui.Combo(
-                    "Property", cast( int* )( & vg.sim_ubo.display_property ),
+                    "Display Property", cast( int* )( & vg.sim_ubo.display_property ),
                     "Density\0Velocity Magnitude\0Velocity Gradient\0Velocity Curl\0\0" 
-                ))  vg.updateSimUBO; 
+                ))  vg.updateSimUBO;
+
                 if( ImGui.BeginPopupContextItem( "Display Property Context Menu" )) {
                     import resources : createGraphicsPipeline;
                     if( ImGui.Selectable( "Parse Display Shader" )) vg.createGraphicsPipeline;

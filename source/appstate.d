@@ -139,7 +139,7 @@ void updateSimUBO( ref VDrive_State vd ) {
 }
 
 
-float[3] simDisplayScale(  ref VDrive_State vd , int dim ) {
+float[3] simDisplayScale( ref VDrive_State vd, int dim ) {
     float factor = vd.sim_domain[0] < vd.sim_domain[1] ? vd.sim_domain[0] : vd.sim_domain[1];
     if( dim == 3 && vd.sim_domain[2] < vd.sim_domain[0] && vd.sim_domain[2] < vd.sim_domain[1] )
         factor = vd.sim_domain[2];
