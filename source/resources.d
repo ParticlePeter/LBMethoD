@@ -281,6 +281,44 @@ auto ref resetComputePipeline( ref VDrive_State vd ) {
 
 
 
+auto ref createGraphicsPipeline( ref VDrive_State vd ) {
+
+    // if we are recreating an old pipeline exists already, destroy it first
+    if( vd.graphics_pso.pipeline != VK_NULL_HANDLE )
+        vd.destroy( vd.graphics_pso );
+
+
+
+    //////////////////////////////
+    // create graphics pipeline //
+    //////////////////////////////
+
+    Meta_Graphics meta_graphics;
+    vd.graphics_pso = meta_graphics( vd )
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_VERTEX_BIT,   "shader/lbmd_draw.vert" ))
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_FRAGMENT_BIT, "shader/lbmd_draw.frag" ))
+//      .addBindingDescription( 0, 2 * float.sizeof, VK_VERTEX_INPUT_RATE_VERTEX )  // add vertex binding and attribute descriptions
+//      .addAttributeDescription( 0, 0, VK_FORMAT_R32G32_SFLOAT, 0 )                // location (per shader), binding (per buffer), type, offset in struct/buffer
+        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.surface.imageExtent )       // add viewport and scissor state, necessary even if we use dynamic state
+        .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
+        .depthState                                                                 // set depth state - enable depth test with default attributes
+        .addColorBlendState( VK_FALSE )                                             // color blend state - append common (default) color blend attachment state
+        .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
+        .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
+        .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )              // describe pipeline layout
+        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT , 0, 8 )                  // specify push constant range
+        .renderPass( vd.render_pass.render_pass )                                   // describe compatible render pass
+        .construct                                                                  // construct the Pipleine Layout and Pipleine State Object (PSO)
+        .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
+        .reset;                                                                     // extract core data into Core_Pipeline struct
+
+    return vd;
+}
+
+
+
+
 auto ref createRenderResources( ref VDrive_State vd ) {
 
     /////////////////////////////////////////////////////////
@@ -337,34 +375,8 @@ auto ref createRenderResources( ref VDrive_State vd ) {
         .construct;
 
 
-
-
-
-    //////////////////////////////
-    // create graphics pipeline //
-    //////////////////////////////
-
-    // add shader stages - git repo needs only to keep track of the shader sources,
-    // vdrive will compile them into spir-v with glslangValidator (must be in path!)
-    Meta_Graphics meta_graphics;
-    vd.graphics_pso = meta_graphics( vd )
-        .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_VERTEX_BIT,   "shader/lbmd_draw.vert" ))
-        .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_FRAGMENT_BIT, "shader/lbmd_draw.frag" ))
-//      .addBindingDescription( 0, 2 * float.sizeof, VK_VERTEX_INPUT_RATE_VERTEX )  // add vertex binding and attribute descriptions
-//      .addAttributeDescription( 0, 0, VK_FORMAT_R32G32_SFLOAT, 0 )                // location (per shader), binding (per buffer), type, offset in struct/buffer
-        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
-        .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.surface.imageExtent )       // add viewport and scissor state, necessary even if we use dynamic state
-        .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
-        .depthState                                                                 // set depth state - enable depth test with default attributes
-        .addColorBlendState( VK_FALSE )                                             // color blend state - append common (default) color blend attachment state
-        .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
-        .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
-        .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )              // describe pipeline layout
-        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT , 0, 8 )                  // specify push constant range
-        .renderPass( vd.render_pass.render_pass )                                   // describe compatible render pass
-        .construct                                                                  // construct the Pipleine Layout and Pipleine State Object (PSO)
-        .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
-        .reset;                                                                     // extract core data into Core_Pipeline struct
+    // create the graphics pipeline, can be called multiple time to parse shader at runtime
+    vd.createGraphicsPipeline;
 
     // create all resources for the compute pipeline
     return vd.createComputeResources;
