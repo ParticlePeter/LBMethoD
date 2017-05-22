@@ -153,14 +153,14 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
     // For D2Q9 we need 1 + 2 * 8 Shader Storage Buffers with sim_dim.x * sim_dim.y floats each
     // for 512 ^ 2 cells this means ( 1 + 2 * 8 ) * 4 * 512 * 512 = 17_825_792 bytes
     // create one buffer 1 + 2 * 8 buffer views into that buffer
-    uint32_t population_mem_size = vd.sim_domain.x * vd.sim_domain.y * vd.sim_domain.z * float.sizeof.toUint;
+    uint32_t population_mem_size = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2] * float.sizeof.toUint;
     uint32_t buffer_size = vd.sim_layers * population_mem_size;
 
 
     // Todo(pp): the format should be choose-able
     // Todo(pp): here checks are required if this image format is available for VK_IMAGE_USAGE_STORAGE_BIT
     vd.sim_image( vd )
-        .create( VK_FORMAT_R16G16B16A16_SFLOAT, vd.sim_domain.x, vd.sim_domain.y, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT );
+        .create( VK_FORMAT_R16G16B16A16_SFLOAT, vd.sim_domain[0], vd.sim_domain[1], VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT );
 
     vd.sim_buffer( vd )
         .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_size );
@@ -256,11 +256,10 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
 
 auto ref resetComputePipeline( ref VDrive_State vd ) {
 
-    auto extent = vd.sim_image.extent;
+    uint32_t[3] image_extent = [ vd.sim_image.extent.width, vd.sim_image.extent.height, vd.sim_image.extent.depth ];
 
      // 1.) check if the last layer and domain settings differ from the recently used, if not return from this function
-    import dlsl.vector;
-    if( vd.sim_domain != uvec3( extent.width, extent.height, extent.depth )) {
+    if( vd.sim_domain != image_extent ) {
     // || vd.sim_layers != vd.sim_buffer_views.length   // Todo(pp): fix this logic
 
         vd.graphics_queue.vkQueueWaitIdle;
@@ -391,12 +390,10 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     /////////////////////////////
 
     //Meta_Specialization meta_sc;
-    Meta_SC!( 4 ) meta_sc;
+    Meta_SC!( 2 ) meta_sc;
     meta_sc
-        .addMapEntry( MapEntry32( vd.sim_work_group_size.x ))
-        .addMapEntry( MapEntry32( vd.sim_work_group_size.y ))
-        .addMapEntry( MapEntry32( vd.sim_work_group_size.z ))
-        .addMapEntry( MapEntry32( 0 ))
+        .addMapEntry( MapEntry32( vd.sim_work_group_size_x ))   // default constantID is 0, next would be 1
+        .addMapEntry( MapEntry32( 0 ), 3 )                      // latter is the constantID, must be passed in, othervise its 1
         .construct;
 
 
@@ -453,12 +450,9 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     // initialize populations with compute pipeline //
     //////////////////////////////////////////////////
 
-    // determine dispatch group count based on VkBufferView or VkImage pupulation approach
-    // and from simulation domain vd.sim_domain and compute work group size vd.sim_work_group_size
-    auto dispatch_group_count = vd.sim_buffer_view != VK_NULL_HANDLE
-        ? uvec3(( vd.sim_domain.x * vd.sim_domain.y * vd.sim_domain.z ) / vd.sim_work_group_size.x, 1, 1 ) 
-        : vd.sim_domain.xyz / vd.sim_work_group_size;
-    
+    // determine dispatch group X count from simulation domain vd.sim_domain and compute work group size vd.sim_work_group_size_x
+    uint32_t dispatch_x = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2] / vd.sim_work_group_size_x;
+
     init_cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.compute_pso.pipeline );   // bind compute vd.compute_pso
     init_cmd_buffer.vkCmdBindDescriptorSets(// VkCommandBuffer              commandBuffer           // bind descriptor set
         VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
@@ -470,7 +464,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
         null                                // const( uint32_t )*           pDynamicOffsets
     );
 
-    init_cmd_buffer.cmdDispatch( dispatch_group_count );    // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+    init_cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );      // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
     init_cmd_buffer.vkEndCommandBuffer;                     // finish recording and submit the command
     auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
     vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
@@ -482,7 +476,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     ////////////////////////////////////////////////
 
     // reuse meta_compute to create loop compute pso with collision algorithm specialization
-    meta_sc.specialization_data[3] = MapEntry32( vd.sim_algorithm + 8 );    // all settings higher 0 are loop algorithms
+    meta_sc.specialization_data[1] = MapEntry32( vd.sim_algorithm + 8 );    // all settings higher 0 are loop algorithms
     createComputePSO;                                                       // reuse code from above
 
 
@@ -510,7 +504,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
             null                                // const( uint32_t )*           pDynamicOffsets
         );
         cmd_buffer.vkCmdPushConstants( vd.compute_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 4, &push_constant ); // push constant
-        cmd_buffer.cmdDispatch( dispatch_group_count );     // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+        cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );       // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
         cmd_buffer.vkEndCommandBuffer;                      // finish recording and submit the command
     }
 

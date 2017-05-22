@@ -59,13 +59,9 @@ struct VDrive_State {
     Core_Descriptor             descriptor;
     Core_Pipeline               graphics_pso;
     Core_Pipeline               compute_pso;
-    //Meta_Framebuffers         framebuffers;
     Meta_FB!( 4, 2 )            framebuffers;
-    VkViewport                  viewport;
-    VkRect2D                    scissors;
-
-    // dynamic state
-    import dlsl.vector;
+    VkViewport                  viewport;               // dynamic state viewport
+    VkRect2D                    scissors;               // dynamic state scissors
 
     // simulation resources
     VkCommandPool               sim_cmd_pool;           // we do not reset this on window resize events
@@ -84,9 +80,9 @@ struct VDrive_State {
     // simulation configuration and auxiliary data
 
     // compute parameters
-    uvec3       sim_domain                  = uvec3( 256, 256, 1 );
+    uint32_t[3] sim_domain                  = [ 256, 256, 1 ];
     uint32_t    sim_layers                  = 17;
-    uvec3       sim_work_group_size         = uvec3( 256, 1, 1 );
+    uint32_t    sim_work_group_size_x       = 256;   
 
     // simulation parameters
     immutable float sim_unit_speed_of_sound = 0.5773502691896258; // 1 / sqrt( 3 );
