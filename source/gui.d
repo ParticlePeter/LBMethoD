@@ -765,6 +765,14 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                     "Density\0Velocity Magnitude\0Velocity Gradient\0Velocity Curl\0\0" 
                 ))  vg.updateSimUBO; 
                 if( ImGui.DragFloat( "Amp Display Property", vg.sim_ubo.amplify_property, 0.001f, 0, 256 )) vg.updateSimUBO;
+
+                if( ImGui.BeginPopupContextItem( "Amp Display Property Context Menu" )) {
+                    if( ImGui.Selectable( "1" ))    { vg.sim_ubo.amplify_property = 1;      vg.updateSimUBO; }
+                    if( ImGui.Selectable( "10" ))   { vg.sim_ubo.amplify_property = 10;     vg.updateSimUBO; }
+                    if( ImGui.Selectable( "100" ))  { vg.sim_ubo.amplify_property = 100;    vg.updateSimUBO; }
+                    if( ImGui.Selectable( "1000" )) { vg.sim_ubo.amplify_property = 1000;   vg.updateSimUBO; }
+                    ImGui.EndPopup();
+                }
             }
         } ImGui.EndChild();
 
