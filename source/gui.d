@@ -191,10 +191,11 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
     vg.resources_createMemoryObjects;
 
     // initialize VDrive_Gui_State member from VDrive_State member
-    vg.sim_wall_velocity = vg.sim_ubo.wall_velocity * vg.sim_speed_of_sound * vg.sim_speed_of_sound;
-    vg.sim_relaxation_rate = 1 / vg.sim_ubo.collision_frequency;
-    vg.sim_viscosity = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
-    vg.sim_display_scale = vg.simDisplayScale( 2 );
+    vg.sim_wall_velocity    = vg.sim_ubo.wall_velocity * vg.sim_speed_of_sound * vg.sim_speed_of_sound;
+    vg.sim_relaxation_rate  = 1 / vg.sim_ubo.collision_frequency;
+    vg.sim_display_scale    = vg.simDisplayScale( 2 );
+    vg.updateViscosity;
+    
 
     // Initialize gui draw buffers
     foreach( i; 0 .. vg.GUI_QUEUED_FRAMES ) {
@@ -448,8 +449,16 @@ private {
             ( vg.sim_unit_temporal * ( 2 * vg.sim_viscosity + speed_of_sound_squared ));
         vg.sim_relaxation_rate = 1 / vg.sim_ubo.collision_frequency;
         vg.updateSimUBO;
-    }   
-     
+    }
+
+    void updateWallVelocity( ref VDrive_Gui_State vg ) {
+        float speed_of_sound_squared = vg.sim_speed_of_sound * vg.sim_speed_of_sound;
+        vg.sim_ubo.wall_velocity = vg.sim_wall_velocity / speed_of_sound_squared;
+    }
+
+    void updateViscosity( ref VDrive_Gui_State vg ) {
+        vg.sim_viscosity = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
+    }
 
     int resetFrameMax   = 0;
     float minFramerate  = 10000, maxFramerate = 0.0001f;
@@ -585,8 +594,7 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
             if( ImGui.CollapsingHeader( "Simulation Parameter" )) {
 
                 if( ImGui.DragFloat( "Wall Velocity", vg.sim_wall_velocity, 0.001f )) {
-                    float speed_of_sound_squared = vg.sim_speed_of_sound * vg.sim_speed_of_sound;
-                    vg.sim_ubo.wall_velocity = vg.sim_wall_velocity / speed_of_sound_squared;
+                    vg.updateWallVelocity;
                     vg.updateSimUBO;
                 }
 
@@ -617,13 +625,13 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
      
                     if( ImGui.DragFloat( "Relaxation Rate Tau",  vg.sim_relaxation_rate, 0.001f, 0, 2 )) {
                         vg.sim_ubo.collision_frequency = 1 / vg.sim_relaxation_rate;
-                        vg.sim_viscosity = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
+                        vg.updateViscosity;
                         vg.updateSimUBO;
                     }
 
                     if( ImGui.DragFloat( "Collison Frequency", vg.sim_ubo.collision_frequency, 0.001f, 0, 2 )) {
                         vg.sim_relaxation_rate = 1 / vg.sim_ubo.collision_frequency;
-                        vg.sim_viscosity = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
+                        vg.updateViscosity;
                         vg.updateSimUBO;
                     }
                     ImGui.TreePop();
