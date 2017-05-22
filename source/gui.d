@@ -5,6 +5,8 @@ import imgui.types;
 import ImGui = imgui.funcs_static;
 import derelict.glfw3.glfw3;
 
+debug import std.stdio;
+
 //import vdrive.state;
 import vdrive.memory;
 import vdrive.pipeline;
