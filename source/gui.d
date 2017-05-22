@@ -576,12 +576,68 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
 
                 // Specify Simulation Domain
                 ImGui.DragInt2( "Sim Domain", cast( int* )( vg.sim_domain.ptr ), drag_step, 4, 4096 );
+                import resources : resetComputePipeline;
+                if( ImGui.BeginPopupContextItem( "Sim Domain Context Menu" )) {
+                    import core.stdc.stdio : sprintf;
+                    char[16] label;
+                    uint dim = 8;
+					ImVec2 mouse_pos;
+                    ImGui.GetMousePosOnOpeningCurrentPopup( mouse_pos );
+                    if( mouse_pos.x < 0.25 * main_win_size.x ) {
+                        ImGui.Text( "Resolution X"  ); ImGui.Separator;
+                        if( ImGui.Selectable( "Window Res X"     ))  { vg.sim_domain.x = vg.vd.windowWidth;     vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                        if( ImGui.Selectable( "Window Res X / 2" ))  { vg.sim_domain.x = vg.vd.windowWidth / 2; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                        if( ImGui.Selectable( "Window Res X / 4" ))  { vg.sim_domain.x = vg.vd.windowWidth / 4; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                        if( ImGui.Selectable( "Window Res X / 8" ))  { vg.sim_domain.x = vg.vd.windowWidth / 8; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+
+                        foreach( i; 0 .. 12 ) {
+                            sprintf( label.ptr, "Width: %d", dim );
+                            if( ImGui.Selectable( label.ptr )) { vg.sim_domain.x = dim; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                            dim *= 2;
+                        }
+                    } else if( mouse_pos.x < 0.5 * main_win_size.x ) {
+                        ImGui.Text( "Resolution Y"  ); ImGui.Separator;
+                        if( ImGui.Selectable( "Window Res Y"     ))  { vg.sim_domain.y = vg.vd.windowHeight;     vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                        if( ImGui.Selectable( "Window Res Y / 2" ))  { vg.sim_domain.y = vg.vd.windowHeight / 2; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                        if( ImGui.Selectable( "Window Res Y / 4" ))  { vg.sim_domain.y = vg.vd.windowHeight / 4; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                        if( ImGui.Selectable( "Window Res Y / 8" ))  { vg.sim_domain.y = vg.vd.windowHeight / 8; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+
+                        foreach( i; 0 .. 12 ) {
+                            sprintf( label.ptr, "Height: %d", dim );
+                            if( ImGui.Selectable( label.ptr )) { vg.sim_domain.y = dim; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                            dim *= 2;
+                        }
+                    } else {
+                        ImGui.Text( "Resolution XY" ); ImGui.Separator;
+                        if( ImGui.Selectable( "Window Res"       ))  { vg.sim_domain   = uvec3( vg.vd.windowWidth,     vg.vd.windowHeight,     1 ); vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                        if( ImGui.Selectable( "Window Res / 2"   ))  { vg.sim_domain   = uvec3( vg.vd.windowWidth / 2, vg.vd.windowHeight / 2, 1 ); vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                        if( ImGui.Selectable( "Window Res / 4"   ))  { vg.sim_domain   = uvec3( vg.vd.windowWidth / 4, vg.vd.windowHeight / 4, 1 ); vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                        if( ImGui.Selectable( "Window Res / 8"   ))  { vg.sim_domain   = uvec3( vg.vd.windowWidth / 8, vg.vd.windowHeight / 8, 1 ); vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+
+                        foreach( i; 0 .. 12 ) {
+                            sprintf( label.ptr, "Res: %d ^ 2", dim );
+                            if( ImGui.Selectable( label.ptr )) { vg.sim_domain.x = dim; vg.sim_domain.y = dim; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                            dim *= 2;
+                        }
+                    } ImGui.EndPopup();
+                }
 
                 switch( vg.sim_impl ) {
                     case vg.Sim_Impl.Buffer  : ImGui.DragInt(  "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
                     case vg.Sim_Impl.Image2D : ImGui.DragInt2( "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
                     case vg.Sim_Impl.Image3D : ImGui.DragInt3( "Work Grp Size", cast( int* )( vg.sim_work_group_size.ptr ), drag_step, 4, 1024 ); break;
                     default : break;
+                }
+
+                if( ImGui.BeginPopupContextItem( "Work Group Size Context Menu" )) {
+                    char[24] label;
+                    uint dim = 2;
+                    if( ImGui.Selectable( "Resolution X" )) { vg.sim_work_group_size = uvec3(  vg.sim_domain.x,      1, 1 ); vg.resetComputePipeline; }
+                    foreach( i; 0 .. 8 ) {
+                        sprintf( label.ptr, "Resolution X / %d", dim );
+                        if( ImGui.Selectable( label.ptr  )) { vg.sim_work_group_size = uvec3( vg.sim_domain.x / dim, 1, 1 ); vg.resetComputePipeline; }
+                        dim *= 2;
+                    } ImGui.EndPopup();
                 }
             }
 
