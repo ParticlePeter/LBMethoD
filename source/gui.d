@@ -713,8 +713,39 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                     float len = vg.sim_domain.x;
                     ImGui.DragFloat( "Velocity L", vel, 0.001f );
                     ImGui.DragFloat( "Length L", len, 0.001f );
+                    static float typical_vel = 0.05;
+                    ImGui.DragFloat( "Typical Velocity U",  typical_vel, 0.001f );
+                    if( ImGui.BeginPopupContextItem( "Typical Velocity Context Menu" )) {
+                        if( ImGui.Selectable( "Wall Velocity" )) { typical_vel = vg.sim_wall_velocity; }
+                        ImGui.EndPopup();
+                    }
 
-                    float re = vel * len / vg.sim_viscosity;
+                    static float typical_len = 1;
+                    ImGui.DragFloat( "Typical Length L", typical_len, 0.001f );
+
+                    auto next_win_size = ImVec2( 200, 60 ); ImGui.SetNextWindowSize( next_win_size );
+                    if( ImGui.BeginPopupContextItem( "Typical Length Context Menu" )) {
+                        
+                        if( ImGui.Selectable( "Spatial Lattice Unit" )) { typical_len = vg.sim_unit_spatial; }
+                        ImGui.Separator;
+
+                        ImGui.Columns( 2, "Typical Length Context Columns", true );
+
+                        if( ImGui.Selectable( "Lattice X" )) { typical_len = vg.sim_domain.x; }
+                        ImGui.NextColumn();
+                        if( ImGui.Selectable( "Lattice Y" )) { typical_len = vg.sim_domain.y; }
+                        ImGui.NextColumn();
+
+                        if( ImGui.Selectable( "Domain X" )) { typical_len = vg.sim_domain.x * vg.sim_unit_spatial; }
+                        ImGui.NextColumn();
+                        if( ImGui.Selectable( "Domain Y" )) { typical_len = vg.sim_domain.y * vg.sim_unit_spatial; }
+                        ImGui.NextColumn();
+
+                        ImGui.EndPopup;
+                    }
+
+
+                    float re = typical_vel * typical_len / vg.sim_viscosity;
                     ImGui.DragFloat( "Re", re, 0.001f );
 
                     ImGui.TreePop();
