@@ -649,6 +649,19 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
 
             if( ImGui.CollapsingHeader( "Simulation Parameter" )) {
 
+                // preset settings context menu
+                if( ImGui.BeginPopupContextItem( "Simulation Parameter Context Menu" )) {
+                    if( ImGui.Selectable( "Unit Parameter" )) {
+                        vg.sim_wall_velocity = 0.05; vg.updateWallVelocity;
+                        vg.sim_ubo.collision_frequency = vg.sim_relaxation_rate = 1; vg.updateViscosity;
+                    }
+                    if( ImGui.Selectable( "Zero Viscosity" )) {
+                        vg.sim_wall_velocity = 0.001; vg.updateWallVelocity;
+                        vg.sim_ubo.collision_frequency = 2; 
+                        vg.sim_relaxation_rate = 0.5;
+                        vg.updateViscosity;
+                    } ImGui.EndPopup();
+                }
                 if( ImGui.DragFloat( "Wall Velocity", vg.sim_wall_velocity, 0.001f )) {
                     vg.updateWallVelocity;
                     vg.updateSimUBO;
