@@ -275,7 +275,7 @@ auto ref resetComputePipeline( ref VDrive_State vd ) {
 
     }
 
-    vd.createComputeResources( vd.sim_algorithm );   
+    vd.createComputeResources;   
 
 }
 
@@ -367,12 +367,12 @@ auto ref createRenderResources( ref VDrive_State vd ) {
         .reset;                                                                     // extract core data into Core_Pipeline struct
 
     // create all resources for the compute pipeline
-    return vd.createComputeResources( vd.sim_algorithm );
+    return vd.createComputeResources;
 }
 
 
 
-auto ref createComputeResources( ref VDrive_State vd, uint32_t collision_algorithm ) {
+auto ref createComputeResources( ref VDrive_State vd ) {
 
     /////////////////////////////
     // create compute pipeline //
@@ -470,7 +470,7 @@ auto ref createComputeResources( ref VDrive_State vd, uint32_t collision_algorit
     ////////////////////////////////////////////////
 
     // reuse meta_compute to create loop compute pso with collision algorithm specialization
-    meta_sc.specialization_data[3] = MapEntry32( collision_algorithm + 8 ); // all settings higher 0 are loop algorithms
+    meta_sc.specialization_data[3] = MapEntry32( vd.sim_algorithm + 8 );    // all settings higher 0 are loop algorithms
     createComputePSO;                                                       // reuse code from above
 
 

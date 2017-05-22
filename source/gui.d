@@ -593,15 +593,14 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                     vg.updateTauOmega;
                 }
 
-
+                // collision algorithm
                 if( ImGui.Combo(    // Combo Collision Algorithms
                     "Collision Algorithm", cast( int* )( & vg.sim_algorithm ),
                     "SRT-LBGK\0TRT\0MRT\0Cascaded\0\0" )
                 ) {
                     import resources : createComputeResources;
-                    vg.createComputeResources( vg.sim_algorithm );
-                }  
-
+                    vg.createComputeResources;
+                }
 
                 //ImGui.Separator();
 
