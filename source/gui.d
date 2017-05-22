@@ -423,8 +423,8 @@ void draw( ref VDrive_Gui_State vg ) {
     if( vg.draw_gui ) vg.newGuiFrame;
 
     // forward to appstate draw
-    import resources : resources_draw = draw;
-    vg.resources_draw;
+    import appstate : appstate_draw = draw;
+    vg.appstate_draw;
 }
 
 
