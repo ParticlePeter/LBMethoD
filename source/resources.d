@@ -439,6 +439,9 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     // initialize populations with compute pipeline //
     //////////////////////////////////////////////////
 
+    auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
+    auto init_cmd_buffer_bi = commandBufferBeginInfo( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
+    init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
     // determine dispatch group X count from simulation domain vd.sim_domain and compute work group size vd.sim_work_group_size_x
     uint32_t dispatch_x = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2] / vd.sim_work_group_size_x;
 
