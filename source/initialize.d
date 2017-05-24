@@ -82,6 +82,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
 
         // and report standard validation issues
         const( char )*[1] layers = [ "VK_LAYER_LUNARG_standard_validation" ];
+        //const( char )*[0] layers;
     } else {
         const( char )*[0] layers;
     }
