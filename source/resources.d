@@ -198,6 +198,25 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
         vd.sim_buffer.buffer, VK_FORMAT_R32_SFLOAT, 0, buffer_size );
 
 
+    auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
+    auto init_cmd_buffer_bi = commandBufferBeginInfo( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
+    init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
+
+    // record image layout transition to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    init_cmd_buffer.recordTransition(
+        vd.sim_image.image,
+        vd.sim_image.subresourceRange,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_GENERAL,
+        0,  // no access mask required here
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_HOST_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+
+    init_cmd_buffer.vkEndCommandBuffer;                     // finish recording and submit the command
+    auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
+    vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
+
     return vd;
 }
 
@@ -421,30 +440,6 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     }
 
     createComputePSO();
-
-
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    // record transition of lbmd image from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_GENERAL //
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    // use one command buffer for device resource initialization
-    auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
-    auto init_cmd_buffer_bi = commandBufferBeginInfo( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
-    init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
-
-    // record image layout transition to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-    init_cmd_buffer.recordTransition(
-        vd.sim_image.image,
-        vd.sim_image.subresourceRange,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_GENERAL,
-        0,  // no access mask required here
-        VK_ACCESS_SHADER_WRITE_BIT,
-        VK_PIPELINE_STAGE_HOST_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
-
-
 
     //////////////////////////////////////////////////
     // initialize populations with compute pipeline //
