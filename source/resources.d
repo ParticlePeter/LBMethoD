@@ -335,7 +335,7 @@ auto ref createGraphicsPipeline( ref VDrive_State vd ) {
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )              // describe pipeline layout
         .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT , 0, 8 )                  // specify push constant range
         .renderPass( vd.render_pass.render_pass )                                   // describe compatible render pass
-        .construct                                                                  // construct the Pipleine Layout and Pipleine State Object (PSO)
+        .construct( vd.graphics_cache )                                             // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct
 
@@ -398,6 +398,15 @@ auto ref createRenderResources( ref VDrive_State vd ) {
         .construct;
 
 
+
+    //////////////////////////////////////////////////////////////////
+    // create pipeline cache for the graphics and compute pipelines //
+    //////////////////////////////////////////////////////////////////
+
+    vd.graphics_cache   = vd.createPipelineCache;   // create once, but will be used several times in createGRaphicsPipeline
+    vd.compute_cache    = vd.createPipelineCache;   // Todo(pp): move this into createComputeResources and extract createComputePipeline from it
+
+
     // create the graphics pipeline, can be called multiple time to parse shader at runtime
     vd.createGraphicsPipeline;
 
@@ -433,11 +442,11 @@ auto ref createComputeResources( ref VDrive_State vd ) {
                     VK_SHADER_STAGE_COMPUTE_BIT,
                     "shader/lbmd_loop.comp",
                     & meta_sc.specialization_info ))
-        .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
-        .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 4 )
-        .construct
-        .destroyShaderModule
-        .reset;
+            .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
+            .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 4 )
+            .construct( vd.compute_cache )  // construct using pipeline cache
+            .destroyShaderModule
+            .reset;
 
         // destroy old compute pipeline and layout
         if( old_pso.pipeline != VK_NULL_HANDLE )
@@ -731,6 +740,8 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.destroy( vd.descriptor );
     vd.destroy( vd.graphics_pso );
     vd.destroy( vd.compute_pso );
+    vd.destroy( vd.graphics_cache );
+    vd.destroy( vd.compute_cache );
 
     // command and synchronize
     vd.destroy( vd.cmd_pool );

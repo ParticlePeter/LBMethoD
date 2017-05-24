@@ -61,6 +61,8 @@ struct VDrive_State {
     Core_Descriptor             descriptor;
     Core_Pipeline               graphics_pso;
     Core_Pipeline               compute_pso;
+    VkPipelineCache             graphics_cache;
+    VkPipelineCache             compute_cache;
     Meta_FB!( 4, 2 )            framebuffers;
     VkViewport                  viewport;               // dynamic state viewport
     VkRect2D                    scissors;               // dynamic state scissors
