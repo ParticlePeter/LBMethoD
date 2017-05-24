@@ -6,11 +6,9 @@ layout( location = 0 ) out  vec4 fs_color;      // output from fragment shader
 layout( binding = 4 ) uniform sampler2D vel_rho_tex[2];      // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
 
 // uniform buffer
-layout( std140, binding = 5 ) uniform Sim_UBO {
-    float   amplify_property;
-    float   omega;
-    float   wall_vel;
+layout( std140, binding = 6 ) uniform Display_UBO {
     uint    display_property;
+    float   amplify_property;
 };
 
 #define DISPLAY_DENSITY 0

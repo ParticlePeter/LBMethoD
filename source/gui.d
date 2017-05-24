@@ -183,8 +183,8 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
     vg.resources_createMemoryObjects;
 
     // initialize VDrive_Gui_State member from VDrive_State member
-    vg.sim_wall_velocity    = vg.sim_ubo.wall_velocity * vg.sim_speed_of_sound * vg.sim_speed_of_sound;
-    vg.sim_relaxation_rate  = 1 / vg.sim_ubo.collision_frequency;
+    vg.sim_wall_velocity    = vg.compute_ubo.wall_velocity * vg.sim_speed_of_sound * vg.sim_speed_of_sound;
+    vg.sim_relaxation_rate  = 1 / vg.compute_ubo.collision_frequency;
     vg.sim_display_scale    = vg.simDisplayScale( 2 );
     vg.updateViscosity;
     
@@ -435,16 +435,16 @@ private {
     
     void updateTauOmega( ref VDrive_Gui_State vg ) {
         float speed_of_sound_squared = vg.sim_speed_of_sound * vg.sim_speed_of_sound;
-        vg.sim_ubo.collision_frequency = 
+        vg.compute_ubo.collision_frequency = 
             2 * speed_of_sound_squared /
             ( vg.sim_unit_temporal * ( 2 * vg.sim_viscosity + speed_of_sound_squared ));
-        vg.sim_relaxation_rate = 1 / vg.sim_ubo.collision_frequency;
-        vg.updateSimUBO;
+        vg.sim_relaxation_rate = 1 / vg.compute_ubo.collision_frequency;
+        vg.updateComputeUBO;
     }
 
     void updateWallVelocity( ref VDrive_Gui_State vg ) {
         float speed_of_sound_squared = vg.sim_speed_of_sound * vg.sim_speed_of_sound;
-        vg.sim_ubo.wall_velocity = vg.sim_wall_velocity / speed_of_sound_squared;
+        vg.compute_ubo.wall_velocity = vg.sim_wall_velocity / speed_of_sound_squared;
     }
 
     void updateViscosity( ref VDrive_Gui_State vg ) {
@@ -637,11 +637,11 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
             if( ImGui.BeginPopupContextItem( "Simulation Parameter Context Menu" )) {
                 if( ImGui.Selectable( "Unit Parameter" )) {
                     vg.sim_wall_velocity = 0.05; vg.updateWallVelocity;
-                    vg.sim_ubo.collision_frequency = vg.sim_relaxation_rate = 1; vg.updateViscosity;
+                    vg.compute_ubo.collision_frequency = vg.sim_relaxation_rate = 1; vg.updateViscosity;
                 }
                 if( ImGui.Selectable( "Zero Viscosity" )) {
                     vg.sim_wall_velocity = 0.001; vg.updateWallVelocity;
-                    vg.sim_ubo.collision_frequency = 2; 
+                    vg.compute_ubo.collision_frequency = 2; 
                     vg.sim_relaxation_rate = 0.5;
                     vg.updateViscosity;
                 } ImGui.EndPopup();
@@ -650,7 +650,7 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
             // wall velocity
             if( ImGui.DragFloat( "Wall Velocity", vg.sim_wall_velocity, 0.001f )) {
                 vg.updateWallVelocity;
-                vg.updateSimUBO;
+                vg.updateComputeUBO;
             }
 
             // kinematic viscosity
@@ -680,15 +680,15 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                 }
  
                 if( ImGui.DragFloat( "Relaxation Rate Tau",  vg.sim_relaxation_rate, 0.001f, 0, 2 )) {
-                    vg.sim_ubo.collision_frequency = 1 / vg.sim_relaxation_rate;
+                    vg.compute_ubo.collision_frequency = 1 / vg.sim_relaxation_rate;
                     vg.updateViscosity;
-                    vg.updateSimUBO;
+                    vg.updateComputeUBO;
                 }
 
-                if( ImGui.DragFloat( "Collison Frequency", vg.sim_ubo.collision_frequency, 0.001f, 0, 2 )) {
-                    vg.sim_relaxation_rate = 1 / vg.sim_ubo.collision_frequency;
+                if( ImGui.DragFloat( "Collison Frequency", vg.compute_ubo.collision_frequency, 0.001f, 0, 2 )) {
+                    vg.sim_relaxation_rate = 1 / vg.compute_ubo.collision_frequency;
                     vg.updateViscosity;
-                    vg.updateSimUBO;
+                    vg.updateComputeUBO;
                 }
                 ImGui.PopItemWidth;
                 ImGui.TreePop;
@@ -750,9 +750,9 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
         if( ImGui.CollapsingHeader( "Display Parameter" )) {
             // specify display parameter
             if( ImGui.Combo(
-                "Display Property", cast( int* )( & vg.sim_ubo.display_property ),
+                "Display Property", cast( int* )( & vg.display_ubo.display_property ),
                 "Density\0Velocity Magnitude\0Velocity Gradient\0Velocity Curl\0\0" 
-            ))  vg.updateSimUBO;
+            ))  vg.updateDisplayUBO;
 
             if( ImGui.BeginPopupContextItem( "Display Property Context Menu" )) {
                 import resources : createGraphicsPipeline;
@@ -760,13 +760,13 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                 ImGui.EndPopup();
             }
 
-            if( ImGui.DragFloat( "Amp Display Property", vg.sim_ubo.amplify_property, 0.001f, 0, 256 )) vg.updateSimUBO;
+            if( ImGui.DragFloat( "Amp Display Property", vg.display_ubo.amplify_property, 0.001f, 0, 256 )) vg.updateDisplayUBO;
 
             if( ImGui.BeginPopupContextItem( "Amp Display Property Context Menu" )) {
-                if( ImGui.Selectable( "1" ))    { vg.sim_ubo.amplify_property = 1;      vg.updateSimUBO; }
-                if( ImGui.Selectable( "10" ))   { vg.sim_ubo.amplify_property = 10;     vg.updateSimUBO; }
-                if( ImGui.Selectable( "100" ))  { vg.sim_ubo.amplify_property = 100;    vg.updateSimUBO; }
-                if( ImGui.Selectable( "1000" )) { vg.sim_ubo.amplify_property = 1000;   vg.updateSimUBO; }
+                if( ImGui.Selectable( "1" ))    { vg.display_ubo.amplify_property = 1;      vg.updateDisplayUBO; }
+                if( ImGui.Selectable( "10" ))   { vg.display_ubo.amplify_property = 10;     vg.updateDisplayUBO; }
+                if( ImGui.Selectable( "100" ))  { vg.display_ubo.amplify_property = 100;    vg.updateDisplayUBO; }
+                if( ImGui.Selectable( "1000" )) { vg.display_ubo.amplify_property = 1000;   vg.updateDisplayUBO; }
                 ImGui.EndPopup();
             }
         }

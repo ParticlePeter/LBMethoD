@@ -76,44 +76,60 @@ auto ref createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags com
 /// the corresponding createDescriptorSet function might be overwritten somewhere else
 auto ref createMemoryObjects( ref VDrive_State vd ) {
 
-    ////////////////////////////////////////////////
-    // create matrix uniform buffer - called once //
-    ////////////////////////////////////////////////
+    //////////////////////////////////////////
+    // create uniform buffers - called once //
+    //////////////////////////////////////////
 
-    vd.wvpm_buffer( vd )
-        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 2 * 16 * float.sizeof )
-        .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
-
-    // map the uniform buffer memory persistently
+    // create transformation ubo buffer withour memory backing
     import dlsl.matrix;
-    vd.wvpm = cast( mat4* )vd.wvpm_buffer.mapMemory;
-
-    // specify mapped memory range for the matrix uniform buffer
-    vd.wvpm_flush.memory    = vd.wvpm_buffer.memory;
-    vd.wvpm_flush.size      = vd.wvpm_buffer.memSize;
-
-    // update projection matrix from member data _fovy, _near, _far and aspect of
-    // the swapchain extent, initialized once, resized by the input.windowSizeCallback
-    // however we can set _fovy, _near, _far to desired values before calling updateProjection
-    vd.updateProjection;
-
-    // multiply projection with trackball (view) matrix and upload to uniform buffer
-    vd.updateWVPM;
+    vd.wvpm_ubo_buffer( vd )
+        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, mat4.sizeof );
 
 
-    vd.sim_ubo_flush = vd.sim_ubo_buffer( vd )
-        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vd.Sim_UBO.sizeof )
-        .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
-        .createMappedMemoryRange;
+    // create compute ubo buffer without memory backing
+    vd.compute_ubo_buffer( vd )
+        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vd.Compute_UBO.sizeof );
 
-    immutable float wall_velocity = 0.001; // 0.05;
-    vd.sim_ubo = cast( vd.Sim_UBO* )vd.sim_ubo_buffer.mapMemory;
-    vd.sim_ubo.amplify_property = 1;
-    vd.sim_ubo.collision_frequency = 2;
-    vd.sim_ubo.wall_velocity = wall_velocity / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
-    vd.sim_ubo.display_property = 1;
-    vd.updateSimUBO;
 
+    // create display ubo buffer without memory backing
+    vd.display_ubo_buffer( vd )
+        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vd.Display_UBO.sizeof );
+
+
+    // create host visible memory for ubo buffers and map it
+    auto mapped_memory = vd.host_visible_memory( vd )    
+        .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
+        .addRange( vd.wvpm_ubo_buffer )
+        .addRange( vd.compute_ubo_buffer )
+        .addRange( vd.display_ubo_buffer )
+        .allocate
+        .bind( vd.wvpm_ubo_buffer )
+        .bind( vd.compute_ubo_buffer )
+        .bind( vd.display_ubo_buffer )
+        .mapMemory;                         // map the memory object persistently
+
+
+    // cast the mapped memory pointer without offset into our transformation matrix
+    vd.wvpm = cast( mat4* )mapped_memory;                           // cast to mat4
+    vd.wvpm_ubo_flush = vd.wvpm_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the wvpm ubo 
+    vd.updateProjection;    // update projection matrix from member data _fovy, _near, _far and aspect of the swapchain extent
+    vd.updateWVPM;          // multiply projection with trackball (view) matrix and upload to uniform buffer
+
+
+    // cast the mapped memory pointer with its offset into the backing memory to our compute ubo struct and initialize the memory
+    vd.compute_ubo = cast( vd.Compute_UBO* )( mapped_memory + vd.compute_ubo_buffer.memOffset );
+    vd.compute_ubo_flush = vd.compute_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the compute ubo
+    vd.compute_ubo.collision_frequency = 2;
+    vd.compute_ubo.wall_velocity = 0.001 / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
+    vd.updateComputeUBO;
+
+
+    // cast the mapped memory pointer with its offset into the backing memory to our display ubo struct and initialize the memory
+    vd.display_ubo = cast( vd.Display_UBO* )( mapped_memory + vd.display_ubo_buffer.memOffset );
+    vd.display_ubo_flush = vd.display_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the display ubo
+    vd.display_ubo.display_property = 1;
+    vd.display_ubo.amplify_property = 1;
+    vd.updateDisplayUBO;
 
 
 
@@ -238,7 +254,7 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
 
     vd.descriptor = ( *meta_descriptor_ptr )    // VDrive_State.descriptor is a Core_Descriptor
         .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
-            .addBufferInfo( vd.wvpm_buffer.buffer )
+            .addBufferInfo( vd.wvpm_ubo_buffer.buffer )
         .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
             .addTexelBufferView( vd.sim_buffer_view )
         .addLayoutBinding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT )
@@ -247,7 +263,9 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_sampler_nearest )
         .addLayoutBinding( 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT )
-            .addBufferInfo( vd.sim_ubo_buffer.buffer )
+            .addBufferInfo( vd.compute_ubo_buffer.buffer )
+        .addLayoutBinding( 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT )
+            .addBufferInfo( vd.display_ubo_buffer.buffer )
         .construct
         .reset;
 
@@ -695,7 +713,10 @@ auto ref destroyResources( ref VDrive_State vd ) {
 
     // memory Resources
     vd.depth_image.destroyResources;
-    vd.wvpm_buffer.unmapMemory.destroyResources;
+    vd.wvpm_ubo_buffer.destroyResources;
+    vd.compute_ubo_buffer.destroyResources;
+    vd.display_ubo_buffer.destroyResources;
+    vd.host_visible_memory.unmapMemory.destroyResources;
 
     // compute resources
     vd.destroy( vd.sim_sampler_nearest );
@@ -703,7 +724,6 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.sim_buffer.destroyResources;
     vd.sim_memory.destroyResources;
     vd.sim_image.destroyResources;
-    vd.sim_ubo_buffer.destroyResources;
 
     // render setup
     vd.render_pass.destroyResources;

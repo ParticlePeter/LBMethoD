@@ -38,8 +38,10 @@ struct VDrive_State {
 
     // memory Resources
     Meta_Image                  depth_image;
-    Meta_Buffer                 wvpm_buffer;
-    VkMappedMemoryRange         wvpm_flush;
+    Meta_Buffer                 wvpm_ubo_buffer;
+    VkMappedMemoryRange         wvpm_ubo_flush;
+    Meta_Memory                 host_visible_memory;
+
 
     // command and related
     VkCommandPool               cmd_pool;
@@ -72,8 +74,10 @@ struct VDrive_State {
     VkBufferView                sim_buffer_view;        // arbitrary count of buffer views, dynamic resizing is not that easy as we would have to recreate the descriptor set each time
     Meta_Descriptor_Update      sim_descriptor_update;  // updating the descriptor in the case of reconstructed sim resources
     VkSampler                   sim_sampler_nearest;
-    Meta_Buffer                 sim_ubo_buffer;
-    VkMappedMemoryRange         sim_ubo_flush;
+    Meta_Buffer                 compute_ubo_buffer;
+    VkMappedMemoryRange         compute_ubo_flush;
+    Meta_Buffer                 display_ubo_buffer;
+    VkMappedMemoryRange         display_ubo_flush;
 
 
 
@@ -86,24 +90,30 @@ struct VDrive_State {
 
     // simulation parameters
     immutable float sim_unit_speed_of_sound = 0.5773502691896258; // 1 / sqrt( 3 );
-    float       sim_speed_of_sound          = sim_unit_speed_of_sound;
-    float       sim_unit_spatial            = 1;
-    float       sim_unit_temporal           = 1;
-    uint32_t    sim_algorithm               = 3;      
+    float           sim_speed_of_sound      = sim_unit_speed_of_sound;
+    float           sim_unit_spatial        = 1;
+    float           sim_unit_temporal       = 1;
+    uint32_t        sim_algorithm           = 3;      
 
-    struct Sim_UBO {
-        float       amplify_property        = 1;    // display param amplify param
+
+    struct Compute_UBO {
         float       collision_frequency     = 1;    // sim param omega 
         float       wall_velocity           = 0;    // sim param for lid driven cavity
-        uint32_t    display_property        = 0;    // display param display
     }
 
-    Sim_UBO*    sim_ubo;
 
-    ubyte       sim_ping_pong               = 1;
-    ubyte       sim_ping_pong_scale         = 8;
-    bool        sim_step                    = false;
-    bool        sim_play                    = false; 
+    struct Display_UBO {
+        uint32_t    display_property        = 0;    // display param display
+        float       amplify_property        = 1;    // display param amplify param
+    }
+
+    Compute_UBO*    compute_ubo;
+    Display_UBO*    display_ubo;
+
+    ubyte           sim_ping_pong           = 1;
+    ubyte           sim_ping_pong_scale     = 8;
+    bool            sim_step                = false;
+    bool            sim_play                = false; 
 
 
 
@@ -124,14 +134,20 @@ auto windowHeight( ref VDrive_State vd ) { return vd.surface.imageExtent.height;
 
 void updateWVPM( ref VDrive_State vd ) {
     *( vd.wvpm ) = vd.projection * vd.tb.matrix;
-    vd.device.vkFlushMappedMemoryRanges( 1, &vd.wvpm_flush );
-    //vk.device.vkInvalidateMappedMemoryRanges( 1, &wvpm_flush );
+    vd.device.vkFlushMappedMemoryRanges( 1, &vd.wvpm_ubo_flush );
+    //vk.device.vkInvalidateMappedMemoryRanges( 1, &wvpm_ubo_flush );
 }
 
 
-void updateSimUBO( ref VDrive_State vd ) {
+void updateComputeUBO( ref VDrive_State vd ) {
     // data will be updated elsewhere
-    vd.device.vkFlushMappedMemoryRanges( 1, &vd.sim_ubo_flush );
+    vd.device.vkFlushMappedMemoryRanges( 1, &vd.compute_ubo_flush );
+}
+
+
+void updateDisplayUBO( ref VDrive_State vd ) {
+    // data will be updated elsewhere
+    vd.device.vkFlushMappedMemoryRanges( 1, &vd.display_ubo_flush );
 }
 
 
