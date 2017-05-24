@@ -6,7 +6,6 @@ import vdrive;
 import appstate;
 
 import dlsl.matrix;
-import dlsl.vector;
 
 
 
