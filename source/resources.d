@@ -131,7 +131,7 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
 
     // 1.) (re)create Image, Buffer (and the buffer view) without memory backing
     // 2.) check if the memory requirement for the objects above has increased, if not goto 4.) - this does not work currently ... 
-    // 3.) if it has recreate the memory object - ... as memory can be bound only once, skipping step 2.)
+    // 3.) if it has recreate the memory object - ... as memory can be bound only once, skipping step 2.) but delete memory if it exist
     // 4.) (re)register resources
     // 5.) (re)create VkImageView and VkBufferView(s)
     // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
@@ -158,7 +158,7 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
         .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_size );
 
 
-    // 2.) check if the memory requirement for the objects above has increased, if not goto 4.) - this does not work currently ... 
+    // 2.) check if the memory requirement for the objects above has increased, if not goto 4.) - this does not work currently ... skipping 
 /*  VkDeviceSize required_mem_size = 0;     // here we will store the required memory
     vd.sim_memory( vd )
         .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
@@ -166,16 +166,15 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
         .addRange( vd.sim_image,  & required_mem_size );   // the meta memory struct does not mutate
 */
 
-    // 3.) if it has recreate the memory object - ... as memory can be bound only once, skipping step 2.)
-    //if( vd.sim_memory.memSize < required_mem_size )
-    {
-        vd.sim_memory.destroyResources;
-        vd.sim_memory( vd )
-            .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
-            .addRange( vd.sim_buffer )
-            .addRange( vd.sim_image )
-            .allocate;     
-    }
+    // 3.) if it has recreate the memory object - ... as memory can be bound only once, skipping step 2.) but delete memory if it exist
+    if( vd.sim_memory.memSize > 0 )
+        vd.sim_memory( vd ).destroyResources;
+
+    vd.sim_memory( vd )
+        .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
+        .addRange( vd.sim_buffer )
+        .addRange( vd.sim_image )
+        .allocate;     
 
 
     // 4.) (re)register resources
@@ -188,7 +187,6 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
     vd.sim_image.createView;
     vd.sim_buffer_view = vd.createBufferView(
         vd.sim_buffer.buffer, VK_FORMAT_R32_SFLOAT, 0, buffer_size );
-
 
 
     // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
@@ -253,7 +251,7 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         .construct
         .reset;
 
-    // prepare simumaltion data descriptor update
+    // prepare simulation data descriptor update
     vd.sim_descriptor_update( vd )
         .addBindingUpdate( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
             .addTexelBufferView( vd.sim_buffer_view )
@@ -271,7 +269,7 @@ auto ref resetComputePipeline( ref VDrive_State vd ) {
 
     uint32_t[3] image_extent = [ vd.sim_image.extent.width, vd.sim_image.extent.height, vd.sim_image.extent.depth ];
 
-     // 1.) check if the last layer and domain settings differ from the recently used, if not return from this function
+    // check if the last layer and domain settings differ from the recently used, if not return from this function
     if( vd.sim_domain != image_extent ) {
     // || vd.sim_layers != vd.sim_buffer_views.length   // Todo(pp): fix this logic
 
@@ -309,8 +307,6 @@ auto ref createGraphicsPipeline( ref VDrive_State vd ) {
     vd.graphics_pso = meta_graphics( vd )
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_VERTEX_BIT,   "shader/lbmd_draw.vert" ))
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_FRAGMENT_BIT, "shader/lbmd_draw.frag" ))
-//      .addBindingDescription( 0, 2 * float.sizeof, VK_VERTEX_INPUT_RATE_VERTEX )  // add vertex binding and attribute descriptions
-//      .addAttributeDescription( 0, 0, VK_FORMAT_R32G32_SFLOAT, 0 )                // location (per shader), binding (per buffer), type, offset in struct/buffer
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.surface.imageExtent )       // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
@@ -365,7 +361,6 @@ auto ref createRenderResources( ref VDrive_State vd ) {
 
 
 
-
     ////////////////////////
     // create render pass //
     ////////////////////////
@@ -379,11 +374,9 @@ auto ref createRenderResources( ref VDrive_State vd ) {
         .addDependencyByRegion
         .srcDependency( VK_SUBPASS_EXTERNAL, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT         , VK_ACCESS_MEMORY_READ_BIT )
         .dstDependency( 0                  , VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT )
-
         .addDependencyByRegion
         .srcDependency( 0                  , VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT )
         .dstDependency( VK_SUBPASS_EXTERNAL, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT         , VK_ACCESS_MEMORY_READ_BIT )
-
         .construct;
 
 
@@ -414,7 +407,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     Meta_Compute meta_compute;
     void createComputePSO() {
         vd.graphics_queue.vkQueueWaitIdle;  // wait for queue idle as we need to destroy the pipeline
-        auto old_pso = vd.compute_pso;      // store old pipeline to inproove new pipeline construction speed
+        auto old_pso = vd.compute_pso;      // store old pipeline to improve new pipeline construction speed
         vd.compute_pso = meta_compute( vd )
             //.basePipeline( old_pso.pipeline )
             .shaderStageCreateInfo(
@@ -500,7 +493,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
         cmd_buffer.vkEndCommandBuffer;                      // finish recording and submit the command
     }
 
-    // initiaize ping pong variable to 1
+    // initialize ping pong variable to 1
     // it will be switched to 0 ( pp = 1 - pp ) befor submitting compute commands
     vd.sim_ping_pong = 1;
 
