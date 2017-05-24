@@ -14,8 +14,8 @@ layout( std140, binding = 5 ) uniform Compute_UBO {
 
 // specialization constants for local work group size
 layout( local_size_x_id = 0 ) in;
-layout( local_size_y_id = 1 ) in;
-layout( local_size_z_id = 2 ) in;
+//layout( local_size_y_id = 1 ) in;
+//layout( local_size_z_id = 2 ) in;
 
 // local work group defaults, when constants are not defined
 layout( local_size_x = 256 ) in;
@@ -24,11 +24,11 @@ layout( local_size_z =   1 ) in;
 
 // specialization constants for init or loop phase
 layout( constant_id = 3 ) const uint ALGORITHM = 0;
-#define INIT_DENSITY_ONE     0
-#define LOOP_SRT_LBGK   8
-#define LOOP_TRT        9
-#define LOOP_MRT       10
-#define LOOP_CASCADED  11
+#define INIT_DENSITY_ONE     1 + 255
+#define LOOP_SRT_LBGK        0
+#define LOOP_TRT             1
+#define LOOP_MRT             2
+#define LOOP_CASCADED        3
 
 
 // populations 1 single buffered rest velocity, 8 double buffered link velocities

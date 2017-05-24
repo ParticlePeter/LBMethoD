@@ -425,7 +425,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     Meta_SC!( 2 ) meta_sc;
     meta_sc
         .addMapEntry( MapEntry32( vd.sim_work_group_size_x ))   // default constantID is 0, next would be 1
-        .addMapEntry( MapEntry32( 0 ), 3 )                      // latter is the constantID, must be passed in, othervise its 1
+        .addMapEntry( MapEntry32( 1 + 255 ), 3 )                // latter is the constantID, must be passed in, otherwise its 1
         .construct;
 
 
@@ -487,8 +487,8 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     ////////////////////////////////////////////////
 
     // reuse meta_compute to create loop compute pso with collision algorithm specialization
-    meta_sc.specialization_data[1] = MapEntry32( vd.sim_algorithm + 8 );    // all settings higher 0 are loop algorithms
-    createComputePSO;                                                       // reuse code from above
+    meta_sc.specialization_data[1] = MapEntry32( vd.sim_algorithm );    // all settings higher 0 are loop algorithms
+    createComputePSO;                                                   // reuse code from above
 
 
 
