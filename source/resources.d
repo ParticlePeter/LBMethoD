@@ -279,10 +279,10 @@ auto ref resetComputePipeline( ref VDrive_State vd ) {
         vd.createSimMemoryObjects;
 
         // update the descriptor
-        vd.sim_descriptor_update.texel_buffer_views[0]    = vd.sim_buffer_view;
-        vd.sim_descriptor_update.image_infos[0].imageView = vd.sim_image.image_view;
-        vd.sim_descriptor_update.image_infos[1].imageView = vd.sim_image.image_view;
-        vd.sim_descriptor_update.image_infos[2].imageView = vd.sim_image.image_view;
+        vd.sim_descriptor_update.texel_buffer_views[0]    = vd.sim_buffer_view;         // populations buffer and optionally other data like temperature
+        vd.sim_descriptor_update.image_infos[0].imageView = vd.sim_image.image_view;    // image view for writing from compute shader
+        vd.sim_descriptor_update.image_infos[1].imageView = vd.sim_image.image_view;    // image view for reading in display fragment shader with linear sampling
+        vd.sim_descriptor_update.image_infos[2].imageView = vd.sim_image.image_view;    // image view for reading in display fragment shader with nearest sampling
         vd.sim_descriptor_update.update;
 
     }
