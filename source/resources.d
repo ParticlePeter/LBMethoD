@@ -121,7 +121,6 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
     // create simulation memory objects - called several times //
     /////////////////////////////////////////////////////////////
 
-
     return vd.createSimMemoryObjects;
 }
 
@@ -130,21 +129,14 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
 /// create or recreate simulation memory, buffers and images
 auto ref createSimMemoryObjects( ref VDrive_State vd ) {
 
-    // 1.) check if the last layer and dim settings differ from the recently used, if not return from this function
-    // 2.) If they do recreate VkImage(s) and or VkBuffers without attaching memory
-    // 3.) check if the memory requirement for the objects above has increased, if not goto 5.)
-    // 4.) if it has recreate the memory object
-    // 5.) re-register resources
-    // 6.) recreate VkImageView and VkBufferView(s)
+    // 1.) (re)create Image, Buffer (and the buffer view) without memory backing
+    // 2.) check if the memory requirement for the objects above has increased, if not goto 4.) - this does not work currently ... 
+    // 3.) if it has recreate the memory object - ... as memory can be bound only once, skipping step 2.)
+    // 4.) (re)register resources
+    // 5.) (re)create VkImageView and VkBufferView(s)
+    // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
 
-
-    // 1.) check if the last layer and dim settings differ from the recently used, if not return from this function
-    import dlsl.vector;
-    //if( uvec4( sim_dim.x, sim_dim.y, sim_dim.z, layers ) == vd.sim_domain )
-    //    return vd;
-
-
-    // 2.) If they do recreate VkImage(s) and VkBuffers without attaching memory
+    // 1.) (re)create Image, Buffer (and the buffer view) without memory backing
     if( vd.sim_image.image     != VK_NULL_HANDLE ) vd.sim_image.destroyResources( false );  // destroy old image and its view, keeping the sampler
     if( vd.sim_buffer.buffer   != VK_NULL_HANDLE ) vd.sim_buffer.destroyResources;          // destroy old buffer
     if( vd.sim_buffer_view     != VK_NULL_HANDLE ) vd.destroy( vd.sim_buffer_view );        // destroy old buffer view
@@ -166,15 +158,15 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
         .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_size );
 
 
-    // 3.) check if the memory requirement for the objects above has increased, if not goto 5.)   
-    VkDeviceSize required_mem_size = 0;     // here we will store the required memory
+    // 2.) check if the memory requirement for the objects above has increased, if not goto 4.) - this does not work currently ... 
+/*  VkDeviceSize required_mem_size = 0;     // here we will store the required memory
     vd.sim_memory( vd )
         .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
-        .addRange( vd.sim_buffer, & required_mem_size )    // with the optional second parametet
+        .addRange( vd.sim_buffer, & required_mem_size )    // with the optional second parameter
         .addRange( vd.sim_image,  & required_mem_size );   // the meta memory struct does not mutate
+*/
 
-
-    // 4.) if it has recreate the memory object
+    // 3.) if it has recreate the memory object - ... as memory can be bound only once, skipping step 2.)
     //if( vd.sim_memory.memSize < required_mem_size )
     {
         vd.sim_memory.destroyResources;
@@ -186,18 +178,20 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
     }
 
 
-    // 5.) re-register resources
+    // 4.) (re)register resources
     vd.sim_memory
         .bind( vd.sim_buffer )
         .bind( vd.sim_image );
 
 
-    // 6.) recreate VkImageView and VkBufferView(s)
+    // 5.) (re)create VkImageView and VkBufferView(s)
     vd.sim_image.createView;
     vd.sim_buffer_view = vd.createBufferView(
         vd.sim_buffer.buffer, VK_FORMAT_R32_SFLOAT, 0, buffer_size );
 
 
+
+    // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
     auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
     auto init_cmd_buffer_bi = commandBufferBeginInfo( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
     init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
