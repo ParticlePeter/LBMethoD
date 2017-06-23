@@ -311,8 +311,10 @@ auto ref resetComputePipeline( ref VDrive_State vd ) {
 auto ref createGraphicsPipeline( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
-    if( vd.graphics_pso.pipeline != VK_NULL_HANDLE )
+    if( vd.graphics_pso.pipeline != VK_NULL_HANDLE ) {
+        vd.graphics_queue.vkQueueWaitIdle;
         vd.destroy( vd.graphics_pso );
+    }
 
 
 
