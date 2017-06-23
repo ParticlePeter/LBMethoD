@@ -75,16 +75,22 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
     extensions[ 0..extension_count ] = glfw_required_extensions[ 0..extension_count ];
 
 
-    debug {
-        // we would like to use the debug report callback functionality
-        extensions[ extension_count ] = "VK_EXT_debug_report";
-        ++extension_count;
+    // we would like to enable LunarG Validation layers if they are available
+    uint32_t layer_count; 
+    const( char )*[1] layers;   // one layer suffices
 
-        // and report standard validation issues
-        const( char )*[1] layers = [ "VK_LAYER_LUNARG_standard_validation" ];
-        //const( char )*[0] layers;
-    } else {
-        const( char )*[0] layers;
+    debug {
+        // we would like to use the debug report callback functionality if available
+        if( "VK_EXT_debug_report".isExtension ) {
+            extensions[ extension_count ] = "VK_EXT_debug_report";
+            ++extension_count;
+        }
+
+        // and report standard validation issues if LunarG validation layer is available
+        if( "VK_LAYER_LUNARG_standard_validation".isLayer( false )) {
+           layers[ layer_count ] = "VK_LAYER_LUNARG_standard_validation";
+           ++layer_count; 
+        }
     }
 
 
@@ -107,7 +113,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
 
 
     // initialize the vulkan instance, pass the correct slice into the extension array
-    vd.initInstance( extensions[ 0..extension_count ], layers );
+    vd.initInstance( extensions[ 0..extension_count ], layers[ 0..layer_count ] );
 
 
     // setup debug report callback
