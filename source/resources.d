@@ -139,7 +139,7 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
     return vd.createSimMemoryObjects;
 }
 
-
+private enum USE_DOUBLE = false;
 
 /// create or recreate simulation memory, buffers and images
 auto ref createSimMemoryObjects( ref VDrive_State vd ) {
@@ -161,26 +161,29 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
     // for 512 ^ 2 cells this means ( 1 + 2 * 8 ) * 4 * 512 * 512 = 17_825_792 bytes
     // create one buffer 1 + 2 * 8 buffer views into that buffer
     uint32_t population_mem_size = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2] * float.sizeof.toUint;
-    uint32_t buffer_size = vd.sim_layers * population_mem_size;
+    uint32_t buffer_size = vd.sim_layers * population_mem_size * ( USE_DOUBLE ? 2 : 1 );
 
 
     // Todo(pp): the format should be choose-able
     // Todo(pp): here checks are required if this image format is available for VK_IMAGE_USAGE_STORAGE_BIT
     vd.sim_image( vd )
-        .create( VK_FORMAT_R16G16B16A16_SFLOAT, vd.sim_domain[0], vd.sim_domain[1], VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT );
+        .create( VK_FORMAT_R16G16B16A16_SFLOAT, vd.sim_domain[0], vd.sim_domain[1], VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT )
+        .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
 
     vd.sim_buffer( vd )
-        .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_size );
+        .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_size )
+        .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
 
 
-    // 2.) check if the memory requirement for the objects above has increased, if not goto 4.) - this does not work currently ... skipping 
+    // 2.) check if the memory requirement for the objects above has increased, if not goto 4.) 
+    // - this does not work currently ... skipping 
 /*  VkDeviceSize required_mem_size = 0;     // here we will store the required memory
     vd.sim_memory( vd )
         .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
         .addRange( vd.sim_buffer, & required_mem_size )    // with the optional second parameter
         .addRange( vd.sim_image,  & required_mem_size );   // the meta memory struct does not mutate
 */
-
+/*
     // 3.) if it has recreate the memory object - ... as memory can be bound only once, skipping step 2.) but delete memory if it exist
     if( vd.sim_memory.memSize > 0 )
         vd.sim_memory( vd ).destroyResources;
@@ -196,12 +199,11 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
     vd.sim_memory
         .bind( vd.sim_buffer )
         .bind( vd.sim_image );
-
+*/
 
     // 5.) (re)create VkImageView and VkBufferView(s)
     vd.sim_image.createView;
-    vd.sim_buffer_view = vd.createBufferView(
-        vd.sim_buffer.buffer, VK_FORMAT_R32_SFLOAT, 0, buffer_size );
+    vd.sim_buffer_view = vd.createBufferView( vd.sim_buffer.buffer, USE_DOUBLE ? VK_FORMAT_R32G32_UINT : VK_FORMAT_R32_SFLOAT, 0, buffer_size );
 
 
     // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
@@ -441,7 +443,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
             .shaderStageCreateInfo(
                 vd.createPipelineShaderStage(
                     VK_SHADER_STAGE_COMPUTE_BIT,
-                    "shader/lbmd_loop.comp",
+                    USE_DOUBLE ? "shader/lbmd_loop_double.comp" : "shader/lbmd_loop.comp",
                     & meta_sc.specialization_info ))
             .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
             .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 4 )
@@ -731,9 +733,10 @@ auto ref destroyResources( ref VDrive_State vd ) {
     // compute resources
     vd.destroy( vd.sim_sampler_nearest );
     vd.destroy( vd.sim_buffer_view );
-    vd.sim_buffer.destroyResources;
-    vd.sim_memory.destroyResources;
     vd.sim_image.destroyResources;
+    vd.sim_buffer.destroyResources;
+    if( vd.sim_memory.memory != VK_NULL_HANDLE )
+        vd.sim_memory.destroyResources;
 
     // render setup
     vd.render_pass.destroyResources;

@@ -1,0 +1,336 @@
+// --- COMP ---
+#version 450 core
+
+// input uniforms
+layout( push_constant ) uniform Push_Constant {
+    int ping;
+} pc;
+
+// uniform buffer
+layout( std140, binding = 5 ) uniform Compute_UBO {
+    float omega;            // collision frequency
+    float wall_velocity;
+};
+
+// specialization constants for local work group size
+layout( local_size_x_id = 0 ) in;
+//layout( local_size_y_id = 1 ) in;
+//layout( local_size_z_id = 2 ) in;
+
+// local work group defaults, when constants are not defined
+layout( local_size_x = 256 ) in;
+layout( local_size_y =   1 ) in;
+layout( local_size_z =   1 ) in;
+
+// specialization constants for init or loop phase
+layout( constant_id = 3 ) const uint ALGORITHM = 0;
+#define INIT_DENSITY_ONE     1 + 255
+#define LOOP_SRT_LBGK        0
+#define LOOP_TRT             1
+#define LOOP_MRT             2
+#define LOOP_CASCADED        3
+
+
+// populations 1 single buffered rest velocity, 8 double buffered link velocities
+layout( binding = 2, rg32ui  ) uniform restrict uimageBuffer popul_buffer;
+
+// velocity and density write target, will be rendered as texture in next pass
+layout( binding = 3, rgba16f ) uniform restrict writeonly image2D vel_rho_img;
+
+
+// population indices
+// 6 2 5 //
+//  \|/  //
+// 3-0-1 //
+//  /|\  //
+// 7 4 8 //
+
+
+// Directions:          R       E       N       W       S       NE      NW      SW      SE
+const double[9] pw = {  4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 };
+const int[9]   inv = {  0, 3, 4, 1, 2, 7, 8, 5, 6 };
+
+
+// Cell Type Attributes
+//#define NOSLIP 1
+//#define FORCE 2
+
+
+////////////////////////////////////////////////////////
+// Common Indices and Counts for VkImage and VkBuffer //
+////////////////////////////////////////////////////////
+
+// shortcut to imageSize, the Domain of the computation, same as Global Size
+//#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
+#define D imageSize( vel_rho_img )
+
+// define access indices for the population buffers
+#define ping (  pc.ping )
+#define pong ( 8 - ping )
+
+
+
+/////////////////////////////////////////
+// Indices and Counts if using VkImage //
+/////////////////////////////////////////
+/*
+// indices velocity and density
+#define UX gl_GlobalInvocationID.x
+#define UY gl_GlobalInvocationID.y
+#define UZ gl_GlobalInvocationID.z
+
+#define X int( UX )
+#define Y int( UY )
+#define Z int( UZ )
+
+// buffer offsets coresponding streaming ( in 2D so far )
+int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
+
+// stream function if not near boundary
+void stream( int p, double f ) {
+    int i = ( I + buffer_offset[ p ] + node_count ) % node_count;
+    imageStore( popul_buf[ pong + p ], i, vec4( f ));
+}
+
+// bounce function if next to boundary and velocity is pointing towards it
+void bounce( int p, double f ) {
+    imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
+}
+*/
+
+
+
+//////////////////////////////////////////
+// Indices and Counts if using VkBuffer //
+//////////////////////////////////////////
+
+// We use one rest position and two times the other velocities due to double buffering
+// loading populations p with variable ping = 0 V 8 and storing with pong = 8 V 0
+// All populations are stored in one contignuous double array/buffer
+// first come N rest populations then N east, etc.,
+// With the index variable I = [0..N) we can reach individual velocities of population intervall at p
+// We load with ( ping + 1 ) * N + I and store with ( pong + 1 ) * N + I
+// to reach the population of any node 
+
+// define global equivalent for gl_LocalInvocationIndex
+#define UI gl_GlobalInvocationID.x
+
+// U and I are also the index velocity population index
+#define I int( UI )
+
+#define X ( I % imageSize( vel_rho_img ).x )
+#define Y ( I / imageSize( vel_rho_img ).x )
+//#define Z ( I / ( imageSize( vel_rho_img ).x * imageSize( vel_rho_img ).y )
+
+// derived total count of nodes
+int node_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
+#define N node_count
+#define buffer_size ( 17 * N )  // count of elements in the passed in buffer, required for periodic boundary conditions
+
+// buffer offsets coresponding streaming ( in 2D so far )
+int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
+
+// stream function if not near boundary
+void stream( int p, double f ) {
+    int i = (( pong + p ) * N + I + buffer_offset[ p ] );// + buffer_size ) % buffer_size; // latter for periodic bondary conditions
+    imageStore( popul_buffer, i, uvec4( unpackDouble2x32( f ), 0, 0 ));
+}
+
+// bounce function if next to boundary and velocity is pointing towards it
+void bounce( int p, double f ) {
+    imageStore( popul_buffer, ( pong + inv[ p ] ) * N + I, uvec4( unpackDouble2x32( f ), 0, 0 ));
+}
+
+// bounce function if next to boundary and velocity is pointing towards it
+void bounce_velocity( int p, double f, dvec2 vel ) {
+    imageStore( popul_buffer, ( pong + inv[ p ] ) * N + I, uvec4( unpackDouble2x32( f ), 0, 0 ));
+}
+
+//#define tau 0.50001 //0.6
+//#define w (1.f/tau)
+#define tau 0.50001
+#define w omega
+#define wb 1
+#define w3 1
+#define w4 1
+
+
+// main simulation function
+void main( void ) {
+
+    if( ALGORITHM == INIT_DENSITY_ONE ) {
+
+        // Init velocities and densities
+        imageStore( vel_rho_img, ivec2( X, Y ), vec4( 0, 0, 0, 1 ));
+
+        // init all distribution f(unctions) with equilibrium, p = population
+        for( int p = 0; p < 9; ++p )  {
+            imageStore( popul_buffer, p * N + I, uvec4( unpackDouble2x32( double( pw[ p ] )), 0, 0 ));
+            //if( p > 0 ) imageStore( popul_buffer, ( p + 8 ) * N + I, vec4( pw[ p ] ));
+        }   
+    } else {
+
+        // load populations
+        double f[9] = {
+             packDouble2x32( imageLoad( popul_buffer,/* ping + 0 ) * N*/ I ).rg ),
+             packDouble2x32( imageLoad( popul_buffer, ( ping + 1 ) * N + I ).rg ),
+             packDouble2x32( imageLoad( popul_buffer, ( ping + 2 ) * N + I ).rg ),
+             packDouble2x32( imageLoad( popul_buffer, ( ping + 3 ) * N + I ).rg ),
+             packDouble2x32( imageLoad( popul_buffer, ( ping + 4 ) * N + I ).rg ),
+             packDouble2x32( imageLoad( popul_buffer, ( ping + 5 ) * N + I ).rg ),
+             packDouble2x32( imageLoad( popul_buffer, ( ping + 6 ) * N + I ).rg ),
+             packDouble2x32( imageLoad( popul_buffer, ( ping + 7 ) * N + I ).rg ),
+             packDouble2x32( imageLoad( popul_buffer, ( ping + 8 ) * N + I ).rg ) 
+        };
+
+        double rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
+        dvec2  vel = ( dvec2(f[1],f[2]) - dvec2(f[3],f[4]) + dvec2(f[5]) - dvec2(f[7]) + dvec2(f[8],f[6]) - dvec2(f[6],f[8])) / rho;
+        //dvec2  vel = dvec2(   f[1] - f[3] + f[5] - f[7] + f[8] - f[6],
+        //                    f[2] - f[4] + f[5] - f[7] + f[6] - f[8] ) / rho;
+
+        // store velocities and densities in image
+        imageStore( vel_rho_img, ivec2( X, Y ), vec4( vel, 0, rho ));
+
+
+        if( ALGORITHM == LOOP_SRT_LBGK ) {
+
+        // compute equilibrium
+        #define X_P_Y ( vel.x + vel.y )
+        #define X_M_Y ( vel.x - vel.y )
+        #define V_X_2 ( 4.5 * vel.x * vel.x )
+        #define V_Y_2 ( 4.5 * vel.y * vel.y )
+        #define XPY_2 ( 4.5 * X_P_Y * X_P_Y )
+        #define XMY_2 ( 4.5 * X_M_Y * X_M_Y )
+        #define V_D_V ( 1.5 * dot( vel, vel ))
+
+        double f_eq[9] = {                                    // #define SQ(x) ((x) * (x))
+            pw[0] * rho * ( 1                     - V_D_V ), // pw[0] * rho * (1                                                   - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[1] * rho * ( 1 + 3 * vel.x + V_X_2 - V_D_V ), // pw[1] * rho * (1 + 3 * ( vel.x)         + 4.5 * SQ( vel.x)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[2] * rho * ( 1 + 3 * vel.y + V_Y_2 - V_D_V ), // pw[2] * rho * (1 + 3 * ( vel.y)         + 4.5 * SQ( vel.y)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[3] * rho * ( 1 - 3 * vel.x + V_X_2 - V_D_V ), // pw[3] * rho * (1 + 3 * (-vel.x)         + 4.5 * SQ(-vel.x)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[4] * rho * ( 1 - 3 * vel.y + V_Y_2 - V_D_V ), // pw[4] * rho * (1 + 3 * (-vel.y)         + 4.5 * SQ(-vel.y)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[5] * rho * ( 1 + 3 * X_P_Y + XPY_2 - V_D_V ), // pw[5] * rho * (1 + 3 * ( vel.x + vel.y) + 4.5 * SQ( vel.x + vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[6] * rho * ( 1 - 3 * X_M_Y + XMY_2 - V_D_V ), // pw[6] * rho * (1 + 3 * (-vel.x + vel.y) + 4.5 * SQ(-vel.x + vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[7] * rho * ( 1 - 3 * X_P_Y + XPY_2 - V_D_V ), // pw[7] * rho * (1 + 3 * (-vel.x - vel.y) + 4.5 * SQ(-vel.x - vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[8] * rho * ( 1 + 3 * X_M_Y + XMY_2 - V_D_V )  // pw[8] * rho * (1 + 3 * ( vel.x - vel.y) + 4.5 * SQ( vel.x - vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y)))
+        };
+
+        
+        // Collide - might be optimized if using f0 and 2 * vec4
+        f[0] = mix( f[0], f_eq[0], omega ); //f[0] * ( 1 - omega ) + f_eq[0] * omega;
+        f[1] = mix( f[1], f_eq[1], omega ); //f[1] * ( 1 - omega ) + f_eq[1] * omega;
+        f[2] = mix( f[2], f_eq[2], omega ); //f[2] * ( 1 - omega ) + f_eq[2] * omega;
+        f[3] = mix( f[3], f_eq[3], omega ); //f[3] * ( 1 - omega ) + f_eq[3] * omega;
+        f[4] = mix( f[4], f_eq[4], omega ); //f[4] * ( 1 - omega ) + f_eq[4] * omega;
+        f[5] = mix( f[5], f_eq[5], omega ); //f[5] * ( 1 - omega ) + f_eq[5] * omega;
+        f[6] = mix( f[6], f_eq[6], omega ); //f[6] * ( 1 - omega ) + f_eq[6] * omega;
+        f[7] = mix( f[7], f_eq[7], omega ); //f[7] * ( 1 - omega ) + f_eq[7] * omega;
+        f[8] = mix( f[8], f_eq[8], omega ); //f[8] * ( 1 - omega ) + f_eq[8] * omega;
+
+
+        } else if( ALGORITHM == LOOP_CASCADED ) {
+
+            #define vx vel.x
+            #define vy vel.y
+            #define f0 f[0]
+            #define f1 f[1]
+            #define f2 f[2]
+            #define f3 f[3]
+            #define f4 f[4]
+            #define f5 f[5]
+            #define f6 f[6]
+            #define f7 f[7]
+            #define f8 f[8]
+
+
+            // with the following "hack" the cascaded LBM will be ALWAYS stable!
+            #define NORM 0.42f
+            double norm = length( vel );//sqrt(vx*vx+vy*vy);
+            if( norm > NORM ) vel *=  NORM / norm;
+
+
+            //trace of the pressure tensor
+            double T = 1/rho*((((-vx)*(-vx)))*f0+(((1-vx)*(1-vx)))*f1+(((-vx)*(-vx)))*f2+(((-1-vx)*(-1-vx)))*f3+(((-vx)*(-vx)))*f4+(((1-vx)*(1-vx)))*f5+(((-1-vx)*(-1-vx)))*f6+(((-1-vx)*(-1-vx)))*f7+(((1-vx)*(1-vx)))*f8)+1/rho*((((-vy)*(-vy)))*f0+(((-vy)*(-vy)))*f1+(((1-vy)*(1-vy)))*f2+(((-vy)*(-vy)))*f3+(((-1-vy)*(-1-vy)))*f4+(((1-vy)*(1-vy)))*f5+(((1-vy)*(1-vy)))*f6+(((-1-vy)*(-1-vy)))*f7+(((-1-vy)*(-1-vy)))*f8);
+            //normal stress difference
+            double N = 1/rho*((((-vx)*(-vx)))*f0+(((1-vx)*(1-vx)))*f1+(((-vx)*(-vx)))*f2+(((-1-vx)*(-1-vx)))*f3+(((-vx)*(-vx)))*f4+(((1-vx)*(1-vx)))*f5+(((-1-vx)*(-1-vx)))*f6+(((-1-vx)*(-1-vx)))*f7+(((1-vx)*(1-vx)))*f8)-(1/rho*((((-vy)*(-vy)))*f0+(((-vy)*(-vy)))*f1+(((1-vy)*(1-vy)))*f2+(((-vy)*(-vy)))*f3+(((-1-vy)*(-1-vy)))*f4+(((1-vy)*(1-vy)))*f5+(((1-vy)*(1-vy)))*f6+(((-1-vy)*(-1-vy)))*f7+(((-1-vy)*(-1-vy)))*f8));
+            //off diagonal element of the stress tensor
+            double Pxy = 1/rho*(((-vx)*(-vy))*f0+((1-vx)*(-vy))*f1+((-vx)*(1-vy))*f2+((-1-vx)*(-vy))*f3+((-vx)*(-1-vy))*f4+((1-vx)*(1-vy))*f5+((-1-vx)*(1-vy))*f6+((-1-vx)*(-1-vy))*f7+((1-vx)*(-1-vy))*f8);
+            //fisrt third order moment
+            double Qyxx = 1/rho*((((-vx)*(-vx))*(-vy))*f0+(((1-vx)*(1-vx))*(-vy))*f1+(((-vx)*(-vx))*(1-vy))*f2+(((-1-vx)*(-1-vx))*(-vy))*f3+(((-vx)*(-vx))*(-1-vy))*f4+(((1-vx)*(1-vx))*(1-vy))*f5+(((-1-vx)*(-1-vx))*(1-vy))*f6+(((-1-vx)*(-1-vx))*(-1-vy))*f7+(((1-vx)*(1-vx))*(-1-vy))*f8);
+            //second third order moment
+            double Qxyy = 1/rho*(((-vx)*((-vy)*(-vy)))*f0+((1-vx)*((-vy)*(-vy)))*f1+((-vx)*((1-vy)*(1-vy)))*f2+((-1-vx)*((-vy)*(-vy)))*f3+((-vx)*((-1-vy)*(-1-vy)))*f4+((1-vx)*((1-vy)*(1-vy)))*f5+((-1-vx)*((1-vy)*(1-vy)))*f6+((-1-vx)*((-1-vy)*(-1-vy)))*f7+((1-vx)*((-1-vy)*(-1-vy)))*f8);
+            //fourth order moment
+            double A = 1/rho*((((-vx)*(-vx))*((-vy)*(-vy)))*f0+(((1-vx)*(1-vx))*((-vy)*(-vy)))*f1+(((-vx)*(-vx))*((1-vy)*(1-vy)))*f2+(((-1-vx)*(-1-vx))*((-vy)*(-vy)))*f3+(((-vx)*(-vx))*((-1-vy)*(-1-vy)))*f4+(((1-vx)*(1-vx))*((1-vy)*(1-vy)))*f5+(((-1-vx)*(-1-vx))*((1-vy)*(1-vy)))*f6+(((-1-vx)*(-1-vx))*((-1-vy)*(-1-vy)))*f7+(((1-vx)*(1-vx))*((-1-vy)*(-1-vy)))*f8);
+
+            //=== RELAX TOWARD EQUILIBRIUM ========================
+            Pxy = (1-w)*Pxy;
+            N = (1-w)*N;
+            T = (1-wb)*T+0.66666666666667*wb;
+            Qxyy = (1-w3)*Qxyy;
+            Qyxx = (1-w3)*Qyxx;
+            A = (1-w4)*A+0.11111111111111*w4;
+
+            f[0] = rho*(1-(vx*vx+vy*vy)+4*vx*vy*Pxy-(((vx*vx-vy*vy)/2)*N)+((-2+vx*vx+vy*vy)/2)*T+2*vx*Qxyy+2*vy*Qyxx+A);
+            f[1] = rho/2*(vx*vx+vx*(1-vy*vy)-((2*vy+4*vx*vy)*Pxy)+((1+vx+vx*vx-vy*vy)/2)*N+((1-vx-(vx*vx+vy*vy))/2)*T-((1+2*vx)*Qxyy)-2*vy*Qyxx-A);
+            f[2] = rho/2*(vy*vy+vy*(1-vx*vx)-((2*vx+4*vx*vy)*Pxy)+((-1-vy+vx*vx-vy*vy)/2)*N+((1-vy-(vx*vx+vy*vy))/2)*T-((1+2*vy)*Qyxx)-2*vx*Qxyy-A);
+            f[3] = rho/2*(vx*vx+(-vx)*(1-vy*vy)-((-2*vy+4*vx*vy)*Pxy)+((1-vx+vx*vx-vy*vy)/2)*N+((1-(-vx)-(vx*vx+vy*vy))/2)*T-((-1+2*vx)*Qxyy)-2*vy*Qyxx-A);
+            f[4] = rho/2*(vy*vy+(-vy)*(1-vx*vx)-((-2*vx+4*vx*vy)*Pxy)+((-1-(-vy)+vx*vx-vy*vy)/2)*N+((1-(-vy)-(vx*vx+vy*vy))/2)*T-((-1+2*vy)*Qyxx)-2*vx*Qxyy-A);
+            f[5] = rho/4*(vx*vy+vx*vy*vy+vy*vx*vx+(1+4*vx*vy+2*vy+2*vx)*Pxy+((-vx*vx+vy*vy-vx+vy)/2)*N+((vx*vx+vy*vy+vx+vy)/2)*T+(1+2*vx)*Qxyy+(1+2*vy)*Qyxx+A);
+            f[6] = rho/4*((-vx)*vy+(-vx)*vy*vy+vy*vx*vx+(-1+4*vx*vy-2*vy+2*vx)*Pxy+((-vx*vx+vy*vy-(-vx)+vy)/2)*N+((vx*vx+vy*vy-vx+vy)/2)*T+(-1+2*vx)*Qxyy+(1+2*vy)*Qyxx+A);
+            f[7] = rho/4*(vx*vy+(-vx)*vy*vy+(-vy)*vx*vx+(1+4*vx*vy-2*vy-2*vx)*Pxy+((-vx*vx+vy*vy-(-vx)-vy)/2)*N+((vx*vx+vy*vy-vx-vy)/2)*T+(-1+2*vx)*Qxyy+(-1+2*vy)*Qyxx+A);
+            f[8] = rho/4*((-vx)*vy+vx*vy*vy+(-vy)*vx*vx+(-1+4*vx*vy+2*vy-2*vx)*Pxy+((-vx*vx+vy*vy-vx-vy)/2)*N+((vx*vx+vy*vy+vx-vy)/2)*T+(1+2*vx)*Qxyy+(-1+2*vy)*Qyxx+A);
+
+        }
+
+
+        // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+        if( Y == D.y - 1 || Y == 0 ) {
+            f[1] += 2 * pw[1] * rho * wall_velocity;
+            f[3] -= 2 * pw[3] * rho * wall_velocity;
+            f[5] += 2 * pw[5] * rho * wall_velocity;
+            f[6] -= 2 * pw[6] * rho * wall_velocity;
+            f[7] -= 2 * pw[7] * rho * wall_velocity;
+            f[8] += 2 * pw[8] * rho * wall_velocity;
+        }
+
+        // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+        if( X == D.x - 1 || X == 0 ) {
+            f[2] += 2 * pw[2] * rho * wall_velocity;
+            f[4] -= 2 * pw[4] * rho * wall_velocity;
+            f[5] += 2 * pw[5] * rho * wall_velocity;
+            f[6] += 2 * pw[6] * rho * wall_velocity;
+            f[7] -= 2 * pw[7] * rho * wall_velocity;
+            f[8] -= 2 * pw[8] * rho * wall_velocity;
+        }
+
+        // 6 2 5 //
+        //  \|/  //
+        // 3-0-1 //
+        //  /|\  //
+        // 7 4 8 //
+
+
+        // Store new functions
+        //imageStore( popul_buf[0], I, vec4( f[0] ));
+        imageStore( popul_buffer, I, uvec4( unpackDouble2x32( f[0] ), 0, 0 ));
+
+
+        if( X == D.x - 1 ) bounce( 1, f[1] ); else stream( 1, f[1] );
+        if( Y ==       0 ) bounce( 2, f[2] ); else stream( 2, f[2] );
+        if( X ==       0 ) bounce( 3, f[3] ); else stream( 3, f[3] );
+        if( Y == D.y - 1 ) bounce( 4, f[4] ); else stream( 4, f[4] );
+
+        if( X == D.x - 1 || Y ==       0 ) bounce( 5, f[5] ); else stream( 5, f[5] );
+        if( Y ==       0 || X ==       0 ) bounce( 6, f[6] ); else stream( 6, f[6] );
+        if( X ==       0 || Y == D.y - 1 ) bounce( 7, f[7] ); else stream( 7, f[7] );
+        if( Y == D.y - 1 || X == D.x - 1 ) bounce( 8, f[8] ); else stream( 8, f[8] );
+
+    }   // switch
+}   // main
+
+
+
+
+
+// Directions   :   R   N   S   E   W   NE  SW  SE  NW
+// Cascaded     :   R   NW  W   SW  S   SE  E   NE  N
