@@ -60,9 +60,9 @@ extern( C ) void windowSizeCallback( GLFWwindow * window, int w, int h ) nothrow
 
 /// Callback Function for capturing mouse motion events
 extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) nothrow {
-    if( vd.tb.button == 0 ) return;
+    if( vd.tb.button == 0 || glfwGetKey( window, GLFW_KEY_LALT ) != GLFW_PRESS ) return;
     switch( vd.tb.button ) {
-        //case 1  : vd.tb.orbit( x, y ); break;
+        case 1  : vd.tb.orbit( x, y ); break;
         case 2  : vd.tb.xform( x, y ); break;
         case 4  : vd.tb.dolly( x, y ); break;
         default : break;

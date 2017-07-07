@@ -14,7 +14,7 @@ dependency          "erupted"           path    = "../ErupteD"
 dependency          "vdrive"            path    = "../V-Drive"
 dependency          "imgui_lib"         path    = "../../Lib_CPP/imgui_lib"
 
-libs                "../../Lib_CPP/imgui_lib/lib/imgui"     // this should not be required or should simply be "imgui_lib"
+libs                "../../Lib_CPP/imgui_lib/project/Release/imgui"     // this should not be required or should simply be "imgui_lib"
 
 //buildOptions      "profile"
 //buildOptions      "profileGC"
@@ -22,3 +22,6 @@ libs                "../../Lib_CPP/imgui_lib/lib/imgui"     // this should not b
 
 buildRequirements   "allowWarnings"
 
+buildType "release-noinline" {
+    buildOptions "releaseMode" "optimize" "noBoundsCheck"
+}

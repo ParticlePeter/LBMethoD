@@ -769,6 +769,21 @@ auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
                 if( ImGui.Selectable( "1000" )) { vg.display_ubo.amplify_property = 1000;   vg.updateDisplayUBO; }
                 ImGui.EndPopup();
             }
+
+            if( ImGui.SliderFloat( "Inner Tesselation", vg.display_ubo.tess_level_inner, 0.0f, 64.0f )) vg.updateDisplayUBO;
+            if( ImGui.SliderFloat( "Outer Tesselation", vg.display_ubo.tess_level_outer, 0.0f, 64.0f )) vg.updateDisplayUBO;
+            if( ImGui.SliderFloat( "Inner and Outer T", vg.display_ubo.tess_level_inner, 0.0f, 64.0f )) {
+                vg.display_ubo.tess_level_outer = vg.display_ubo.tess_level_inner;
+                vg.updateDisplayUBO;
+            }
+
+            if( ImGui.DragFloat( "Two Steps I and O T", vg.display_ubo.tess_level_inner, 2.0f, 1.0f, 63.0f )) {
+                vg.display_ubo.tess_level_outer = vg.display_ubo.tess_level_inner;
+                vg.updateDisplayUBO;
+            }
+
+            if( ImGui.DragFloat( "Amp Tesselation", vg.display_ubo.tess_height_amp, 0.001f, 0, 8 )) vg.updateDisplayUBO;
+            if( ImGui.SliderFloat( "Dead Zone", vg.display_ubo.tess_dead_zone, 0.0f, 1.0f )) vg.updateDisplayUBO;
         }
 
         // Bottom Transport Controls

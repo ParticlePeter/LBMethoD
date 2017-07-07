@@ -178,7 +178,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
     VkPhysicalDeviceFeatures features;
     auto available_features = vd.gpu.listFeatures( false );
     features.fillModeNonSolid = available_features.fillModeNonSolid;
-    //features.tessellationShader = available_features.tessellationShader;
+    features.tessellationShader = available_features.tessellationShader;
     //features.shaderClipDistance = available_features.shaderClipDistance;
     //features.shaderCullDistance = available_features.shaderCullDistance;
     //features.shaderStorageImageExtendedFormats = available_features.shaderStorageImageExtendedFormats;

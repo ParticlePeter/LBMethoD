@@ -128,6 +128,10 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
     vd.display_ubo_flush = vd.display_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the display ubo
     vd.display_ubo.display_property = 1;
     vd.display_ubo.amplify_property = 1;
+    vd.display_ubo.tess_level_inner = 8;
+    vd.display_ubo.tess_level_outer = 8;
+    vd.display_ubo.tess_height_amp  = 1;
+    vd.display_ubo.tess_dead_zone   = 0.5;
     vd.updateDisplayUBO;
 
 
@@ -254,18 +258,18 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
     vd.sim_sampler_nearest  = vd.createSampler( VK_FILTER_NEAREST, VK_FILTER_NEAREST );
 
     vd.descriptor = ( *meta_descriptor_ptr )    // VDrive_State.descriptor is a Core_Descriptor
-        .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT ) //| VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT )
+        .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT )
             .addBufferInfo( vd.wvpm_ubo_buffer.buffer )
         .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
             .addTexelBufferView( vd.sim_buffer_view )
         .addLayoutBinding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT )
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
-        .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT ) //| VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT ) // immutable does not filter properly, either driver bug or module descriptor bug
+        .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT ) // immutable does not filter properly, either driver bug or module descriptor bug
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
             .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_sampler_nearest )
         .addLayoutBinding( 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT )
             .addBufferInfo( vd.compute_ubo_buffer.buffer )
-        .addLayoutBinding( 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT ) //| VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT )
+        .addLayoutBinding( 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT )
             .addBufferInfo( vd.display_ubo_buffer.buffer )
         .construct
         .reset;
@@ -328,14 +332,14 @@ auto ref createGraphicsPipeline( ref VDrive_State vd ) {
     vd.graphics_pso = meta_graphics( vd )
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/lbmd_draw.vert" ))
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/lbmd_draw.frag" ))
-        //.addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/lbmd_draw.tesc" ))   // these displace the plane ...
-        //.addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/lbmd_draw.tese" ))   // ... with velocity magnitude
-        //.patchControlPoints( 4 )
-        //.inputAssembly( VK_PRIMITIVE_TOPOLOGY_PATCH_LIST )
-        //.polygonMode( VK_POLYGON_MODE_LINE )
-        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
-        .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.surface.imageExtent )       // add viewport and scissor state, necessary even if we use dynamic state
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/lbmd_draw.tesc" ))   // these displace the plane ...
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/lbmd_draw.tese" ))   // ... with velocity magnitude
+        .polygonMode( VK_POLYGON_MODE_LINE )
+        .patchControlPoints( 4 )
+        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_PATCH_LIST )
+        //.inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.surface.imageExtent )       // add viewport and scissor state, necessary even if we use dynamic state
         .depthState                                                                 // set depth state - enable depth test with default attributes
         .addColorBlendState( VK_FALSE )                                             // color blend state - append common (default) color blend attachment state
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport

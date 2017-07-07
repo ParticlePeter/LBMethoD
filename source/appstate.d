@@ -107,6 +107,10 @@ struct VDrive_State {
     struct Display_UBO {
         uint32_t    display_property        = 0;    // display param display
         float       amplify_property        = 1;    // display param amplify param
+        float       tess_level_inner        = 1;
+        float       tess_level_outer        = 1;
+        float       tess_height_amp         = 1;
+        float       tess_dead_zone          = 0;
     }
 
     Compute_UBO*    compute_ubo;
