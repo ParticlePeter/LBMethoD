@@ -61,7 +61,7 @@ auto ref createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags com
         waitSemaphoreCount      = 1;
         pWaitSemaphores         = &vd.rendered_semaphore;
         swapchainCount          = 1;
-        pSwapchains             = &vd.surface.swapchain;
+        pSwapchains             = &vd.swapchain.swapchain;
     //  pImageIndices           = &next_image_index;            // set before presentation, using the acquired next_image_index
     //  pResults                = null;                         // per swapchain prsentation results, redundant when using only one swapchain
     }
@@ -329,7 +329,7 @@ auto ref createGraphicsPipeline( ref VDrive_State vd ) {
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_VERTEX_BIT,   "shader/lbmd_draw.vert" ))
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_FRAGMENT_BIT, "shader/lbmd_draw.frag" ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
-        .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.surface.imageExtent )       // add viewport and scissor state, necessary even if we use dynamic state
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
         .depthState                                                                 // set depth state - enable depth test with default attributes
         .addColorBlendState( VK_FALSE )                                             // color blend state - append common (default) color blend attachment state
@@ -354,15 +354,15 @@ auto ref createRenderResources( ref VDrive_State vd ) {
     // select swapchain image format and presentation mode //
     /////////////////////////////////////////////////////////
 
-    // Note: to get GPU surface capabilities to check for possible image usages
+    // Note: to get GPU swapchain capabilities to check for possible image usages
     //VkSurfaceCapabilitiesKHR surface_capabilities;
-    //vkGetPhysicalDeviceSurfaceCapabilitiesKHR( surface.gpu, surface.surface, &surface_capabilities );
+    //vkGetPhysicalDeviceSurfaceCapabilitiesKHR( swapchain.gpu, swapchain.swapchain, &surface_capabilities );
     //surface_capabilities.printTypeInfo;
 
     // we need to know the swapchain image format before we create a render pass
     // to render into that swapcahin image. We don't have to create the swapchain itself
     // renderpass needs to be created only once in contrary to the swapchain, which must be
-    // recreated if the window surface size changes
+    // recreated if the window swapchain size changes
     // We set all required parameters here to avoid configuration at multiple locations
     // additionally configuration needs to happen only once
 
@@ -372,7 +372,7 @@ auto ref createRenderResources( ref VDrive_State vd ) {
     //VkPresentModeKHR[2] request_mode = [ VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
 
 
-    vd.surface( vd )
+    vd.swapchain( vd )
         .selectSurfaceFormat( request_format )
         .selectPresentMode( request_mode )
         .minImageCount( 2 ) // MAX_FRAMES
@@ -388,7 +388,7 @@ auto ref createRenderResources( ref VDrive_State vd ) {
 
     vd.render_pass( vd )
         .renderPassAttachment_Clear_None(  vd.depth_image_format,  vd.sample_count, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ).subpassRefDepthStencil
-        .renderPassAttachment_Clear_Store( vd.surface.imageFormat, vd.sample_count, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ).subpassRefColor( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL )
+        .renderPassAttachment_Clear_Store( vd.swapchain.imageFormat, vd.sample_count, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ).subpassRefColor( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL )
 
         // Note: specify dependencies despite of only one subpass, as suggested by:
         // https://software.intel.com/en-us/articles/api-without-secrets-introduction-to-vulkan-part-4#
@@ -539,10 +539,10 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
     // (re)construct the already parametrized swapchain //
     //////////////////////////////////////////////////////
 
-    vd.surface.construct;
+    vd.swapchain.construct;
 
     // set the corresponding present info member to the (re)constructed swapchain
-    vd.present_info.pSwapchains = &vd.surface.swapchain;
+    vd.present_info.pSwapchains = &vd.swapchain.swapchain;
 
 
 
@@ -613,9 +613,9 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
             vd.framebuffers.fb_count + render_targets.length.toUint
             )(
             vd.render_pass.render_pass,                 // specify render pass COMPATIBILITY
-            vd.surface.imageExtent,                     // extent of the framebuffer
+            vd.swapchain.imageExtent,                   // extent of the framebuffer
             render_targets,                             // first ( static ) attachments which will not change ( here only )
-            vd.surface.present_image_views.data,        // next one dynamic attachment ( swapchain ) which changes per command buffer
+            vd.swapchain.present_image_views.data,      // next one dynamic attachment ( swapchain ) which changes per command buffer
             [], false );                                // if we are recreating we do not want to destroy clear values ...
 
     // ... we should keep the clear values, they might have been edited by the gui
@@ -638,8 +638,8 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
     // update dynamic viewport and scissor state //
     ///////////////////////////////////////////////
 
-    vd.viewport = VkViewport( 0, 0, vd.surface.imageExtent.width, vd.surface.imageExtent.height, 0, 1 );
-    vd.scissors = VkRect2D( VkOffset2D( 0, 0 ), vd.surface.imageExtent );
+    vd.viewport = VkViewport( 0, 0, vd.swapchain.imageExtent.width, vd.swapchain.imageExtent.height, 0, 1 );
+    vd.scissors = VkRect2D( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent );
 
     return vd;
 }
@@ -657,7 +657,7 @@ auto ref createResizedCommands( ref VDrive_State vd ) nothrow {
 
 
     // if we know how many command buffers are required we can use this static array function
-    vd.allocateCommandBuffers( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vd.cmd_buffers[ 0 .. vd.surface.imageCount ] );
+    vd.allocateCommandBuffers( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vd.cmd_buffers[ 0 .. vd.swapchain.imageCount ] );
 
 
     // draw command buffer begin info for vkBeginCommandBuffer, can be used in any command buffer
@@ -665,7 +665,7 @@ auto ref createResizedCommands( ref VDrive_State vd ) nothrow {
 
 
     // record command buffer for each swapchain image
-    foreach( uint32_t i, ref cmd_buffer; vd.cmd_buffers[ 0 .. vd.surface.imageCount ] ) {    // remove .data if using static array
+    foreach( uint32_t i, ref cmd_buffer; vd.cmd_buffers[ 0 .. vd.swapchain.imageCount ] ) {    // remove .data if using static array
 
         // attach one of the framebuffers to the render pass
         vd.render_pass.attachFramebuffer( vd.framebuffers( i ));
@@ -720,8 +720,8 @@ auto ref destroyResources( ref VDrive_State vd ) {
 
     vd.device.vkDeviceWaitIdle;
 
-    // surface, swapchain and present image views
-    vd.surface.destroyResources;
+    // swapchain, swapchain and present image views
+    vd.swapchain.destroyResources;
 
     // memory Resources
     vd.depth_image.destroyResources;

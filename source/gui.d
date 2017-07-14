@@ -254,7 +254,7 @@ auto ref createRenderResources( ref VDrive_Gui_State vg ) {
     ///////////////////////////////////////////
 
     // create pipeline for gui rendering
-    import vdrive.shader, vdrive.surface, vdrive.pipeline;
+    import vdrive.shader, vdrive.swapchain, vdrive.pipeline;
     Meta_Graphics meta_graphics = vg;   // temporary construction struct
     vg.gui_graphics_pso = meta_graphics
         .addShaderStageCreateInfo( vg.createPipelineShaderStage( VK_SHADER_STAGE_VERTEX_BIT,   "shader/imgui.vert" ))
@@ -264,7 +264,7 @@ auto ref createRenderResources( ref VDrive_Gui_State vg ) {
         .addAttributeDescription( 1, 0, VK_FORMAT_R32G32_SFLOAT,  ImDrawVert.uv.offsetof  )
         .addAttributeDescription( 2, 0, VK_FORMAT_R8G8B8A8_UNORM, ImDrawVert.col.offsetof )
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST )                   // set the inputAssembly
-        .addViewportAndScissors( VkOffset2D( 0, 0 ), vg.surface.imageExtent )   // add viewport and scissor state, necessary even if we use dynamic state
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), vg.swapchain.imageExtent ) // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_NONE )                                          // set rasterization state
         .frontFace( VK_FRONT_FACE_COUNTER_CLOCKWISE )                           // create deafult depth state
         .depthState                                                             // set depth state - enable depth test with default attributes
@@ -393,9 +393,9 @@ auto ref resizeRenderResources( ref VDrive_Gui_State vg ) {
 
     // allocate vg.GUI_QUEUED_FRAMES command buffers
     import vdrive.command : allocateCommandBuffers;
-    vg.allocateCommandBuffers( vg.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vg.cmd_buffers[ 0 .. vg.surface.imageCount ] );
+    vg.allocateCommandBuffers( vg.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vg.cmd_buffers[ 0 .. vg.swapchain.imageCount ] );
 
-    // gui io display size from surface extent
+    // gui io display size from swapchain extent
     auto io = & ImGui.GetIO();
     io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
 

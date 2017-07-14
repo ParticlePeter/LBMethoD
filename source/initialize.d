@@ -6,7 +6,6 @@ import derelict.glfw3;
 import core.stdc.stdio : printf;
 
 import vdrive.state;
-import vdrive.surface;
 import vdrive.util.info;
 import vdrive.util.util;
 import vdrive.util.array;
@@ -128,9 +127,9 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
 
 
     // create the window VkSurfaceKHR with the instance, surface is stored in the state object
-    import vdrive.surface;
-    glfwCreateWindowSurface( vd.instance, vd.window, vd.allocator, &vd.surface.create_info.surface ).vkAssert;
-    vd.surface.create_info.imageExtent = VkExtent2D( win_w, win_h );    // Set the desired surface extent, this might change at swapchain creation
+    import vdrive.swapchain;
+    glfwCreateWindowSurface( vd.instance, vd.window, vd.allocator, vd.swapchain.surface_ptr ).vkAssert;
+    vd.swapchain.create_info.imageExtent = VkExtent2D( win_w, win_h );    // Set the desired swapchain extent, this might change at swapchain creation
 
 
     // enumerate gpus
@@ -146,7 +145,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
         //gpu.listFeatures;
         //gpu.listLayers;
         //gpu.listExtensions;
-        //printf( "Present supported: %u\n", gpu.presentSupport( vd.surface ));
+        //printf( "Present supported: %u\n", gpu.presentSupport( vd.swapchain ));
     }
 
 
@@ -155,7 +154,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
     // - gpu must support the VK_KHR_swapchain extension
     bool presentation_supported = false;
     foreach( ref gpu; gpus ) {
-        if( gpu.presentSupport( vd.surface.surface )) {
+        if( gpu.presentSupport( vd.swapchain.surface )) {
             presentation_supported = true;
             vd.gpu = gpu;
             break;
@@ -184,10 +183,10 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
 
 
     // Todo(pp): the filtering bellow is not lazy and also allocates, change both to lazy range based
-    auto queue_families = listQueueFamilies( vd.gpu, false, vd.surface.surface );   // last param is optional and only for printing
+    auto queue_families = listQueueFamilies( vd.gpu, false, vd.swapchain.surface );   // last param is optional and only for printing
     auto graphic_queues = queue_families
         .filterQueueFlags( VK_QUEUE_GRAPHICS_BIT )                  // .filterQueueFlags( include, exclude )
-        .filterPresentSupport( vd.gpu, vd.surface.surface );        // .filterPresentSupport( gpu, surface )
+        .filterPresentSupport( vd.gpu, vd.swapchain.surface );      // .filterPresentSupport( gpu, swapchain )
 
 
     // treat the case of combined graphics and presentation queue first
@@ -201,7 +200,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
 
         // get device queues
         vd.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &vd.graphics_queue );
-        vd.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &vd.surface.present_queue );
+        vd.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &vd.swapchain.present_queue );
 
         // store queue family index, required for command pool creation
         vd.graphics_queue_family_index = filtered_queues[0].family_index;
@@ -218,11 +217,11 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
             return VK_ERROR_INITIALIZATION_FAILED;
         }
 
-        // We know that the gpu has presentation support and can present to the surface
+        // We know that the gpu has presentation support and can present to the swapchain
         // take the first available presentation queue
         Queue_Family[2] filtered_queues = [
             graphic_queues.front,
-            queue_families.filterPresentSupport( vd.gpu, vd.surface.surface ).front // .filterPresentSupport( gpu, surface
+            queue_families.filterPresentSupport( vd.gpu, vd.swapchain.surface ).front // .filterPresentSupport( gpu, swapchain
         ];
 
         // initialize the logical device
@@ -230,7 +229,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
 
         // get device queues
         vd.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &vd.graphics_queue );
-        vd.device.vkGetDeviceQueue( filtered_queues[1].family_index, 0, &vd.surface.present_queue );
+        vd.device.vkGetDeviceQueue( filtered_queues[1].family_index, 0, &vd.swapchain.present_queue );
 
         // store queue family index, required for command pool creation
         // family_index of presentation queue seems not to be required later on

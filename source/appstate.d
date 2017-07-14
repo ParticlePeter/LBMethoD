@@ -32,7 +32,7 @@ struct VDrive_State {
     float                       eye_delta = 1;
 
     // surface and swapchain
-    Meta_Surface                surface;
+    Meta_Swapchain              swapchain;
     VkSampleCountFlagBits       sample_count = VK_SAMPLE_COUNT_1_BIT;
     VkFormat                    depth_image_format = VK_FORMAT_D16_UNORM;
 
@@ -124,14 +124,20 @@ struct VDrive_State {
 
   
 
+
+
 }
+
+
+
+
 
 nothrow:
 
 
 // convenience functions for perspective computations in main
-auto windowWidth(  ref VDrive_State vd ) { return vd.surface.imageExtent.width;  }
-auto windowHeight( ref VDrive_State vd ) { return vd.surface.imageExtent.height; }
+auto windowWidth(  ref VDrive_State vd ) { return vd.swapchain.imageExtent.width;  }
+auto windowHeight( ref VDrive_State vd ) { return vd.swapchain.imageExtent.height; }
 
 
 void updateWVPM( ref VDrive_State vd ) {
@@ -177,7 +183,7 @@ void recreateSwapchain( ref VDrive_State vd ) {
 
     // recreate swapchain and other dependent resources
     try {
-        //surface.create_info.imageExtent  = VkExtent2D( win_w, win_h );  // Set the desired surface extent, this might change at swapchain creation
+        //swapchain.create_info.imageExtent  = VkExtent2D( win_w, win_h );  // Set the desired swapchain extent, this might change at swapchain creation
         import resources : resizeRenderResources;
         vd.resizeRenderResources;   // destroy old and recreate window size dependant resources
 
@@ -188,7 +194,7 @@ void recreateSwapchain( ref VDrive_State vd ) {
 // this is used in windowResizeCallback
 // there only a VDrive_State pointer is available and we avoid ugly dereferencing
 void swapchainExtent( VDrive_State* vd, uint32_t win_w, uint32_t win_h ) {
-    vd.surface.create_info.imageExtent = VkExtent2D( win_w, win_h );
+    vd.swapchain.create_info.imageExtent = VkExtent2D( win_w, win_h );
 }
 
 
@@ -212,7 +218,7 @@ void drawInit( ref VDrive_State vd ) {
     }
 
     // acquire next swapchain image
-    vd.device.vkAcquireNextImageKHR( vd.surface.swapchain, uint64_t.max, vd.acquired_semaphore, VK_NULL_HANDLE, &vd.next_image_index );
+    vd.device.vkAcquireNextImageKHR( vd.swapchain.swapchain, uint64_t.max, vd.acquired_semaphore, VK_NULL_HANDLE, &vd.next_image_index );
 
     // wait for finished drawing
     vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );
@@ -243,7 +249,7 @@ void draw( ref VDrive_State vd ) {
 
     // present rendered image
     vd.present_info.pImageIndices = &vd.next_image_index;
-    vd.surface.present_queue.vkQueuePresentKHR( &vd.present_info );
+    vd.swapchain.present_queue.vkQueuePresentKHR( &vd.present_info );
 
 
     // check if window was resized and handle the case
@@ -259,7 +265,7 @@ void draw( ref VDrive_State vd ) {
     }
 
     // acquire next swapchain image
-    vd.device.vkAcquireNextImageKHR( vd.surface.swapchain, uint64_t.max, vd.acquired_semaphore, VK_NULL_HANDLE, &vd.next_image_index );
+    vd.device.vkAcquireNextImageKHR( vd.swapchain.swapchain, uint64_t.max, vd.acquired_semaphore, VK_NULL_HANDLE, &vd.next_image_index );
 
     // wait for finished drawing
     vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );
