@@ -1,0 +1,8 @@
+.dub/
+profile/
+*.spv
+dub.selections.json
+*.sublime-workspace
+*.sln
+.vs/
+ensight/
