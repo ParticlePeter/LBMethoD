@@ -795,7 +795,7 @@ auto ref createResizedCommands( ref VDrive_State vd ) nothrow {
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.graphics_pso.pipeline );
 
         // push constant the sim display scale
-        auto sim_display_scale = vd.simDisplayScale( 2 ); 
+        auto sim_display_scale = vd.simDisplayScale( 2 );
         cmd_buffer.vkCmdPushConstants( vd.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, sim_display_scale.ptr );
 
         // buffer-less draw with build in gl_VertexIndex exclusively to generate position and texcoord data
@@ -810,6 +810,14 @@ auto ref createResizedCommands( ref VDrive_State vd ) nothrow {
 
     return vd;
 }
+
+
+
+
+
+
+
+
 
 
 
