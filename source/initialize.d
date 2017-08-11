@@ -176,10 +176,18 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
     // enabling shader clip and cull distance is not required if gl_PerVertex is (re)defined
     VkPhysicalDeviceFeatures features;
     auto available_features = vd.gpu.listFeatures( false );
-    features.fillModeNonSolid = available_features.fillModeNonSolid;
+    //features.fillModeNonSolid = available_features.fillModeNonSolid;
     //features.shaderClipDistance = available_features.shaderClipDistance;
     //features.shaderCullDistance = available_features.shaderCullDistance;
-    //features.shaderStorageImageExtendedFormats = available_features.shaderStorageImageExtendedFormats;
+    //features.tessellationShader = available_features.tessellationShader;
+    features.shaderStorageImageExtendedFormats = available_features.shaderStorageImageExtendedFormats;
+    features.largePoints = available_features.largePoints;
+
+
+    if( available_features.shaderFloat64 ) {
+        vd.sim_shader_double = true;
+        features.shaderFloat64 = available_features.shaderFloat64;
+    }
 
 
     // Todo(pp): the filtering bellow is not lazy and also allocates, change both to lazy range based
