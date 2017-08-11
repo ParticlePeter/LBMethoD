@@ -738,7 +738,14 @@ private {
 }
 
 
-auto ref newGuiFrame( ref VDrive_Gui_State vg ) {
+
+
+
+////////////////////////////////////
+// Create and draw User Interface //
+////////////////////////////////////
+
+void drawGui( ref VDrive_Gui_State vg ) {
 
     auto io = & ImGui.GetIO();
     auto style = & ImGui.GetStyle();
