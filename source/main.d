@@ -85,6 +85,8 @@ int main() {
         glfwPollEvents();
     }
 
+    import cpustate : cpuFree;
+    vd.cpuFree;
 
     // drain work and destroy vulkan
     vd.destroyResources;
