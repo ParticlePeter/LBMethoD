@@ -194,6 +194,34 @@ auto ref createCommandObjects( ref VDrive_Gui_State vg ) {
 auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
     resources.createMemoryObjects( vg );
 
+    // get available devices, store their names concatenated in private devices pointer
+    // with this we can list them in an ImGui.Combo and make them selectable
+    import vdrive.util.info;
+    size_t devices_char_count = 4;
+    auto gpus = vg.instance.listPhysicalDevices( false );
+    device_count += cast( ubyte )gpus.length;
+    //devices_char_count += device_count * size_t.sizeof;  // sizeof( some_pointer );
+
+    import core.stdc.string : strlen;
+    foreach( ref gpu; gpus ) {
+        devices_char_count += strlen( gpu.listProperties.deviceName.ptr ) + 1;
+    }
+
+    import core.stdc.stdlib : malloc;
+    device_names = cast( char* )malloc( devices_char_count + 1 );   // + 1 for second terminating zero
+    device_names[ 0 .. 4 ] = "CPU\0";
+
+    char* device_name_target = device_names + 4;
+    import core.stdc.string : strcpy;
+    foreach( ref gpu; gpus ) {
+        strcpy( device_name_target, gpu.listProperties.deviceName.ptr );
+        device_name_target += strlen( gpu.listProperties.deviceName.ptr ) + 1;
+    }
+
+    // even though the allocated memory range seems to be \0 initialized we set the last char to \0 to be sure
+    device_names[ devices_char_count ] = '\0';  // we allocated devices_char_count + 1, hence no -1 required 
+
+
     // initialize VDrive_Gui_State member from VDrive_State member
     vg.sim_domain               = vg.vd.sim_domain;
     vg.sim_layers               = vg.vd.sim_layers;
