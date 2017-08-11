@@ -140,76 +140,69 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
     return vd.createSimMemoryObjects;
 }
 
-private enum USE_DOUBLE = false;
-
-/// create or recreate simulation memory, buffers and images
-auto ref createSimMemoryObjects( ref VDrive_State vd ) {
-
-    // 1.) (re)create Image, Buffer (and the buffer view) without memory backing
-    // 2.) check if the memory requirement for the objects above has increased, if not goto 4.) - this does not work currently ... 
-    // 3.) if it has recreate the memory object - ... as memory can be bound only once, skipping step 2.) but delete memory if it exist
-    // 4.) (re)register resources
-    // 5.) (re)create VkImageView and VkBufferView(s)
-    // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
-
-    // 1.) (re)create Image, Buffer (and the buffer view) without memory backing
-    if( vd.sim_image.image     != VK_NULL_HANDLE ) vd.sim_image.destroyResources( false );  // destroy old image and its view, keeping the sampler
-    if( vd.sim_buffer.buffer   != VK_NULL_HANDLE ) vd.sim_buffer.destroyResources;          // destroy old buffer
-    if( vd.sim_buffer_view     != VK_NULL_HANDLE ) vd.destroy( vd.sim_buffer_view );        // destroy old buffer view
 
 
-    // For D2Q9 we need 1 + 2 * 8 Shader Storage Buffers with sim_dim.x * sim_dim.y floats each
+/// create or recreate simulation buffer
+auto ref createSimBuffer( ref VDrive_State vd ) {
+
+    // (re)create buffer and buffer view
+    if( vd.sim_buffer.buffer   != VK_NULL_HANDLE ) {
+        vd.graphics_queue.vkQueueWaitIdle;
+        vd.sim_buffer.destroyResources;          // destroy old buffer
+    }
+    if( vd.sim_buffer_view     != VK_NULL_HANDLE ) {
+        vd.graphics_queue.vkQueueWaitIdle;
+        vd.destroy( vd.sim_buffer_view );        // destroy old buffer view
+    }
+
+
+    // For D2Q9 we need 1 + 2 * 8 Shader Storage Buffers with sim_dim.x * sim_dim.y cells,
     // for 512 ^ 2 cells this means ( 1 + 2 * 8 ) * 4 * 512 * 512 = 17_825_792 bytes
     // create one buffer 1 + 2 * 8 buffer views into that buffer
-    uint32_t population_mem_size = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2] * float.sizeof.toUint;
-    uint32_t buffer_size = vd.sim_layers * population_mem_size * ( USE_DOUBLE ? 2 : 1 );
+    uint32_t buffer_size = vd.sim_layers * vd.sim_domain[0] * vd.sim_domain[1] * ( vd.sim_use_3_dim ? vd.sim_domain[2] : 1 );
+    uint32_t buffer_mem_size = buffer_size * ( vd.sim_use_double ? double.sizeof : float.sizeof ).toUint;
 
+    vd.sim_buffer( vd )
+        .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_mem_size )
+        .createMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+
+    vd.sim_buffer_view =
+        vd.createBufferView( vd.sim_buffer.buffer,
+            vd.sim_use_double ? VK_FORMAT_R32G32_UINT : VK_FORMAT_R32_SFLOAT, 0, buffer_mem_size );
+
+    return vd;
+}
+
+
+
+/// create or recreate simulation images
+auto ref createSimImage( ref VDrive_State vd ) {
+
+    // 1) (re)create Image
+    if( vd.sim_image.image != VK_NULL_HANDLE ) {
+        vd.graphics_queue.vkQueueWaitIdle;
+        vd.sim_image.destroyResources( false );  // destroy old image and its view, keeping the sampler
+    }
 
     // Todo(pp): the format should be choose-able
     // Todo(pp): here checks are required if this image format is available for VK_IMAGE_USAGE_STORAGE_BIT
+    auto image_format = VK_FORMAT_R32G32_SFLOAT; //VK_FORMAT_R16G16B16A16_SFLOAT
     vd.sim_image( vd )
-        .create( VK_FORMAT_R16G16B16A16_SFLOAT, vd.sim_domain[0], vd.sim_domain[1], VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT )
-        .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
-
-    vd.sim_buffer( vd )
-        .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_size )
-        .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
-
-
-    // 2.) check if the memory requirement for the objects above has increased, if not goto 4.) 
-    // - this does not work currently ... skipping 
-/*  VkDeviceSize required_mem_size = 0;     // here we will store the required memory
-    vd.sim_memory( vd )
-        .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
-        .addRange( vd.sim_buffer, & required_mem_size )    // with the optional second parameter
-        .addRange( vd.sim_image,  & required_mem_size );   // the meta memory struct does not mutate
-*/
-/*
-    // 3.) if it has recreate the memory object - ... as memory can be bound only once, skipping step 2.) but delete memory if it exist
-    if( vd.sim_memory.memSize > 0 )
-        vd.sim_memory( vd ).destroyResources;
-
-    vd.sim_memory( vd )
-        .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
-        .addRange( vd.sim_buffer )
-        .addRange( vd.sim_image )
-        .allocate;     
-
-
-    // 4.) (re)register resources
-    vd.sim_memory
-        .bind( vd.sim_buffer )
-        .bind( vd.sim_image );
-*/
-
-    // 5.) (re)create VkImageView and VkBufferView(s)
-    vd.sim_image.createView;
-    vd.sim_buffer_view = vd.createBufferView( vd.sim_buffer.buffer, USE_DOUBLE ? VK_FORMAT_R32G32_UINT : VK_FORMAT_R32_SFLOAT, 0, buffer_size );
+        .create(
+            image_format,
+            vd.sim_domain[0], vd.sim_domain[1], vd.sim_use_3_dim ? vd.sim_domain[1] : 0,    // through the 0 we request a VK_IMAGE_TYPE_2D
+            1, 1, // mip levels and array layers
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+            VK_SAMPLE_COUNT_1_BIT,
+            GREG ? VK_IMAGE_TILING_OPTIMAL : VK_IMAGE_TILING_LINEAR
+            )
+        .createMemory( GREG ? VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT : VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )   // Todo(pp): check which memory property is required for the image format
+        .createView;
 
 
     // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
     auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
-    auto init_cmd_buffer_bi = commandBufferBeginInfo( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
+    auto init_cmd_buffer_bi = createCmdBufferBI( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
     init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
 
     // record image layout transition to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
@@ -227,7 +220,34 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
     auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
     vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
 
+    // map the image after the layout transition, according to validation layers
+    // only GENERAL or PREINITIALIZED layouts should be used for memory mapping
+    if( !GREG )
+        vd.sim_image_ptr = cast( float* )vd.sim_image.mapMemory;
+
+
     return vd;
+}
+
+
+
+enum GREG = false;
+
+/// create or recreate simulation memory, buffers and images
+auto ref createSimMemoryObjects( ref VDrive_State vd ) {
+
+    // 1.) (re)create Image, Buffer (and the buffer view) without memory backing
+    // 2.) check if the memory requirement for the objects above has increased, if not goto 4.) - this does not work currently ...
+    // 3.) if it has recreate the memory object - ... as memory can be bound only once, skipping step 2.) but delete memory if it exist
+    // 4.) (re)register resources
+    // 5.) (re)create VkImageView and VkBufferView(s)
+    // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
+
+    return vd
+        .createParticleBuffer
+        .createSimBuffer
+        .createSimImage;
+
 }
 
 
