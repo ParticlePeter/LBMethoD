@@ -285,6 +285,22 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
     */
 
 
+
+
+    // collect useable shaders
+    if( hasShaderDirChanged( "shader" ))
+        parseShaderDirectory;
+    /*
+    import std.stdio;
+    printf( shader_names_ptr[ 1 ] );
+    writefln( " and %s are %s", vg.sim_init_shader,
+        compareShaderNamesAndReplace( shader_names_ptr[ 1 ], vg.sim_init_shader ) ? "equal!" : "not equal!" );
+
+    printf( shader_names_ptr[ 1 ] );
+    writefln( " and %s are %s", vg.sim_init_shader,
+        compareShaderNamesAndReplace( shader_names_ptr[ 1 ], vg.sim_init_shader ) ? "equal!" : "not equal!" );
+    */
+
     // Initialize gui draw buffers
     foreach( i; 0 .. vg.GUI_QUEUED_FRAMES ) {
         vg.gui_vtx_buffers[ i ] = vg;
@@ -689,6 +705,202 @@ private {
             ImGui.PopTextWrapPos;
             ImGui.EndTooltip;
         }
+    }
+
+
+
+    /////////////////////////////////////////////////////////////////////////////////////
+    // store available shader names concatenated and pointer into it as dynamic arrays //  
+    /////////////////////////////////////////////////////////////////////////////////////
+
+    import vdrive.util.array;
+    Array!( const( char )* )    shader_names_ptr;
+    Array!char                  shader_names_combined;
+
+    // any of the following will be set to size_t max
+    // if no shader of corresponding type is found
+    size_t  init_shader_start_index = 0;
+    size_t  loop_shader_start_index;
+    size_t  draw_shader_start_index;
+    size_t  export_shader_start_index;
+
+
+    void parseShaderDirectoryNo( string path_to_dir = "shader" ) {
+        init_shader_start_index     = size_t.max;
+        loop_shader_start_index     = size_t.max;
+        draw_shader_start_index     = size_t.max;
+        export_shader_start_index   = size_t.max;
+    }
+
+
+    void parseShaderDirectory( string path_to_dir = "shader" ) {
+        import std.file : dirEntries, SpanMode;
+        import std.path : stripExtension;
+        import std.array : array;
+        import std.algorithm : filter, map, startsWith, endsWith, uniq;
+
+        shader_dir = path_to_dir;
+        shader_names_ptr.clear();
+        shader_names_combined.clear();
+
+
+        //
+        // append init shader
+        //
+        dirEntries( path_to_dir, SpanMode.shallow )
+            .filter!( f => f.name.startsWith( "shader\\init_" ))
+            .filter!( f => f.name.endsWith( ".comp" ))
+            .map!( f => f.name.stripExtension )
+            .array
+            .toPtrArray( shader_names_ptr, shader_names_combined, '\0' );
+
+
+        // if shader_names_combined reallocated shader_names_ptr are invalid afterwards
+        // hence we cast each pointer to the distance to his successor
+        // the last appending operation will have valid pointers and we can use the
+        // distances to reconstruct the correct pointers
+
+        // store the last valid start pointer
+        const( char )* last_start_pointer = null;
+        size_t last_shader_count;
+        if( 0 < shader_names_ptr.length ) {
+            last_start_pointer = shader_names_ptr[0];
+        
+            // get distances of init shaders
+            foreach( i, ptr; shader_names_ptr.data[ 1 .. $ ] )
+                shader_names_ptr[ i ] = cast( const( char* ))( ptr - shader_names_ptr[ i ] );
+            shader_names_ptr[ $ - 1 ] = cast( const( char* ))( & shader_names_combined[ $ - 1 ] + 1 - shader_names_ptr[ $ - 1 ] );
+
+            // store the current shader count, should be the same as loop_shader_start_index
+            last_shader_count = shader_names_ptr.length;
+        } else
+            init_shader_start_index = size_t.max;
+
+
+        //
+        // append loop shader 
+        //
+        loop_shader_start_index = dirEntries( path_to_dir, SpanMode.shallow )
+            .filter!( f => f.name.startsWith( "shader\\loop_" ))
+            .filter!( f => f.name.endsWith( ".comp" ))
+            .map!( f => f.name.stripExtension )
+            .array
+            .toPtrArray( shader_names_ptr, shader_names_combined, '\0' );
+
+        // store the last valid start pointer
+        if( last_shader_count  < shader_names_ptr.length ) {
+            last_start_pointer = shader_names_ptr[ last_shader_count ];
+
+            // get distances of loop shaders
+            foreach( i, ptr; shader_names_ptr.data[ last_shader_count + 1 .. $ ] )
+                shader_names_ptr[last_shader_count + i ] = cast( const( char* ))( ptr - shader_names_ptr[ last_shader_count + i ] );
+            shader_names_ptr[ $ - 1 ] = cast( const( char* ))( & shader_names_combined[ $ - 1 ] + 1 - shader_names_ptr[ $ - 1 ] );
+
+            // if store the current shader count, should be the same as draw_shader_start_index
+            last_shader_count = shader_names_ptr.length;
+        } else
+            loop_shader_start_index = size_t.max;
+
+
+        //
+        // append draw display shader
+        //
+        draw_shader_start_index = dirEntries( path_to_dir, SpanMode.shallow )
+            .filter!( f => f.name.startsWith( "shader\\display_" ))
+            .filter!( f => f.name.endsWith( ".frag" ))
+            .map!( f => f.name.stripExtension )
+            .array
+            .toPtrArray( shader_names_ptr, shader_names_combined, '\0' );
+
+
+        // store the last valid start pointer
+        if( last_shader_count  < shader_names_ptr.length ) {
+            last_start_pointer = shader_names_ptr[ last_shader_count ];
+
+            // get distances of draw display shaders
+            foreach( i, ptr; shader_names_ptr.data[ last_shader_count + 1 .. $ ] )
+                shader_names_ptr[ last_shader_count + i ] = cast( const( char* ))( ptr - shader_names_ptr[ last_shader_count + i ] );
+            shader_names_ptr[ $ - 1 ] = cast( const( char* ))( & shader_names_combined[ $ - 1 ] + 1 - shader_names_ptr[ $ - 1 ] );
+
+            // store the current shader count, should be the same as draw_shader_start_index
+            last_shader_count = shader_names_ptr.length;
+        } else
+            draw_shader_start_index = size_t.max;
+
+        //
+        // append export shader
+        //
+        export_shader_start_index = dirEntries( path_to_dir, SpanMode.shallow )
+            .filter!( f => f.name.startsWith( "shader\\export_" ))
+            .filter!( f => f.name.endsWith( ".comp" ))
+            .map!( f => f.name.stripExtension )
+            .array
+            .toPtrArray( shader_names_ptr, shader_names_combined, '\0' );
+
+        // store the last valid start pointer
+        if( last_shader_count  < shader_names_ptr.length ) {
+            last_start_pointer = shader_names_ptr[ last_shader_count ];
+
+            // get distances of draw display shaders
+            foreach( i, ptr; shader_names_ptr.data[ last_shader_count + 1 .. $ ] )
+                shader_names_ptr[ last_shader_count + i ] = cast( const( char* ))( ptr - shader_names_ptr[ last_shader_count + i ] );
+            shader_names_ptr[ $ - 1 ] = cast( const( char* ))( & shader_names_combined[ $ - 1 ] + 1 - shader_names_ptr[ $ - 1 ] );
+
+            // store the current shader count, should be the same as draw_shader_start_index
+            last_shader_count = shader_names_ptr.length;
+        } else
+            export_shader_start_index = size_t.max;
+
+        // the distance stored at index last_shader_count is not needed any more
+        // set the location to the last valid start pointer
+        shader_names_ptr[ $ - 1 ] = shader_names_combined.ptr + shader_names_combined.length - cast( int )shader_names_ptr[ $ - 1 ];
+
+        //auto reconstruct_ptr = 
+        // now patch shader_names_ptr going backwards from index last_shader_count
+        // fixing previous pointers with distances stored starting a last_shader_count - 1
+        foreach_reverse( i, ptr; shader_names_ptr.data[ 1 .. $ ] ) {
+            shader_names_ptr[ i ] = ptr - cast( int )shader_names_ptr[ i ];
+        }
+
+
+        //  foreach( shader; shader_names_ptr ) {
+        //      import core.stdc.stdio : printf;
+        //      printf( "%s\n", shader );
+        //  }
+    }
+
+    //
+    // comapere shader names of currently used shader and currently selected shader
+    //
+    bool compareShaderNamesAndReplace( const( char* ) gui_shader, ref string sim_shader ) {
+        import std.conv : to;
+        import std.algorithm : cmp;
+        import std.string : fromStringz;
+        import std.path : extension, stripExtension;
+        
+        bool equal = cmp( gui_shader.fromStringz, sim_shader.stripExtension ) == 0;
+        if( !equal ) sim_shader = gui_shader.fromStringz.to!string ~ sim_shader.extension;
+        import std.stdio;
+        writeln( sim_shader );
+        return equal;
+    }
+
+    //
+    // detect if shader directory was modified
+    //
+    import std.datetime : SysTime;
+    SysTime shader_dir_mod_time;
+    string  shader_dir;
+
+    bool hasShaderDirChanged( string path_to_dir = "shader" ) {
+        import std.file : getTimes;
+        SysTime access_time, mod_time;                          // access times are irrelevant
+        path_to_dir.getTimes( access_time, mod_time );          // get dir mod times
+        if( shader_dir_mod_time < mod_time || path_to_dir != shader_dir ) {
+            shader_dir_mod_time = mod_time;
+            return true;
+        }
+        return false;
     }
 
 
