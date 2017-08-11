@@ -754,7 +754,7 @@ auto ref destroyResources( ref VDrive_State vd ) {
 
     // memory Resources
     vd.depth_image.destroyResources;
-    vd.wvpm_ubo_buffer.destroyResources;
+    vd.xform_ubo_buffer.destroyResources;
     vd.compute_ubo_buffer.destroyResources;
     vd.display_ubo_buffer.destroyResources;
     vd.host_visible_memory.unmapMemory.destroyResources;
