@@ -258,7 +258,7 @@ void draw( ref VDrive_State vd ) {
         vd.recreateSwapchain;
         import resources : createResizedCommands;
         vd.createResizedCommands;
-    } /*else if( vd.tb.dirty )*/ {
+    } else if( vd.tb.dirty ) {
         vd.updateWVPM;  // this happens anyway in recreateSwapchain
         //import core.stdc.stdio : printf;
         //printf( "%d\n", (*( vd.wvpm ))[0].y );
