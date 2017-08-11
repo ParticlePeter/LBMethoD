@@ -1046,10 +1046,30 @@ void drawGui( ref VDrive_Gui_State vg ) {
     }
 
 
+    ////////////////////
+    // Compute Device //
+    ////////////////////
 
         ////////////////////////
         // Compute Parameters //
         ////////////////////////
+    if( ImGui.CollapsingHeader( "Compute Device" )) {
+        ImGui.Separator;
+        ImGui.PushItemWidth( -1 );
+        if( ImGui.Combo( "Device", & compute_device, device_names )) {
+            if( compute_device == 0 ) {
+                vg.cpuReset;
+                vg.sim_use_cpu = true;
+            } else {
+                //vg.cpuFree;
+                vg.sim_use_cpu = false;
+                vg.sim_use_double &= vg.sim_shader_double;
+            }
+        }
+        ImGui.PopItemWidth;
+        
+        collapsingTerminator;
+    }
 
         float drag_step = 16;
         if( ImGui.CollapsingHeader( "Compute Parameter" )) {
