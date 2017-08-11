@@ -22,3 +22,7 @@ libs                "../../Lib_CPP/imgui_lib/project/Debug/imgui"     // this sh
 
 buildRequirements   "allowWarnings"
 
+buildType "release-noinline" {
+    buildOptions "releaseMode" "optimize" "noBoundsCheck"
+}
+
