@@ -34,7 +34,7 @@ struct VDrive_Gui_State {
     Meta_Buffer[ GUI_QUEUED_FRAMES ]    gui_vtx_buffers;
     Meta_Buffer[ GUI_QUEUED_FRAMES ]    gui_idx_buffers;
 
-    VkCommandBufferBeginInfo    gui_cmd_buffer_bi = {
+    VkCommandBufferBeginInfo gui_cmd_buffer_bi = {
         flags : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
     };
 
@@ -366,7 +366,7 @@ auto ref createRenderResources( ref VDrive_Gui_State vg ) {
 
 
 auto ref resetGlfwCallbacks( ref VDrive_Gui_State vg ) {
-    // set glfw callbacks, these here wrap the callbacks in module input  
+    // set glfw callbacks, these here wrap the callbacks in module input
     glfwSetWindowSizeCallback(      vg.window, & guiWindowSizeCallback );
     glfwSetMouseButtonCallback(     vg.window, & guiMouseButtonCallback );
     glfwSetScrollCallback(          vg.window, &guiScrollCallback );
