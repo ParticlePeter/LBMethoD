@@ -172,15 +172,13 @@ auto ref initImgui( ref VDrive_Gui_State vg ) {
 
 
 auto ref createCommandObjects( ref VDrive_Gui_State vg ) {
-    import resources : resources_createCommandObjects = createCommandObjects;    // forward to appstate createRenderResources
-    vg.resources_createCommandObjects( VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT );
+    resources.createCommandObjects( vg, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT );
     return vg;
 }
 
 
 auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
-    import resources : resources_createMemoryObjects = createMemoryObjects; // forward to appstate createRenderResources
-    vg.resources_createMemoryObjects;
+    resources.createMemoryObjects( vg );
 
     // initialize VDrive_Gui_State member from VDrive_State member
     vg.sim_wall_velocity    = vg.compute_ubo.wall_velocity * vg.sim_speed_of_sound * vg.sim_speed_of_sound;
@@ -229,8 +227,7 @@ auto ref createDescriptorSet( ref VDrive_Gui_State vg ) {
             .addImageInfo( vg.gui_font_tex.image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, vg.gui_font_tex.sampler );
 
     // forward to appstate createDescriptorSet with the currently being configured meta_descriptor
-    import resources : resources_createDescriptorSet = createDescriptorSet;
-    vg.resources_createDescriptorSet( & meta_descriptor );
+    resources.createDescriptorSet( vg, & meta_descriptor );
 
     return vg;
 }
@@ -244,8 +241,7 @@ auto ref createRenderResources( ref VDrive_Gui_State vg ) {
     //////////////////////////////////////////////
 
     // forward to appstate createRenderResources
-    import resources : resources_createRenderResources = createRenderResources;
-    vg.resources_createRenderResources;
+    resources.createRenderResources( vg );
 
 
 
@@ -384,8 +380,7 @@ auto ref resetGlfwCallbacks( ref VDrive_Gui_State vg ) {
 
 auto ref resizeRenderResources( ref VDrive_Gui_State vg ) {
     // forward to appstate resizeRenderResources
-    import resources : resources_resizeRenderResources = resizeRenderResources;
-    vg.resources_resizeRenderResources;
+    resources.resizeRenderResources( vg );
 
     // reset the command pool to start recording drawing commands
     vg.graphics_queue.vkQueueWaitIdle;   // equivalent using a fence per Spec v1.0.48
@@ -406,8 +401,7 @@ auto ref resizeRenderResources( ref VDrive_Gui_State vg ) {
 
 auto ref drawInit( ref VDrive_Gui_State vg ) {
     // forward to appstate drawInit
-    import resources : resources_drawInit = drawInit;
-    vg.resources_drawInit;
+    appstate.drawInit( vg );
 }
 
 
