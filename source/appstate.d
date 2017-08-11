@@ -96,6 +96,13 @@ struct VDrive_State {
     Core_Pipeline               draw_line_pso;
 
 
+    // export resources
+    Core_Pipeline               comp_export_pso;
+    Meta_Memory                 export_memory;
+    Meta_Buffer                 export_buffer;
+    VkBufferView                export_buffer_view;
+    Meta_Descriptor_Update      export_descriptor_update;  // update only the export descriptor
+    void*                       export_data;
 
 
     /////////////////////////////////////////////////
@@ -110,6 +117,7 @@ struct VDrive_State {
 
     string      sim_init_shader             = "shader\\init_D2Q9.comp";
     string      sim_loop_shader             = "shader\\loop_D2Q9_channel_flow.comp";
+    string      export_shader               = "shader\\export_from_image.comp";
 
     struct Compute_UBO {
         float       collision_frequency     = 1;    // sim param omega
