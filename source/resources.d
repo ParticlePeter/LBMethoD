@@ -510,21 +510,15 @@ auto ref createCompBoltzmannPipeline( ref VDrive_State vd, bool init_pso, bool l
         .addMapEntry( MapEntry32( 1 + 255 ), 3 )                // latter is the constantID, must be passed in if the current constant id does not correspond
         .construct;
 
-
-    // create initial compute pso with specialization, if we are recreating we r
-    Meta_Compute meta_compute;
-    void createComputePSO() {
+    void createComputePSO( Core_Pipeline* pso, string shader_path ) {
         vd.graphics_queue.vkQueueWaitIdle;  // wait for queue idle as we need to destroy the pipeline
-        auto old_pso = vd.compute_pso;      // store old pipeline to improve new pipeline construction speed
-        vd.compute_pso = meta_compute( vd )
+        Meta_Compute meta_compute;          // use temporary Meta_Compute struct to specify and create the pso
+        auto old_pso = *pso;                // store old pipeline to destroy after new pipeline is created
+        *pso = meta_compute( vd )           // extracting the core items after construction with reset call
             //.basePipeline( old_pso.pipeline )
-            .shaderStageCreateInfo(
-                vd.createPipelineShaderStage(
-                    VK_SHADER_STAGE_COMPUTE_BIT,
-                    USE_DOUBLE ? "shader/lbmd_loop_double.comp" : "shader/lbmd_loop.comp",
-                    & meta_sc.specialization_info ))
+            .shaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_COMPUTE_BIT, shader_path, & meta_sc.specialization_info ))
             .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
-            .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 4 )
+            .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 8 )
             .construct( vd.compute_cache )  // construct using pipeline cache
             .destroyShaderModule
             .reset;
@@ -534,33 +528,52 @@ auto ref createCompBoltzmannPipeline( ref VDrive_State vd, bool init_pso, bool l
             vd.destroy( old_pso );
     }
 
-    createComputePSO();
+    // determine dispatch group X count from simulation domain vd.sim_domain and compute work group size vd.sim_work_group_size[0]
+    uint32_t dispatch_x = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2] / vd.sim_work_group_size[0];
+    /*
+    uint32_t[3] work_group_count = [
+        vd.sim_domain[0] / vd.sim_work_group_size[0],
+        vd.sim_domain[1] / vd.sim_work_group_size[1],
+        vd.sim_use_3_dim ? vd.sim_domain[2] / vd.sim_work_group_size[2] : 1,
+    ];
+    */
 
-    //////////////////////////////////////////////////
-    // initialize populations with compute pipeline //
-    //////////////////////////////////////////////////
+    // possibly initialize the populations with initialization compute shader
+    if( init_pso ) {
+        createComputePSO( & vd.comp_init_pso, vd.sim_init_shader ); // putting responsibility to use the right double shader into users hand
+        //  vd.sim_use_double ? "shader/init_D2Q9_double.comp" : "shader/init_D2Q9.comp" );
+        reset_sim = true;
+    }
 
-    auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
-    auto init_cmd_buffer_bi = commandBufferBeginInfo( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
-    init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
-    // determine dispatch group X count from simulation domain vd.sim_domain and compute work group size vd.sim_work_group_size_x
-    uint32_t dispatch_x = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2] / vd.sim_work_group_size_x;
+    if( reset_sim ) {
 
-    init_cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.compute_pso.pipeline );   // bind compute vd.compute_pso
-    init_cmd_buffer.vkCmdBindDescriptorSets(// VkCommandBuffer              commandBuffer           // bind descriptor set
-        VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
-        vd.compute_pso.pipeline_layout,     // VkPipelineLayout             layout
-        0,                                  // uint32_t                     firstSet
-        1,                                  // uint32_t                     descriptorSetCount
-        &vd.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
-        0,                                  // uint32_t                     dynamicOffsetCount
-        null                                // const( uint32_t )*           pDynamicOffsets
-    );
+        //////////////////////////////////////////////////
+        // initialize populations with compute pipeline //
+        //////////////////////////////////////////////////
 
-    init_cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );      // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
-    init_cmd_buffer.vkEndCommandBuffer;                     // finish recording and submit the command
-    auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
-    vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
+        auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
+        auto init_cmd_buffer_bi = createCmdBufferBI( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
+        init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
+
+
+        init_cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.comp_init_pso.pipeline );   // bind compute vd.comp_loop_pso
+        init_cmd_buffer.vkCmdBindDescriptorSets(// VkCommandBuffer              commandBuffer           // bind descriptor set
+            VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
+            vd.comp_init_pso.pipeline_layout,   // VkPipelineLayout             layout
+            0,                                  // uint32_t                     firstSet
+            1,                                  // uint32_t                     descriptorSetCount
+            &vd.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
+            0,                                  // uint32_t                     dynamicOffsetCount
+            null                                // const( uint32_t )*           pDynamicOffsets
+        );
+
+    //  init_cmd_buffer.vdCmdDispatch( work_group_count );      // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+        init_cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );      // dispatch compute command
+        init_cmd_buffer.vkEndCommandBuffer;                     // finish recording and submit the command
+        auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
+        vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
+
+    }
 
 
 
@@ -568,42 +581,49 @@ auto ref createCompBoltzmannPipeline( ref VDrive_State vd, bool init_pso, bool l
     // recreate compute pipeline for runtime loop //
     ////////////////////////////////////////////////
 
-    // reuse meta_compute to create loop compute pso with collision algorithm specialization
-    meta_sc.specialization_data[1] = MapEntry32( vd.sim_algorithm );    // all settings higher 0 are loop algorithms
-    createComputePSO;                                                   // reuse code from above
-
+    if( loop_pso ) {
+        // reuse meta_compute to create loop compute pso with collision algorithm specialization
+        meta_sc.specialization_data[3] = MapEntry32( vd.sim_algorithm );    // all settings higher 0 are loop algorithms
+        createComputePSO( & vd.comp_loop_pso, vd.sim_loop_shader );         // putting responsibility to use the right double shader into users hand
+        //  vd.sim_use_double ? "shader/loop_D2Q9_ldc_double.comp" : "shader/loop_D2Q9_channel_flow.comp" );
+    }
 
 
     /////////////////////////////////////////////////
     // create two reusable compute command buffers //
     /////////////////////////////////////////////////
 
+    // reset the command pool to start recording drawing commands
+    vd.graphics_queue.vkQueueWaitIdle;   // equivalent using a fence per Spec v1.0.48
+    vd.device.vkResetCommandPool( vd.sim_cmd_pool, 0 ); // second argument is VkCommandPoolResetFlags
+
     // two command buffers for compute loop, one ping and one pong buffer
     vd.allocateCommandBuffers( vd.sim_cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vd.sim_cmd_buffers );
-    auto sim_cmd_buffers_bi = commandBufferBeginInfo;
+    auto sim_cmd_buffers_bi = createCmdBufferBI;
 
     // record commands in loop, only difference is the push constant
     foreach( i, ref cmd_buffer; vd.sim_cmd_buffers ) {
-        uint push_constant = ( i * vd.sim_ping_pong_scale ).toUint;
+        uint32_t[2] push_constant = [ i.toUint, vd.sim_layers ];
         cmd_buffer.vkBeginCommandBuffer( &sim_cmd_buffers_bi );  // begin command buffer recording
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.compute_pso.pipeline );    // bind compute vd.compute_pso.pipeline
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.comp_loop_pso.pipeline );    // bind compute vd.comp_loop_pso.pipeline
         cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
             VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
-            vd.compute_pso.pipeline_layout,     // VkPipelineLayout             layout
+            vd.comp_loop_pso.pipeline_layout,     // VkPipelineLayout             layout
             0,                                  // uint32_t                     firstSet
             1,                                  // uint32_t                     descriptorSetCount
             &vd.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
             0,                                  // uint32_t                     dynamicOffsetCount
             null                                // const( uint32_t )*           pDynamicOffsets
         );
-        cmd_buffer.vkCmdPushConstants( vd.compute_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 4, &push_constant ); // push constant
-        cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );       // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+        cmd_buffer.vkCmdPushConstants( vd.comp_loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
+    //  cmd_buffer.vdCmdDispatch( work_group_count );       // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+        cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );       // dispatch compute command
         cmd_buffer.vkEndCommandBuffer;                      // finish recording and submit the command
     }
 
-    // initialize ping pong variable to 1
+    // init_pso ping pong variable to 1
     // it will be switched to 0 ( pp = 1 - pp ) befor submitting compute commands
-    vd.sim_ping_pong = 1;
+    //vd.sim_ping_pong = 1;
 
     return vd;
 }
