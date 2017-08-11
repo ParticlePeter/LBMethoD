@@ -233,7 +233,50 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
     vg.sim_display.scale        = vg.simDisplayScale( 2 + vg.vd.sim_use_3_dim );
     vg.sim_display.lines_norm[] = 1.0f / vg.sim_domain[];
     vg.updateViscosity;
-    
+    /*
+    import dlsl.vector;
+    import std.stdio;
+    uvec3 Domain = uvec3( vg.sim_domain );
+    uvec3 gl_WorkGroupSize = uvec3( vg.sim_work_group_size );
+    uvec3 gl_NumWorkGroups = uvec3( vg.sim_domain ) / gl_WorkGroupSize;
+    uvec3 gl_WorkGroupID;
+    uvec3 gl_LocalInvocationID;
+    uvec3 gl_GlobalInvocationID;
+    foreach( gl_WorkGroupID_z; 0 .. gl_NumWorkGroups.z )        { gl_WorkGroupID.z = gl_WorkGroupID_z;
+    foreach( gl_WorkGroupID_y; 0 .. gl_NumWorkGroups.y )        { gl_WorkGroupID.y = gl_WorkGroupID_y;
+    foreach( gl_WorkGroupID_x; 0 .. gl_NumWorkGroups.x )        { gl_WorkGroupID.x = gl_WorkGroupID_x;
+    foreach( gl_LocalInvocationID_z; 0 .. gl_WorkGroupSize.z )  { gl_LocalInvocationID.z = gl_LocalInvocationID_z;
+    foreach( gl_LocalInvocationID_y; 0 .. gl_WorkGroupSize.y )  { gl_LocalInvocationID.y = gl_LocalInvocationID_y;
+    foreach( gl_LocalInvocationID_x; 0 .. gl_WorkGroupSize.x )  { gl_LocalInvocationID.x = gl_LocalInvocationID_x;
+        gl_GlobalInvocationID = gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID;
+
+        uint gl_LocalInvocationIndex =
+            gl_LocalInvocationID.z * gl_WorkGroupSize.x * gl_WorkGroupSize.y +
+            gl_LocalInvocationID.y * gl_WorkGroupSize.x + 
+            gl_LocalInvocationID.x;
+
+        uint gl_WorkGroupIndex = 
+            gl_WorkGroupID.z * gl_NumWorkGroups.z * gl_NumWorkGroups.y +
+            gl_WorkGroupID.y * gl_NumWorkGroups.x +
+            gl_WorkGroupID.x;
+
+        uint I = gl_WorkGroupIndex * gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z + gl_LocalInvocationIndex;
+
+
+            //gl_WorkGroupID.z * gl_WorkGroupSize.z + gl_LocalInvocationID.z * Domain.x * Domain.y + // in the 2D case gl_GlobalInvocationID.z is const and 0
+            //gl_WorkGroupID.y * gl_WorkGroupSize.y + gl_LocalInvocationID.y * Domain.x + 
+            //gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
+
+        //writeln( "         gl_WorkGroupID : ", gl_WorkGroupID );
+        //writeln( "       gl_WorkGroupSize : ", gl_WorkGroupSize );
+        //writeln( "   gl_LocalInvocationID : ", gl_LocalInvocationID );
+        //writeln( "  gl_GlobalInvocationID : ", gl_GlobalInvocationID );
+        //writeln( "gl_LocalInvocationIndex : ", gl_LocalInvocationIndex );
+        writeln( "                      I : ", I );
+        //writeln;
+    }}}}}}
+    */
+
 
     // Initialize gui draw buffers
     foreach( i; 0 .. vg.GUI_QUEUED_FRAMES ) {
