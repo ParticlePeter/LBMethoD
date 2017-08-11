@@ -98,29 +98,29 @@ auto ref initImgui( ref VDrive_Gui_State vg ) {
 
     // define style
     auto style                      = & ImGui.GetStyle();
-//  style.Alpha                     = 1;    // Global Alpah                     
-    style.WindowPadding             = ImVec2( 4, 4 );             
-//  style.WindowMinSize
-    style.WindowRounding            = 0;            
-//  style.WindowTitleAlign
-    style.ChildWindowRounding       = 4;      
-//  style.FramePadding
-    style.FrameRounding             = 3;             
+    //  style.Alpha                     = 1;    // Global Alpah
+    style.WindowPadding             = ImVec2( 4, 4 );
+    //  style.WindowMinSize
+    style.WindowRounding            = 0;
+    //  style.WindowTitleAlign
+    style.ChildWindowRounding       = 4;
+    //  style.FramePadding
+    style.FrameRounding             = 3;
     style.ItemSpacing               = ImVec2( 4, 4 );
-//  style.ItemInnerSpacing
-//  style.TouchExtraPadding
-//  style.IndentSpacing
-//  style.ColumnsMinSpacing
-//  style.ScrollbarSize
-    style.ScrollbarRounding         = 3;         
+    //  style.ItemInnerSpacing
+    //  style.TouchExtraPadding
+    //  style.IndentSpacing
+    //  style.ColumnsMinSpacing
+    //  style.ScrollbarSize
+    style.ScrollbarRounding         = 3;
     style.GrabMinSize               = 7;
-    style.GrabRounding              = 2;              
-//  style.ButtonTextAlign
-//  style.DisplayWindowPadding
-//  style.DisplaySafeAreaPadding
-//  style.AntiAliasedLines
-//  style.AntiAliasedShapes
-//  style.CurveTessellationTol
+    style.GrabRounding              = 2;
+    //  style.ButtonTextAlign
+    //  style.DisplayWindowPadding
+    //  style.DisplaySafeAreaPadding
+    //  style.AntiAliasedLines
+    //  style.AntiAliasedShapes
+    //  style.CurveTessellationTol
 
     style.Colors[ ImGuiCol_Text ]                   = ImVec4( 0.90f, 0.90f, 0.90f, 1.00f ); //ImVec4( 0.90f, 0.90f, 0.90f, 1.00f );
     style.Colors[ ImGuiCol_TextDisabled ]           = ImVec4( 0.60f, 0.60f, 0.60f, 1.00f ); //ImVec4( 0.60f, 0.60f, 0.60f, 1.00f );
@@ -130,8 +130,8 @@ auto ref initImgui( ref VDrive_Gui_State vg ) {
     style.Colors[ ImGuiCol_Border ]                 = ImVec4( 0.37f, 0.37f, 0.37f, 0.25f ); //ImVec4( 0.37f, 0.37f, 0.37f, 0.25f );
     style.Colors[ ImGuiCol_BorderShadow ]           = ImVec4( 0.00f, 0.00f, 0.00f, 0.00f ); //ImVec4( 0.00f, 0.00f, 0.00f, 0.00f );
     style.Colors[ ImGuiCol_FrameBg ]                = ImVec4( 0.25f, 0.25f, 0.25f, 1.00f ); //ImVec4( 0.25f, 0.25f, 0.25f, 1.00f );
-    style.Colors[ ImGuiCol_FrameBgHovered ]         = ImVec4( 0.50f, 0.50f, 0.50f, 1.00f ); //ImVec4( 0.50f, 0.50f, 0.50f, 1.00f );
-    style.Colors[ ImGuiCol_FrameBgActive ]          = ImVec4( 0.65f, 0.65f, 0.65f, 1.00f ); //ImVec4( 0.65f, 0.65f, 0.65f, 1.00f );
+    style.Colors[ ImGuiCol_FrameBgHovered ]         = ImVec4( 0.40f, 0.40f, 0.40f, 1.00f ); //ImVec4( 0.50f, 0.50f, 0.50f, 1.00f );
+    style.Colors[ ImGuiCol_FrameBgActive ]          = ImVec4( 0.50f, 0.50f, 0.50f, 1.00f ); //ImVec4( 0.65f, 0.65f, 0.65f, 1.00f );
     style.Colors[ ImGuiCol_TitleBg ]                = ImVec4( 0.16f, 0.26f, 0.38f, 1.00f ); //ImVec4( 0.27f, 0.27f, 0.54f, 0.83f );
     style.Colors[ ImGuiCol_TitleBgCollapsed ]       = ImVec4( 0.16f, 0.26f, 0.38f, 1.00f ); //ImVec4( 0.40f, 0.40f, 0.80f, 0.20f );
     style.Colors[ ImGuiCol_TitleBgActive ]          = ImVec4( 0.19f, 0.30f, 0.41f, 1.00f ); //ImVec4( 0.22f, 0.35f, 0.50f, 1.00f );
@@ -141,7 +141,7 @@ auto ref initImgui( ref VDrive_Gui_State vg ) {
     style.Colors[ ImGuiCol_ScrollbarGrabHovered ]   = ImVec4( 0.22f, 0.35f, 0.50f, 1.00f ); //ImVec4( 0.50f, 0.50f, 0.50f, 1.00f );
     style.Colors[ ImGuiCol_ScrollbarGrabActive ]    = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.00f, 0.50f, 1.00f, 1.00f );
     style.Colors[ ImGuiCol_ComboBg ]                = ImVec4( 0.20f, 0.20f, 0.20f, 1.00f ); //ImVec4( 0.20f, 0.20f, 0.20f, 1.00f );
-    style.Colors[ ImGuiCol_CheckMark ]              = ImVec4( 0.90f, 0.90f, 0.90f, 1.00f ); //ImVec4( 0.90f, 0.90f, 0.90f, 1.00f );
+    style.Colors[ ImGuiCol_CheckMark ]              = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.90f, 0.90f, 0.90f, 1.00f );
     style.Colors[ ImGuiCol_SliderGrab ]             = ImVec4( 1.00f, 1.00f, 1.00f, 0.25f ); //ImVec4( 1.00f, 1.00f, 1.00f, 0.25f );
     style.Colors[ ImGuiCol_SliderGrabActive ]       = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.00f, 0.50f, 1.00f, 1.00f );
     style.Colors[ ImGuiCol_Button ]                 = ImVec4( 0.16f, 0.26f, 0.38f, 1.00f ); //ImVec4( 0.40f, 0.40f, 0.40f, 1.00f );
@@ -164,7 +164,7 @@ auto ref initImgui( ref VDrive_Gui_State vg ) {
     style.Colors[ ImGuiCol_PlotHistogram ]          = ImVec4( 0.90f, 0.70f, 0.00f, 1.00f ); //ImVec4( 0.90f, 0.70f, 0.00f, 1.00f );
     style.Colors[ ImGuiCol_PlotHistogramHovered ]   = ImVec4( 1.00f, 0.60f, 0.00f, 1.00f ); //ImVec4( 1.00f, 0.60f, 0.00f, 1.00f );
     style.Colors[ ImGuiCol_TextSelectedBg ]         = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.00f, 0.50f, 1.00f, 1.00f );
-    style.Colors[ ImGuiCol_ModalWindowDarkening ]   = ImVec4( 0.20f, 0.20f, 0.20f, 0.35f ); //ImVec4( 0.20f, 0.20f, 0.20f, 0.35f );  
+    style.Colors[ ImGuiCol_ModalWindowDarkening ]   = ImVec4( 0.20f, 0.20f, 0.20f, 0.35f ); //ImVec4( 0.20f, 0.20f, 0.20f, 0.35f );
 
     return vg;
 }
