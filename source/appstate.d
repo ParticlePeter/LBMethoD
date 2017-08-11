@@ -107,6 +107,8 @@ struct VDrive_State {
     uint32_t[3] sim_work_group_size         = [ 256, 1, 1 ];
     uint32_t    sim_ping_pong               = 1;
 
+    string      sim_init_shader             = "shader\\init_D2Q9.comp";
+    string      sim_loop_shader             = "shader\\loop_D2Q9_channel_flow.comp";
 
     struct Compute_UBO {
         float       collision_frequency     = 1;    // sim param omega
