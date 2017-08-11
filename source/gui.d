@@ -180,6 +180,13 @@ auto ref initImgui( ref VDrive_Gui_State vg ) {
     style.Colors[ ImGuiCol_TextSelectedBg ]         = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.00f, 0.50f, 1.00f, 1.00f );
     style.Colors[ ImGuiCol_ModalWindowDarkening ]   = ImVec4( 0.20f, 0.20f, 0.20f, 0.35f ); //ImVec4( 0.20f, 0.20f, 0.20f, 0.35f );
 
+    
+
+    // as this is the first func called, without requiring any VDrive state
+    // we use the oportunity to setup the drawFunc function pointer
+    draw_func = & drawFunc;
+    draw_func_sim = & drawFuncSim;
+
     return vg;
 }
 
@@ -519,21 +526,74 @@ auto ref destroyResources( ref VDrive_Gui_State vg ) {
     return vg;
 }
 
+
+
+
+//////////////////////////
+// Initial on time draw // 
+//////////////////////////
+
 auto ref drawInit( ref VDrive_Gui_State vg ) {
     // forward to appstate drawInit
     appstate.drawInit( vg );
+    return vg;
 }
 
 
 
+//////////////////////////////////////////////////////////
+// Step draw called in (loop) draw and with step button // 
+//////////////////////////////////////////////////////////
+
+//
+// Actually a function pointer so that we can set it with the purpose of cpu sim or export
+//
+alias Draw_Func = void function( ref VDrive_Gui_State vg ) nothrow @system;
+private Draw_Func draw_func;
+private Draw_Func draw_func_sim;
+
+void setDrawFunc( Draw_Func func = null ) nothrow @system {
+    if( func )  draw_func = func;
+    else        draw_func = & drawFunc;
+}
+
+void setDrawFuncSim( Draw_Func func = null ) nothrow @system {
+    if( func )  draw_func_sim = func;
+    else        draw_func_sim = & drawFuncSim;
+}
+
+// this is the default draw_func function, we need it outside of VDrive_State
+// now we can perfectly control single stepping through the gui
+// Todo(pp): try if this stuff should better be in VDrive_State
+private void drawFuncSim( ref VDrive_Gui_State vg ) nothrow @system {
+    appstate.drawSim( vg.vd );
+}
+
+private void drawFunc( ref VDrive_Gui_State vg ) nothrow @system {
+    appstate.draw( vg.vd );
+}
+
+private void drawStep( ref VDrive_Gui_State vg ) nothrow @system {
+    vg.drawCmdBufferCount = 2;
+    appstate.drawSim( vg.vd );
+    vg.drawCmdBufferCount = 1;
+    draw_func = & drawFunc;
+
+}
+
+
+///////////////////////////////////
+// Loop draw called in main loop // 
+///////////////////////////////////
+
 void draw( ref VDrive_Gui_State vg ) {
 
-    // record next command buffer asynchronous
-    if( vg.draw_gui ) vg.newGuiFrame;
+    // record next command buffer asynchronous 
+    if( vg.draw_gui )   // this can't be a function pointer as well 
+        vg.drawGui;     // as we wouldn't know what else has to be drawn (drawFunc or drawFuncSim etc. )
 
-    // forward to appstate draw
-    import appstate : appstate_draw = draw;
-    vg.appstate_draw;
+    // call function pointer 
+    vg.draw_func;
 }
 
 
@@ -567,6 +627,35 @@ private {
 
     int resetFrameMax   = 0;
     float minFramerate  = 10000, maxFramerate = 0.0001f;
+    //
+    // transport control funcs
+    //
+    void simPause( ref VDrive_Gui_State vg ) {
+        draw_func = & drawFunc;
+        vg.drawCmdBufferCount = 1;
+    }
+    void simPlay( ref VDrive_Gui_State vg ) {
+        draw_func = & drawFuncSim;
+        vg.drawCmdBufferCount = 2;
+    }
+    void simStep( ref VDrive_Gui_State vg ) {
+        if( !isPlaying ) {
+            draw_func = & drawStep;
+        }
+    }
+    void simReset( ref VDrive_Gui_State vg ) {
+        vg.sim_index = 0;
+        if( vg.sim_use_cpu ) {
+            vg.cpuInit;
+        } else {
+            vg.createCompBoltzmannPipeline( false, false, true );  // rebuild init pipeline, rebuild loop pipeline, reset domain
+        }
+    }
+    bool isPlaying() {
+        return draw_func == draw_func_sim;
+    }
+
+
 
     ImGuiWindowFlags window_flags = 0
         | ImGuiWindowFlags_NoTitleBar
