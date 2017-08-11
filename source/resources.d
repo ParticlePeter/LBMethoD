@@ -355,8 +355,8 @@ auto ref createGraphicsPipeline( ref VDrive_State vd ) {
 
     Meta_Graphics meta_graphics;
     vd.graphics_pso = meta_graphics( vd )
-        .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_VERTEX_BIT,   "shader/lbmd_draw.vert" ))
-        .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_FRAGMENT_BIT, "shader/lbmd_draw.frag" ))
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_display.vert" ))
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_display.frag" ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
