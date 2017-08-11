@@ -80,15 +80,15 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
 
     debug {
         // we would like to use the debug report callback functionality if available
-        if( "VK_EXT_debug_report".isExtension ) {
+        if( "VK_EXT_debug_report".isExtension( false )) {
             extensions[ extension_count ] = "VK_EXT_debug_report";
             ++extension_count;
         }
 
         // and report standard validation issues if LunarG validation layer is available
         if( "VK_LAYER_LUNARG_standard_validation".isLayer( false )) {
-           layers[ layer_count ] = "VK_LAYER_LUNARG_standard_validation";
-           ++layer_count; 
+            layers[ layer_count ] = "VK_LAYER_LUNARG_standard_validation";
+            ++layer_count; 
         }
     }
 
@@ -103,7 +103,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
 
 
     // check if all of the layers are available, exit if not
-    foreach( layer; layers ) {
+    foreach( layer; layers[ 0..layer_count ] ) {
         if( !layer.isLayer( false )) {
             printf( "Required layers %s not available. Exiting!\n", layer );
             return VK_ERROR_INITIALIZATION_FAILED;
