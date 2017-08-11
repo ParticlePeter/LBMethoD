@@ -784,29 +784,24 @@ void drawGui( ref VDrive_Gui_State vg ) {
     // 1. Show a simple window
     // Tip: if we don't call ImGui.Begin()/ImGui.End() the widgets appears in a window automatically called "Debug"
 
-    void transportControls() {
-        if( vg.sim_play ) { if( ImGui.Button( "Pause", button_size )) vg.sim_play = false; }
-        else              { if( ImGui.Button( "Play",  button_size )) vg.sim_play = true;  }
-        ImGui.SameLine;
-        if( ImGui.Button( "Step", button_size )) vg.sim_step = true;
-        ImGui.SameLine;
-        import resources : resetComputePipeline;
-        if( ImGui.Button( "Reset", button_size )) { 
-            vg.sim_display_scale = vg.vd.simDisplayScale( 2 );
-            vg.resetComputePipeline; 
-        }
-    }
-
-
-
-
 
     ImGui.SetNextWindowPos(  main_win_pos,  ImGuiSetCond_Always );
     ImGui.SetNextWindowSize( main_win_size, ImGuiSetCond_Always );
-    ImGui.Begin( "Main Window", null, window_flags ); {
+    ImGui.Begin( "Main Window", null, window_flags );
 
-        // create transport controls at top of window
-        transportControls;
+    // create transport controls at top of window
+    if( isPlaying ) { if( ImGui.Button( "Pause", button_size_3 )) simPause( vg ); }
+    else            { if( ImGui.Button( "Play",  button_size_3 )) simPlay(  vg ); }
+    ImGui.SameLine;   if( ImGui.Button( "Step",  button_size_3 )) simStep(  vg );
+    ImGui.SameLine;   if( ImGui.Button( "Reset", button_size_3 )) simReset( vg );
+    ImGui.Separator;
+
+    // create transport controls at top of window
+    //if( vg.sim_play ) { if( ImGui.Button( "Pause", button_size_3 )) { draw_func = & drawSim; vg.drawCmdBufferCount = 2; }
+    //else              { if( ImGui.Button( "Play",  button_size_3 )) { draw_func = & draw;    vg.drawCmdBufferCount = 1; }
+    //ImGui.SameLine;     if( ImGui.Button( "Step",  button_size_3 ) && !sim_play ) { vg.drawCmdBufferCount = 2; vg.drawSim; vg.drawCmdBufferCount = 1; }
+    //ImGui.SameLine;     if( ImGui.Button( "Reset", button_size_3 )) vg.simReset;
+    //ImGui.Separator;
 
         // set width of items and their label
         ImGui.PushItemWidth( main_win_size.x / 2 );
