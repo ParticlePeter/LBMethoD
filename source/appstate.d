@@ -66,7 +66,8 @@ struct VDrive_State {
     Meta_Renderpass             render_pass;
     Core_Descriptor             descriptor;
     Core_Pipeline               graphics_pso;
-    Core_Pipeline               compute_pso;
+    Core_Pipeline               comp_loop_pso;
+    Core_Pipeline               comp_init_pso;
     VkPipelineCache             graphics_cache;
     VkPipelineCache             compute_cache;
     Meta_FB!( 4, 2 )            framebuffers;

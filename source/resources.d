@@ -556,7 +556,7 @@ auto ref createCompBoltzmannPipeline( ref VDrive_State vd, bool init_pso, bool l
         init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
 
 
-        init_cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.comp_init_pso.pipeline );   // bind compute vd.comp_loop_pso
+        init_cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.comp_init_pso.pipeline ); // bind compute vd.comp_loop_pso
         init_cmd_buffer.vkCmdBindDescriptorSets(// VkCommandBuffer              commandBuffer           // bind descriptor set
             VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
             vd.comp_init_pso.pipeline_layout,   // VkPipelineLayout             layout
@@ -840,7 +840,8 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.framebuffers.destroyResources;
     vd.destroy( vd.descriptor );
     vd.destroy( vd.graphics_pso );
-    vd.destroy( vd.compute_pso );
+    vd.destroy( vd.comp_init_pso );
+    vd.destroy( vd.comp_loop_pso );
     vd.destroy( vd.draw_line_pso );
     vd.destroy( vd.graphics_cache );
     vd.destroy( vd.compute_cache );
