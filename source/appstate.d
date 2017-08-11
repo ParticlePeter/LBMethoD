@@ -56,15 +56,21 @@ struct VDrive_State {
     VkPresentInfoKHR            present_info;
     VkSubmitInfo                submit_info;
 
+
     // synchronize
-    VkFence[MAX_FRAMES]         submit_fence;
+    VkFence[ MAX_FRAMES ]       submit_fence;
     VkSemaphore                 acquired_semaphore;
     VkSemaphore                 rendered_semaphore;
     uint32_t                    next_image_index;
 
+
+    // one descriptor for all purposes
+    Core_Descriptor             descriptor;
+    Meta_Descriptor_Update      sim_descriptor_update;  // updating the descriptor in the case of reconstructed sim resources
+
+
     // render setup
     Meta_Renderpass             render_pass;
-    Core_Descriptor             descriptor;
     Core_Pipeline               graphics_pso;
     Core_Pipeline               comp_loop_pso;
     Core_Pipeline               comp_init_pso;
@@ -74,6 +80,7 @@ struct VDrive_State {
     VkViewport                  viewport;               // dynamic state viewport
     VkRect2D                    scissors;               // dynamic state scissors
 
+
     // simulation resources
     VkCommandPool               sim_cmd_pool;           // we do not reset this on window resize events
     VkCommandBuffer[2]          sim_cmd_buffers;        // using ping pong approach for now
@@ -81,7 +88,6 @@ struct VDrive_State {
     Meta_Buffer                 sim_buffer;             // mesoscopic velocity populations
     Meta_Memory                 sim_memory;             // memory backing image and buffer
     VkBufferView                sim_buffer_view;        // arbitrary count of buffer views, dynamic resizing is not that easy as we would have to recreate the descriptor set each time
-    Meta_Descriptor_Update      sim_descriptor_update;  // updating the descriptor in the case of reconstructed sim resources
     Meta_Buffer                 compute_ubo_buffer;
     VkMappedMemoryRange         compute_ubo_flush;
     Meta_Buffer                 display_ubo_buffer;
@@ -90,26 +96,30 @@ struct VDrive_State {
 
 
 
-    // simulation configuration and auxiliary data
+
+    /////////////////////////////////////////////////
+    // simulation configuration and auxiliary data //
+    /////////////////////////////////////////////////
 
     // compute parameters
     uint32_t[3] sim_domain                  = [ 256, 256, 1 ];
     uint32_t    sim_layers                  = 17;
-    uint32_t    sim_work_group_size_x       = 256;   
+    uint32_t[3] sim_work_group_size         = [ 256, 1, 1 ];
+    uint32_t    sim_ping_pong               = 1;
+
+
+    struct Compute_UBO {
+        float       collision_frequency     = 1;    // sim param omega
+        float       wall_velocity           = 0;    // sim param for lid driven cavity
+    }
 
     // simulation parameters
     immutable float sim_unit_speed_of_sound = 0.5773502691896258; // 1 / sqrt( 3 );
     float           sim_speed_of_sound      = sim_unit_speed_of_sound;
     float           sim_unit_spatial        = 1;
     float           sim_unit_temporal       = 1;
-    uint32_t        sim_algorithm           = 3;      
-
-
-    struct Compute_UBO {
-        float       collision_frequency     = 1;    // sim param omega 
-        float       wall_velocity           = 0;    // sim param for lid driven cavity
-    }
-
+    uint32_t        sim_algorithm           = 4; //3;
+    uint32_t        sim_index               = 0;
 
     struct Display_UBO {
         uint32_t    display_property        = 0;    // display param display
@@ -127,9 +137,9 @@ struct VDrive_State {
 
 
     // window resize callback result
-    bool        window_resized              = false;
+    bool            window_resized          = false;
 
-  
+
 
 
 
