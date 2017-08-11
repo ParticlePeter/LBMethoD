@@ -597,19 +597,57 @@ void draw( ref VDrive_Gui_State vg ) {
 }
 
 
+
+//////////////////////////
+// private module stuff //
+//////////////////////////
+
 private {
     bool show_test_window           = false;
     bool show_style_editor          = false;
     bool show_another_window        = false;
+    bool show_imgui_examples        = false;
 
-    immutable auto button_size      = ImVec2( 112, 20 );
-    immutable auto child_size       = ImVec2( 0, -24 );
+    //
+    // used to determine fps
+    //
+    int resetFrameMax   = 0;
+    float minFramerate  = 10000, maxFramerate = 0.0001f;
+
+    //
+    // Base item settings
+    //
     immutable auto main_win_pos     = ImVec2( 0, 0 );
     auto main_win_size              = ImVec2( 352, 900 );
-    
+
+    immutable auto button_size_1    = ImVec2( 344, 20 );
+    immutable auto button_size_2    = ImVec2( 176, 20 );
+    immutable auto button_size_3    = ImVec2( 112, 20 );
+    immutable auto button_size_4    = ImVec2(  85, 20 );
+
+    immutable auto disabled_text    = ImVec4( 0.4, 0.4, 0.4, 1 );
+
+    ubyte   device_count  = 1;      // initialize with one being the CPU
+    char*   device_names;           // store all names of physical devices consecutively
+    int     compute_device = 1;     // select compute device, 0 = CPU
+    //char**  device_names_ptr;     // store pointers to each individual string
+
+
+    void checkComputeParams( ref VDrive_Gui_State vg ) {
+        vg.sim_compute_dirty = 
+            ( vg.vd.sim_use_double  != vg.sim_use_double )
+        ||  ( vg.vd.sim_use_3_dim   != vg.sim_use_3_dim )
+        ||  ( vg.vd.sim_domain != vg.sim_domain )
+        ||  ( vg.vd.sim_layers != vg.sim_layers );
+    }
+
+    void checkComputePSO( ref VDrive_Gui_State vg ) {
+        vg.sim_work_group_dirty = vg.vd.sim_work_group_size != vg.sim_work_group_size;
+    } 
+
     void updateTauOmega( ref VDrive_Gui_State vg ) {
         float speed_of_sound_squared = vg.sim_speed_of_sound * vg.sim_speed_of_sound;
-        vg.compute_ubo.collision_frequency = 
+        vg.compute_ubo.collision_frequency =
             2 * speed_of_sound_squared /
             ( vg.sim_unit_temporal * ( 2 * vg.sim_viscosity + speed_of_sound_squared ));
         vg.sim_relaxation_rate = 1 / vg.compute_ubo.collision_frequency;
@@ -618,15 +656,43 @@ private {
 
     void updateWallVelocity( ref VDrive_Gui_State vg ) {
         float speed_of_sound_squared = vg.sim_speed_of_sound * vg.sim_speed_of_sound;
-        vg.compute_ubo.wall_velocity = vg.sim_wall_velocity / speed_of_sound_squared;
+        vg.compute_ubo.wall_velocity = vg.sim_wall_velocity * 3;// / speed_of_sound_squared;
     }
 
     void updateViscosity( ref VDrive_Gui_State vg ) {
         vg.sim_viscosity = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
     }
 
-    int resetFrameMax   = 0;
-    float minFramerate  = 10000, maxFramerate = 0.0001f;
+    void pushButtonStyleDisable() {
+        ImGui.PushStyleColor( ImGuiCol_Text, disabled_text );
+        auto disabled_color = ImVec4( 0.08f, 0.13f, 0.19f, 1.00f );
+        ImGui.PushStyleColor( ImGuiCol_Button, disabled_color );
+        ImGui.PushStyleColor( ImGuiCol_ButtonHovered, disabled_color );
+        ImGui.PushStyleColor( ImGuiCol_ButtonActive, disabled_color );
+    }
+
+    void popButtonStyleDisable() {
+        ImGui.PopStyleColor( 4 );
+    }
+
+    void collapsingTerminator() {
+        ImGui.Spacing;
+        ImGui.Separator;
+    }
+
+    void showTooltip( const( char )* text, float wrap_position = 300 ) {
+        //ImGui.TextDisabled("(?)");    // this should be called before showTooltip so we can customize it
+        if( ImGui.IsItemHovered ) {
+            ImGui.BeginTooltip;
+            ImGui.PushTextWrapPos( wrap_position );
+            ImGui.TextUnformatted( text );
+            ImGui.PopTextWrapPos;
+            ImGui.EndTooltip;
+        }
+    }
+
+
+
     //
     // transport control funcs
     //
@@ -657,6 +723,9 @@ private {
 
 
 
+    //
+    // window flags for the main UI window
+    //
     ImGuiWindowFlags window_flags = 0
         | ImGuiWindowFlags_NoTitleBar
     //  | ImGuiWindowFlags_ShowBorders
