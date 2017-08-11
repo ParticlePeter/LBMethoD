@@ -753,6 +753,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
     // Setup time step
     auto current_time = cast( float )glfwGetTime();
     io.DeltaTime = g_Time > 0.0f ? ( current_time - g_Time ) : ( 1.0f / 60.0f );
+    vg.xform_ubo.time_step = io.DeltaTime;
     g_Time = current_time;
 
     // Setup inputs
