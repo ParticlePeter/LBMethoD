@@ -232,6 +232,11 @@ void updateProjection( ref VDrive_State vd ) {
 }
 
 
+void drawCmdBufferCount( ref VDrive_State vd, uint32_t count ) {
+   vd.submit_info.commandBufferCount = count;
+}
+
+
 void drawInit( ref VDrive_State vd ) {
     // check if window was resized and handle the case
     if( vd.window_resized ) {
