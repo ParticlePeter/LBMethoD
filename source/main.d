@@ -18,9 +18,6 @@ int main() {
     import core.stdc.stdio : printf;
     printf( "\n" );
 
-    //import imgui.imgui;
-    //auto imGuiIO = GetIO();
-
     enum IMGUI = true;
 
     static if( IMGUI ) {
@@ -35,14 +32,12 @@ int main() {
     auto vkResult = vd.initVulkan( 1600, 900 );     // initialize instance and (physical) device
     if( vkResult ) return vkResult;                 // exit if initialization failed, VK_SUCCESS = 0
 
-    vd  .createCommandObjects                       // create command pool and sync primitives
-        .createMemoryObjects                        // create memory objects once used through out programm lifetime
-        .createDescriptorSet                        // create descriptor set
-        .createRenderResources                      // configure swapchain, create renderpass and pipeline state object
-        .resizeRenderResources                      // construct swapchain, create depth buffer and frambuffers
-        .initTrackball(                             // initialize the navigation trackball
-            vd.projection_fovy, vd.windowHeight,
-            0, 0, 4 );
+    vd.createCommandObjects;                        // create command pool and sync primitives
+    vd.createMemoryObjects;                         // create memory objects once used through out programm lifetime
+    vd.createDescriptorSet;                         // create descriptor set
+    vd.createRenderResources;                       // configure swapchain, create renderpass and pipeline state object
+    vd.resizeRenderResources;                       // construct swapchain, create depth buffer and frambuffers
+    vd.initTrackball( vd.projection_fovy, vd.windowHeight, 0, 0, 4 );   // initialize the navigation trackball
 
     static if( IMGUI )  vd.resetGlfwCallbacks;      // override callbacks set in module input when initTrackball was called
     else                vd.createResizedCommands;   // create draw loop runtime commands, only used without gui
@@ -55,7 +50,7 @@ int main() {
     // record the first gui command buffer
     // in the draw loop this one will be submitted
     // while the next one is recorded asynchronously
-//    vd.drawInit;
+
 
     //import vdrive.util.info;
     //vd.gpu.listFeatures;
