@@ -472,7 +472,7 @@ auto ref createRenderResources( ref VDrive_State vd ) {
     //////////////////////////////////////////////////////////////////
 
     vd.graphics_cache   = vd.createPipelineCache;   // create once, but will be used several times in createGRaphicsPipeline
-    vd.compute_cache    = vd.createPipelineCache;   // Todo(pp): move this into createComputeResources and extract createComputePipeline from it
+
 
 
     // create the graphics pipeline, can be called multiple time to parse shader at runtime
@@ -485,14 +485,23 @@ auto ref createRenderResources( ref VDrive_State vd ) {
 
 
 
+/////////////////////////////////////////////////////////////////////////////////////////
+// create compute pipelines and compute command buffers to initialize and simulate LBM //
+/////////////////////////////////////////////////////////////////////////////////////////
+
 auto ref createComputeResources( ref VDrive_State vd ) {
 
-    /////////////////////////////
-    // create compute pipeline //
-    /////////////////////////////
+    vd.compute_cache = vd.createPipelineCache;
+    vd.createCompBoltzmannPipeline( true, true );
+
+    return vd;
+}
 
     //Meta_Specialization meta_sc;
     Meta_SC!( 2 ) meta_sc;
+
+
+auto ref createCompBoltzmannPipeline( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim = false ) {
     meta_sc
         .addMapEntry( MapEntry32( vd.sim_work_group_size_x ))   // default constantID is 0, next would be 1
         .addMapEntry( MapEntry32( 1 + 255 ), 3 )                // latter is the constantID, must be passed in, otherwise its 1
