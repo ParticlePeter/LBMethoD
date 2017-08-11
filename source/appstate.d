@@ -179,12 +179,18 @@ void updateDisplayUBO( ref VDrive_State vd ) {
 }
 
 
+/// Scale the display based on the aspect(s) of vd.sim_domain
+/// Parameter signals dimension count, 2D vs 3D
+/// Params:
+///     vd = reference to this modules VDrive_State struct
+///     dim = the current dimensions
+/// Returns: scale factor for the plane or box, in the fomer case result[2] should be ignored
 float[3] simDisplayScale( ref VDrive_State vd, int dim ) {
-    float factor = vd.sim_domain[0] < vd.sim_domain[1] ? vd.sim_domain[0] : vd.sim_domain[1];
-    if( dim == 3 && vd.sim_domain[2] < vd.sim_domain[0] && vd.sim_domain[2] < vd.sim_domain[1] )
-        factor = vd.sim_domain[2];
+    float scale = vd.sim_domain[0] < vd.sim_domain[1] ? vd.sim_domain[0] : vd.sim_domain[1];
+    if( dim > 2 && vd.sim_domain[2] < vd.sim_domain[0] && vd.sim_domain[2] < vd.sim_domain[1] )
+        scale = vd.sim_domain[2];
     float[3] result;
-    result[] = vd.sim_domain[] / factor;
+    result[] = vd.sim_domain[] / scale;
     return result;
 }
 
