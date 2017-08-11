@@ -1,0 +1,145 @@
+// --- COMP ---
+#version 450 core
+
+// input uniforms
+layout( push_constant ) uniform Push_Constant {
+    int ping;
+    int values_per_cell;
+} pc;
+
+// uniform buffer
+layout( std140, binding = 5 ) uniform Compute_UBO {
+    float omega;            // collision frequency
+    float wall_velocity;
+};
+
+// specialization constants for local work group size
+layout( local_size_x_id = 0 ) in;
+//layout( local_size_y_id = 1 ) in;
+//layout( local_size_z_id = 2 ) in;
+
+// local work group defaults, when constants are not defined
+layout( local_size_x = 256 ) in;
+layout( local_size_y =   1 ) in;
+layout( local_size_z =   1 ) in;
+
+// specialization constants for init or loop phase
+layout( constant_id = 3 ) const uint ALGORITHM = 0;
+#define INIT_DENSITY_ONE    1 + 255
+#define LOOP_SRT_LBGK       0
+#define LOOP_TRT            1
+#define LOOP_MRT            2
+#define LOOP_CASCADED       3
+#define LOOP_CASCADED_DRAG  4
+
+
+// populations 1 single buffered rest velocity, 8 double buffered link velocities
+layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
+
+// velocity and density write target, will be rendered as texture in next pass
+layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict readonly image2D vel_rho_img;
+
+// velocity and density write target, will be rendered as texture in next pass
+layout( binding = 8, r32f /*rgba16f*/ ) uniform restrict writeonly imageBuffer export_buffer;
+
+
+// population indices
+// 6 2 5 //
+//  \|/  //
+// 3-0-1 //
+//  /|\  //
+// 7 4 8 //
+
+/*
+// Directions:          R       E       N       W       S       NE      NW      SW      SE
+const float[9] pw = {   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 };
+const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
+*/
+
+// Cell Type Attributes
+//#define NOSLIP 1
+//#define FORCE 2
+
+
+////////////////////////////////////////////////////////
+// Common Indices and Counts for VkImage and VkBuffer //
+////////////////////////////////////////////////////////
+
+// shortcut to imageSize, the Domain of the computation, same as Global Size
+//#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
+#define D imageSize( vel_rho_img )
+
+// define access indices for the population buffers
+#define ping ( 8 * pc.ping )
+#define pong ( 8 -    ping )
+
+
+
+//////////////////////////////////////////
+// Indices and Counts if using VkBuffer //
+//////////////////////////////////////////
+
+// We use one rest position and two times the stream populations due to double buffering
+// loading populations p with variable ping = 0 V 8 and storing with pong = 8 V 0
+// All populations are stored in one contignuous float array/buffer
+// first come N rest populations then N east, N north, ...etc.,
+// With the index variable I = [0..N) we can reach individual velocities of population intervall at p
+// We load and store rest populations with index I
+// load stream populations index ( ping + 1 ) * N + I and store with ( pong + 1 ) * N + I
+// with this we reach the population of any node
+// the 2D output image is accessed simply with ivec2( X, Y )
+
+// define global equivalent for gl_LocalInvocationIndex
+#define UI gl_GlobalInvocationID.x
+
+// U and I are also the index velocity population index
+#define I int( UI )
+
+#define X ( I % D.x )
+#define Y ( I / D.x )
+//#define Z ( I / ( imageSize( vel_rho_img ).x * imageSize( vel_rho_img ).y )
+
+// derived total count of nodes
+int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
+#define buffer_size ( pc.values_per_cell * cell_count )  // count of elements in the passed in buffer, required for periodic boundary conditions
+
+// buffer offsets coresponding streaming ( in 2D so far )
+int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
+
+
+
+// main simulation function
+void main( void ) {
+
+    // population indices
+    // 6 2 5 //
+    //  \|/  //
+    // 3-0-1 //
+    //  /|\  //
+    // 7 4 8 //
+/*
+    // load populations including streaming in a gather fashion
+    float f[9] = {
+        imageLoad( popul_buffer,                                                                                                           I ).r,
+        imageLoad( popul_buffer, ( X ==       0 )                  ? ( ping + 3 ) * cell_count + I : ( ping + 1 ) * cell_count -       1 + I ).r,
+        imageLoad( popul_buffer, ( Y == D.y - 1 )                  ? ( ping + 4 ) * cell_count + I : ( ping + 2 ) * cell_count + D.x     + I ).r,
+        imageLoad( popul_buffer, ( X == D.x - 1 )                  ? ( ping + 1 ) * cell_count + I : ( ping + 3 ) * cell_count +       1 + I ).r,
+        imageLoad( popul_buffer, ( Y ==       0 )                  ? ( ping + 2 ) * cell_count + I : ( ping + 4 ) * cell_count - D.x     + I ).r,
+        imageLoad( popul_buffer, ( X ==       0 || Y == D.y - 1 )  ? ( ping + 7 ) * cell_count + I : ( ping + 5 ) * cell_count + D.x - 1 + I ).r,
+        imageLoad( popul_buffer, ( Y == D.y - 1 || X == D.x - 1 )  ? ( ping + 8 ) * cell_count + I : ( ping + 6 ) * cell_count + D.x + 1 + I ).r,
+        imageLoad( popul_buffer, ( X == D.x - 1 || Y ==       0 )  ? ( ping + 5 ) * cell_count + I : ( ping + 7 ) * cell_count - D.x + 1 + I ).r,
+        imageLoad( popul_buffer, ( Y ==       0 || X ==       0 )  ? ( ping + 6 ) * cell_count + I : ( ping + 8 ) * cell_count - D.x - 1 + I ).r,
+    };
+
+    float rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
+    vec2  vel = ( vec2(f[1],f[2]) - vec2(f[3],f[4]) + vec2(f[5]) - vec2(f[7]) + vec2(f[8],f[6]) - vec2(f[6],f[8])) / rho;
+*/
+
+    vec3 vel = imageLoad( vel_rho_img, ivec2( X, Y ) ).rgb;
+    imageStore( export_buffer,                  I, vec4( vel.x ));
+    imageStore( export_buffer,     cell_count + I, vec4( vel.y ));
+    imageStore( export_buffer, 2 * cell_count + I, vec4(     0 ));  // vel.z
+
+
+}   // main
+
