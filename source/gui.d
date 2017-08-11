@@ -1015,8 +1015,11 @@ void drawGui( ref VDrive_Gui_State vg ) {
     //ImGui.SameLine;     if( ImGui.Button( "Reset", button_size_3 )) vg.simReset;
     //ImGui.Separator;
 
-        // set width of items and their label
-        ImGui.PushItemWidth( main_win_size.x / 2 );
+    // set width of items and their label
+    ImGui.PushItemWidth( main_win_size.x / 2 );
+
+    // ImGui example Widgets
+    if( show_imgui_examples ) {
 
         ImGui.SliderFloat( "Gui Alpha", &style.Colors[ ImGuiCol_WindowBg ].w, 0.0f, 1.0f );
 
@@ -1024,20 +1027,23 @@ void drawGui( ref VDrive_Gui_State vg ) {
         ImGui.ColorEdit3( "clear color", cast( float* )( & vg.framebuffers.clear_values[ 1 ] ));
 
         //ImGui.ColorEdit3( "clear color", clear_color );
-        if( ImGui.Button( "Test Window" )) show_test_window ^= 1;
+        if( ImGui.Button( "Test Window", button_size_3 )) show_test_window ^= 1;
         ImGui.SameLine;
-        if( ImGui.Button( "Style Editor", button_size )) show_style_editor ^= 1;
-
-        if( ImGui.Button( "Another Window" )) show_another_window ^= 1;
+        if( ImGui.Button( "Another Window", button_size_3 )) show_another_window ^= 1;
+        ImGui.SameLine;
+        if( ImGui.Button( "Style Editor", button_size_3 )) show_style_editor ^= 1;
+        
         if( ImGui.ImGui.GetIO().Framerate < minFramerate ) minFramerate = ImGui.ImGui.GetIO().Framerate;
         if( ImGui.ImGui.GetIO().Framerate > maxFramerate ) maxFramerate = ImGui.ImGui.GetIO().Framerate;
         if( resetFrameMax < 100 ) {
             ++resetFrameMax;
             maxFramerate = 0.0001f;
-        }       
+        }
         ImGui.Text( "Refresh average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui.ImGui.GetIO().Framerate, ImGui.ImGui.GetIO().Framerate );
         ImGui.Text( "Refresh minimum %.3f ms/frame (%.1f FPS)", 1000.0f / minFramerate, minFramerate );
         ImGui.Text( "Refresh maximum %.3f ms/frame (%.1f FPS)", 1000.0f / maxFramerate, maxFramerate );
+        ImGui.Separator;
+    }
 
 
 
