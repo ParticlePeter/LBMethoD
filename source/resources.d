@@ -81,53 +81,54 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
 
     // create transformation ubo buffer withour memory backing
     import dlsl.matrix;
-    vd.wvpm_ubo_buffer( vd )
-        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, mat4.sizeof );
+    vd.xform_ubo_buffer( vd )
+        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VDrive_State.XForm_UBO.sizeof );
 
 
     // create compute ubo buffer without memory backing
     vd.compute_ubo_buffer( vd )
-        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vd.Compute_UBO.sizeof );
+        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VDrive_State.Compute_UBO.sizeof );
 
 
     // create display ubo buffer without memory backing
     vd.display_ubo_buffer( vd )
-        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vd.Display_UBO.sizeof );
+        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VDrive_State.Display_UBO.sizeof );
 
 
     // create host visible memory for ubo buffers and map it
-    auto mapped_memory = vd.host_visible_memory( vd )    
+    auto mapped_memory = vd.host_visible_memory( vd )
         .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
-        .addRange( vd.wvpm_ubo_buffer )
+        .addRange( vd.xform_ubo_buffer )
         .addRange( vd.compute_ubo_buffer )
         .addRange( vd.display_ubo_buffer )
         .allocate
-        .bind( vd.wvpm_ubo_buffer )
+        .bind( vd.xform_ubo_buffer )
         .bind( vd.compute_ubo_buffer )
         .bind( vd.display_ubo_buffer )
         .mapMemory;                         // map the memory object persistently
 
 
     // cast the mapped memory pointer without offset into our transformation matrix
-    vd.wvpm = cast( mat4* )mapped_memory;                           // cast to mat4
-    vd.wvpm_ubo_flush = vd.wvpm_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the wvpm ubo 
+    vd.xform_ubo = cast( VDrive_State.XForm_UBO* )mapped_memory;                       // cast to mat4
+    vd.xform_ubo_flush = vd.xform_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the wvpm ubo
     vd.updateProjection;    // update projection matrix from member data _fovy, _near, _far and aspect of the swapchain extent
     vd.updateWVPM;          // multiply projection with trackball (view) matrix and upload to uniform buffer
 
 
-    // cast the mapped memory pointer with its offset into the backing memory to our compute ubo struct and initialize the memory
-    vd.compute_ubo = cast( vd.Compute_UBO* )( mapped_memory + vd.compute_ubo_buffer.memOffset );
+    // cast the mapped memory pointer with its offset into the backing memory to our compute ubo struct and init_pso the memory
+    vd.compute_ubo = cast( VDrive_State.Compute_UBO* )( mapped_memory + vd.compute_ubo_buffer.memOffset );
     vd.compute_ubo_flush = vd.compute_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the compute ubo
-    vd.compute_ubo.collision_frequency = 2;
-    vd.compute_ubo.wall_velocity = 0.001 / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
+    vd.compute_ubo.collision_frequency = 0.8; //2;
+    vd.compute_ubo.wall_velocity = /*0.001*/ 0.02 * 3;// / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
     vd.updateComputeUBO;
 
 
-    // cast the mapped memory pointer with its offset into the backing memory to our display ubo struct and initialize the memory
-    vd.display_ubo = cast( vd.Display_UBO* )( mapped_memory + vd.display_ubo_buffer.memOffset );
+    // cast the mapped memory pointer with its offset into the backing memory to our display ubo struct and init_pso the memory
+    vd.display_ubo = cast( VDrive_State.Display_UBO* )( mapped_memory + vd.display_ubo_buffer.memOffset );
     vd.display_ubo_flush = vd.display_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the display ubo
-    vd.display_ubo.display_property = 1;
+    vd.display_ubo.display_property = 3;
     vd.display_ubo.amplify_property = 1;
+    vd.display_ubo.color_layers = 0;
     vd.updateDisplayUBO;
 
 
@@ -255,7 +256,8 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
 
     vd.descriptor = ( *meta_descriptor_ptr )    // VDrive_State.descriptor is a Core_Descriptor
         .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
-            .addBufferInfo( vd.wvpm_ubo_buffer.buffer )
+        .addBufferInfo( vd.xform_ubo_buffer.buffer )
+
         .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
             .addTexelBufferView( vd.sim_buffer_view )
         .addLayoutBinding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT )

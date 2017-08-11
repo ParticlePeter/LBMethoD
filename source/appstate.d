@@ -22,9 +22,15 @@ struct VDrive_State {
     GLFWwindow*                 window;
     VkDebugReportCallbackEXT    debugReportCallback;
 
+    struct XForm_UBO {
+        mat4        wvpm;
+        float[3]    eyep = [ 0, 0, 0 ];
+        float       time_step = 0.0;
+    }
+
     // trackball
     TrackballButton             tb;                         // Trackball manipulator updating View Matrix
-    mat4*                       wvpm;                       // World View Projection Matrix
+    XForm_UBO*                  xform_ubo;                  // World View Projection Matrix
     mat4                        projection;                 // Projection Matrix
     float                       projection_fovy =   60;     // Projection Field Of View in Y dimension
     float                       projection_near = 0.01;     // Projection near plane distance
@@ -38,8 +44,8 @@ struct VDrive_State {
 
     // memory Resources
     Meta_Image                  depth_image;
-    Meta_Buffer                 wvpm_ubo_buffer;
-    VkMappedMemoryRange         wvpm_ubo_flush;
+    Meta_Buffer                 xform_ubo_buffer;
+    VkMappedMemoryRange         xform_ubo_flush;
     Meta_Memory                 host_visible_memory;
 
 
@@ -141,8 +147,9 @@ auto windowHeight( ref VDrive_State vd ) { return vd.swapchain.imageExtent.heigh
 
 
 void updateWVPM( ref VDrive_State vd ) {
-    *( vd.wvpm ) = vd.projection * vd.tb.matrix;
-    vd.device.vkFlushMappedMemoryRanges( 1, &vd.wvpm_ubo_flush );
+    vd.xform_ubo.wvpm = vd.projection * vd.tb.matrix;
+    vd.xform_ubo.eyep = vd.tb.eye;
+    vd.device.vkFlushMappedMemoryRanges( 1, &vd.xform_ubo_flush );
     //vk.device.vkInvalidateMappedMemoryRanges( 1, &wvpm_ubo_flush );
 }
 
