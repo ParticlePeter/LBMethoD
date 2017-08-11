@@ -44,7 +44,21 @@ struct VDrive_Gui_State {
     float       sim_viscosity;          // at a relaxation rate of 1 and lattice units x, t = 1
     float       sim_wall_velocity;
 
+    Sim_Display sim_display;
+
+    // compute parameters
+    uint32_t[3] sim_domain;
+    uint32_t    sim_layers;
+    uint32_t[3] sim_work_group_size;
+
+    bool        sim_use_double;
+    bool        sim_use_3_dim;
+    bool        sim_compute_dirty;
+    bool        sim_init_shader_dirty;
+    bool        sim_loop_shader_dirty;
+    bool        sim_work_group_dirty;
     bool        draw_gui = true;
+
 }
 
 
