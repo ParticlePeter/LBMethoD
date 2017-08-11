@@ -490,6 +490,35 @@ auto ref resizeRenderResources( ref VDrive_Gui_State vg ) {
 
 
 
+////////////////////////////////////
+// Exit destroying alll resources // 
+////////////////////////////////////
+
+auto ref destroyResources( ref VDrive_Gui_State vg ) {
+
+    // forward to appstate destroyResources, this also calls device.vkDeviceWaitIdle;
+    resources.destroyResources( vg );
+
+    // now destroy all remaining gui resources
+    foreach( i; 0 .. vg.GUI_QUEUED_FRAMES ) {
+        vg.gui_vtx_buffers[ i ].destroyResources;
+        vg.gui_idx_buffers[ i ].destroyResources;
+    }
+
+    // descriptor set and layout is destroyed in module resources
+    import vdrive.state, vdrive.pipeline;
+    vg.destroy( vg.cmd_pool );
+    vg.destroy( vg.gui_graphics_pso );
+    vg.gui_font_tex.destroyResources;
+
+    import core.stdc.stdlib : free;
+    free( device_names );
+
+    ImGui.Shutdown;
+
+    return vg;
+}
+
 auto ref drawInit( ref VDrive_Gui_State vg ) {
     // forward to appstate drawInit
     appstate.drawInit( vg );
