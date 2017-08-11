@@ -376,6 +376,42 @@ auto ref createGraphicsPipeline( ref VDrive_State vd ) {
 
 
 
+auto ref createVelocityLinePipeline( ref VDrive_State vd, bool draw_as_points = false ) {
+
+    // if we are recreating an old pipeline exists already, destroy it first
+    if( vd.draw_line_pso.pipeline != VK_NULL_HANDLE ) {
+        vd.graphics_queue.vkQueueWaitIdle;
+        vd.destroy( vd.draw_line_pso );
+    }
+
+
+
+    //////////////////////////
+    // create line pipeline //
+    //////////////////////////
+
+    Meta_Graphics meta_graphics;
+    vd.draw_line_pso = meta_graphics( vd )
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.vert" ))
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.frag" ))
+        .inputAssembly( draw_as_points ? VK_PRIMITIVE_TOPOLOGY_POINT_LIST : VK_PRIMITIVE_TOPOLOGY_LINE_STRIP )  // set the inputAssembly
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )    // add viewport and scissor state, necessary even if we use dynamic state
+        .cullMode( VK_CULL_MODE_BACK_BIT )                                         // set rasterization state
+        .depthState                                                                // set depth state - enable depth test with default attributes
+        .addColorBlendState( VK_FALSE )                                            // color blend state - append common (default) color blend attachment state
+        .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                              // add dynamic states viewport
+        .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                               // add dynamic states scissor
+        .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )             // describe pipeline layout
+        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 28 )                 // specify push constant range
+        .renderPass( vd.render_pass.render_pass )                                  // describe compatible render pass
+        .construct( vd.graphics_cache )                                            // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
+        .destroyShaderModules                                                      // shader modules compiled into pipeline, not shared, can be deleted now
+        .reset;                                                                     // extract core data into Core_Pipeline struct
+
+    return vd;
+}
+
+
 
 auto ref createRenderResources( ref VDrive_State vd ) {
 
@@ -441,6 +477,7 @@ auto ref createRenderResources( ref VDrive_State vd ) {
 
     // create the graphics pipeline, can be called multiple time to parse shader at runtime
     vd.createGraphicsPipeline;
+    vd.createVelocityLinePipeline;
 
     // create all resources for the compute pipeline
     return vd.createComputeResources;
@@ -772,6 +809,7 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.destroy( vd.descriptor );
     vd.destroy( vd.graphics_pso );
     vd.destroy( vd.compute_pso );
+    vd.destroy( vd.draw_line_pso );
     vd.destroy( vd.graphics_cache );
     vd.destroy( vd.compute_cache );
 

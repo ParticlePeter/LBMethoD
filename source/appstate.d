@@ -85,6 +85,7 @@ struct VDrive_State {
     VkMappedMemoryRange         compute_ubo_flush;
     Meta_Buffer                 display_ubo_buffer;
     VkMappedMemoryRange         display_ubo_flush;
+    Core_Pipeline               draw_line_pso;
 
 
 
