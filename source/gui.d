@@ -1050,9 +1050,6 @@ void drawGui( ref VDrive_Gui_State vg ) {
     // Compute Device //
     ////////////////////
 
-        ////////////////////////
-        // Compute Parameters //
-        ////////////////////////
     if( ImGui.CollapsingHeader( "Compute Device" )) {
         ImGui.Separator;
         ImGui.PushItemWidth( -1 );
@@ -1071,71 +1068,176 @@ void drawGui( ref VDrive_Gui_State vg ) {
         collapsingTerminator;
     }
 
-        float drag_step = 16;
-        if( ImGui.CollapsingHeader( "Compute Parameter" )) {
 
-            // Specify Simulation Domain
-            ImGui.DragInt2( "Lattice Resolution", cast( int* )( vg.sim_domain.ptr ), drag_step, 4, 4096 );
 
-            import resources : resetComputePipeline;
-            if( ImGui.BeginPopupContextItem( "Sim Domain Context Menu" )) {
-                import core.stdc.stdio : sprintf;
-                char[16] label;
+    ////////////////////////
+    // Compute Parameters //
+    ////////////////////////
+
+    float drag_step = 16;
+    if( ImGui.CollapsingHeader( "Compute Parameter" )) {
+        ImGui.Separator;
+
+        //
+        // Radio 2D or 3D
+        //
+        int dimensions = vg.sim_use_3_dim;
+        if( ImGui.RadioButton( "2D", & dimensions, 0 )) vg.sim_use_3_dim = false;
+
+        ImGui.SameLine;
+        ImGui.SetCursorPosX( main_win_size.x * 0.25 + 6 );
+        if( ImGui.RadioButton( "3D", & dimensions, 1 )) vg.sim_use_3_dim = true;
+
+        ImGui.SameLine;
+        ImGui.SetCursorPosX( main_win_size.x * 0.5 + 8 );
+        ImGui.Text( "Simulation Type" );
+        ImGui.Separator;
+
+        //
+        // Grid Resolution
+        //
+        if( dimensions == 0
+            ? ImGui.DragInt2( "Grid Resolution", cast( int* )( vg.sim_domain.ptr ), drag_step, 4, 4096 )
+            : ImGui.DragInt3( "Grid Resolution", cast( int* )( vg.sim_domain.ptr ), drag_step, 4, 4096 ))
+            vg.checkComputeParams;
+
+        if( ImGui.BeginPopupContextItem( "Sim Domain Context Menu" )) {
+            import core.stdc.stdio : sprintf;
+            char[24]    label;
+            char[3]     dir = [ 'X', 'Y', 'Z' ];
+            float       click_range = 0.5 / ( 2 + dimensions ); 
+            float       mouse_pos_x = ImGui.GetMousePosOnOpeningCurrentPopup.x;
+
+            foreach( j; 0 .. 2 + dimensions ) {
+                if(( j * click_range * main_win_size.x < mouse_pos_x ) && ( mouse_pos_x < ( j + 1 ) * click_range * main_win_size.x )) {
+                    uint dim = 8;
+                    sprintf( label.ptr, "Resolution %c", dir[j] );
+                    ImGui.Text( label.ptr );
+                    ImGui.Separator;
+                    foreach( i; 0 .. 12 ) {
+                        sprintf( label.ptr, "Size %c: %d", dir[j], dim );
+                        if( ImGui.Selectable( label.ptr )) {
+                            vg.sim_domain[j] = dim;
+                            vg.checkComputeParams;
+                        }
+                        dim *= 2;
+                    }
+
+                    if( dimensions == 0 ) {
+                        ImGui.Separator;
+                        sprintf( label.ptr, "Window Res %c",     dir[j] ); if( ImGui.Selectable( label.ptr )) { vg.sim_domain[j] = ( j == 0 ? vg.vd.windowWidth : vg.vd.windowHeight );     vg.checkComputeParams; }
+                        sprintf( label.ptr, "Window Res %c / 2", dir[j] ); if( ImGui.Selectable( label.ptr )) { vg.sim_domain[j] = ( j == 0 ? vg.vd.windowWidth : vg.vd.windowHeight ) / 2; vg.checkComputeParams; }
+                        sprintf( label.ptr, "Window Res %c / 4", dir[j] ); if( ImGui.Selectable( label.ptr )) { vg.sim_domain[j] = ( j == 0 ? vg.vd.windowWidth : vg.vd.windowHeight ) / 4; vg.checkComputeParams; }
+                        sprintf( label.ptr, "Window Res %c / 8", dir[j] ); if( ImGui.Selectable( label.ptr )) { vg.sim_domain[j] = ( j == 0 ? vg.vd.windowWidth : vg.vd.windowHeight ) / 8; vg.checkComputeParams; }
+                    }
+                }
+            }
+
+            if( 0.5 * main_win_size.x < mouse_pos_x ) {
                 uint dim = 8;
-                float mouse_pos_x = ImGui.GetMousePosOnOpeningCurrentPopup.x;
-                if( mouse_pos_x < 0.25 * main_win_size.x ) {
-                    ImGui.Text( "Resolution X"  ); ImGui.Separator;
-                    if( ImGui.Selectable( "Window Res X"     ))  { vg.sim_domain[0] = vg.vd.windowWidth;     vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
-                    if( ImGui.Selectable( "Window Res X / 2" ))  { vg.sim_domain[0] = vg.vd.windowWidth / 2; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
-                    if( ImGui.Selectable( "Window Res X / 4" ))  { vg.sim_domain[0] = vg.vd.windowWidth / 4; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
-                    if( ImGui.Selectable( "Window Res X / 8" ))  { vg.sim_domain[0] = vg.vd.windowWidth / 8; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                ImGui.Text( dimensions == 0 ? "Resolution XY" : "Resolution XYZ" );
+                ImGui.Separator;
+                const( char* )[2] vol = [ "XY", "XYZ" ];
+                foreach( i; 0 .. 12 ) {
+                    sprintf( label.ptr, "Size %s: %d ^ %d", vol[ dimensions ], dim, 2 + dimensions );
+                    if( ImGui.Selectable( label.ptr )) {
+                        vg.sim_domain[ 0 .. 2 + dimensions ] = dim;
+                        vg.checkComputeParams;
+                    } dim *= 2;
+                }
 
-                    foreach( i; 0 .. 12 ) {
-                        sprintf( label.ptr, "Width: %d", dim );
-                        if( ImGui.Selectable( label.ptr )) { vg.sim_domain[0] = dim; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
-                        dim *= 2;
-                    }
-                } else if( mouse_pos_x < 0.5 * main_win_size.x ) {
-                    ImGui.Text( "Resolution Y"  ); ImGui.Separator;
-                    if( ImGui.Selectable( "Window Res Y"     ))  { vg.sim_domain[1] = vg.vd.windowHeight;     vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
-                    if( ImGui.Selectable( "Window Res Y / 2" ))  { vg.sim_domain[1] = vg.vd.windowHeight / 2; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
-                    if( ImGui.Selectable( "Window Res Y / 4" ))  { vg.sim_domain[1] = vg.vd.windowHeight / 4; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
-                    if( ImGui.Selectable( "Window Res Y / 8" ))  { vg.sim_domain[1] = vg.vd.windowHeight / 8; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
+                if( dimensions == 0 ) {
+                    ImGui.Separator;
+                    if( ImGui.Selectable( "Window Res"     )) { vg.sim_domain[0] = vg.vd.windowWidth;     vg.sim_domain[1] = vg.vd.windowHeight;     vg.checkComputeParams; }
+                    if( ImGui.Selectable( "Window Res / 2" )) { vg.sim_domain[0] = vg.vd.windowWidth / 2; vg.sim_domain[1] = vg.vd.windowHeight / 2; vg.checkComputeParams; }
+                    if( ImGui.Selectable( "Window Res / 4" )) { vg.sim_domain[0] = vg.vd.windowWidth / 4; vg.sim_domain[1] = vg.vd.windowHeight / 4; vg.checkComputeParams; }
+                    if( ImGui.Selectable( "Window Res / 8" )) { vg.sim_domain[0] = vg.vd.windowWidth / 8; vg.sim_domain[1] = vg.vd.windowHeight / 8; vg.checkComputeParams; }
+                }
+            } ImGui.EndPopup();
+        }
 
-                    foreach( i; 0 .. 12 ) {
-                        sprintf( label.ptr, "Height: %d", dim );
-                        if( ImGui.Selectable( label.ptr )) { vg.sim_domain[1] = dim; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
-                        dim *= 2;
-                    }
-                } else {
-                    ImGui.Text( "Resolution XY" ); ImGui.Separator;
-                    if( ImGui.Selectable( "Window Res"       ))  { vg.sim_domain[0] = vg.vd.windowWidth;     vg.sim_domain[1] = vg.vd.windowHeight;     vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
-                    if( ImGui.Selectable( "Window Res / 2"   ))  { vg.sim_domain[0] = vg.vd.windowWidth / 2; vg.sim_domain[1] = vg.vd.windowHeight / 2; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
-                    if( ImGui.Selectable( "Window Res / 4"   ))  { vg.sim_domain[0] = vg.vd.windowWidth / 4; vg.sim_domain[1] = vg.vd.windowHeight / 4; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
-                    if( ImGui.Selectable( "Window Res / 8"   ))  { vg.sim_domain[0] = vg.vd.windowWidth / 8; vg.sim_domain[1] = vg.vd.windowHeight / 8; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
 
-                    foreach( i; 0 .. 12 ) {
-                        sprintf( label.ptr, "Res: %d ^ 2", dim );
-                        if( ImGui.Selectable( label.ptr )) { vg.sim_domain[0] = dim; vg.sim_domain[1] = dim; vg.sim_display_scale = vg.vd.simDisplayScale( 2 ); vg.resetComputePipeline; }
-                        dim *= 2;
-                    }
-                } ImGui.EndPopup();
+        //
+        // Values per Cell and their precision
+        //
+        ImGui.PushItemWidth( 86 );
+        if( ImGui.DragInt( "##Values per Cell", cast( int* )( & vg.sim_layers ), 0.1f, 1, 1024 ))
+            vg.checkComputeParams;
+
+
+        // Specify precision
+        int precision = vg.sim_use_double;
+        ImGui.SameLine;
+        if( ImGui.Combo( "Per Cell Values", & precision, vg.sim_shader_double || vg.sim_use_cpu ? "Float\0Double\0\0" : "Float\0\0" )) {
+            vg.sim_use_double = precision > 0;
+            vg.checkComputeParams;
+        }
+
+        // inform if double precision is not available or CPU mode is deactivated
+        if( !( vg.sim_shader_double || vg.sim_use_cpu ))
+            showTooltip( "Shader double precision is not available on the selected device." );
+
+        ImGui.PopItemWidth;
+
+
+        // Apply button for all the settings within Compute Parameter
+        // If more then work group size has changed rebuild sim_buffer 
+        // If the simulation dimensions has not changed we do not need to rebuild sim_image
+        // Update the descriptor set, rebuild compute command buffers and reset cpu data if running on cpu
+        // We also update the scale of the display plane and normalization factors for the velocity lines
+        // Additionally if only the work group size changes, we need to update only the compute PSO (see else if)
+        if( vg.sim_compute_dirty ) {
+            if( ImGui.Button( "Apply", button_size_2 )) {
+                bool rebuild_sim_image      = vg.vd.sim_domain != vg.sim_domain;
+                vg.sim_compute_dirty        = vg.sim_work_group_dirty = false;
+                vg.vd.sim_work_group_size   = vg.sim_work_group_size;
+                vg.vd.sim_use_double        = vg.sim_use_double;
+                vg.vd.sim_domain            = vg.sim_domain;
+                vg.vd.sim_layers            = vg.sim_layers;
+
+                // recreate resources and update descriptor
+                vg.createSimBuffer;
+                if( rebuild_sim_image )
+                    vg.createSimImage;
+                vg.updateDescriptorSet;
+
+                // recreate lattice boltzmann pipeline with possibly new shaders 
+                vg.createCompBoltzmannPipeline( vg.sim_init_shader_dirty, vg.sim_loop_shader_dirty );
+                vg.sim_init_shader_dirty = vg.sim_loop_shader_dirty = false;
+
+                if( vg.sim_use_cpu ) {
+                    vg.cpuReset;
+                }
+
+                vg.sim_display.scale = vg.vd.simDisplayScale( 2 );
+                vg.sim_display.lines_norm = 1.0f / vg.sim_domain[];
             }
+            ImGui.SameLine;
+            ImGui.Text( "Changes" );
 
-
-            // specify simulation domain
-            if( ImGui.DragInt(  "Work Group Size X", cast( int* )( & vg.sim_work_group_size_x ), drag_step, 1, 1024 )) vg.resetComputePipeline;
-
-            if( ImGui.BeginPopupContextItem( "Work Group Size Context Menu" )) {
-                char[24] label;
-                uint dim = 2;
-                if( ImGui.Selectable( "Resolution X" )) { vg.sim_work_group_size_x = vg.sim_domain[0]; vg.resetComputePipeline; }
-                foreach( i; 0 .. 8 ) {
-                    sprintf( label.ptr, "Resolution X / %d", dim );
-                    if( ImGui.Selectable( label.ptr  )) { vg.sim_work_group_size_x = vg.sim_domain[0] / dim; vg.resetComputePipeline; }
-                    dim *= 2;
-                } ImGui.EndPopup();
+        } else if( vg.sim_init_shader_dirty || vg.sim_loop_shader_dirty ) {
+            if( ImGui.Button( "Apply", button_size_2 )) {
+                vg.createCompBoltzmannPipeline( vg.sim_init_shader_dirty, vg.sim_loop_shader_dirty );
+                vg.sim_init_shader_dirty = vg.sim_loop_shader_dirty = false;
             }
+            ImGui.SameLine;
+            ImGui.Text( "Changes" );
+
+        } else if( vg.sim_work_group_dirty ) {
+            if( ImGui.Button( "Apply", button_size_2 )) {
+                vg.sim_work_group_dirty     = false;
+                vg.vd.sim_work_group_size   = vg.sim_work_group_size;
+                vg.createCompBoltzmannPipeline( false, false, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
+            }
+            ImGui.SameLine;
+            ImGui.Text( "Changes" );
+
+        } else {
+            pushButtonStyleDisable;
+            ImGui.Button( "No", button_size_2 );
+            ImGui.SameLine;
+            ImGui.Text( "Changes" );
+            popButtonStyleDisable;
         }
 
 
@@ -1143,53 +1245,215 @@ void drawGui( ref VDrive_Gui_State vg ) {
         ///////////////////////////
         // Simulation Parameters //
         ///////////////////////////
+        //
+        // Work Group Size
+        //
+        if( ImGui.DragInt( "Work Group Size X", cast( int* )( & vg.sim_work_group_size[0] ), drag_step, 1, 1024 )) vg.checkComputePSO;
 
-        if( ImGui.CollapsingHeader( "Simulation Parameter" )) {
+        if( ImGui.BeginPopupContextItem( "Work Group Size Context Menu" )) {
+            ImGui.Text( "Group Size X" );
+            ImGui.Separator;
 
-            // preset settings context menu
-            if( ImGui.BeginPopupContextItem( "Simulation Parameter Context Menu" )) {
-                if( ImGui.Selectable( "Unit Parameter" )) {
-                    vg.sim_wall_velocity = 0.05; vg.updateWallVelocity;
-                    vg.compute_ubo.collision_frequency = vg.sim_relaxation_rate = 1; vg.updateViscosity;
+            char[24] label;
+            uint dim = 2;
+            import core.stdc.stdio;
+            foreach( i; 0 .. 10 ) {
+                sprintf( label.ptr, "Size X: %d", dim );
+                if( ImGui.Selectable( label.ptr )) {
+                    vg.sim_work_group_size[0] = dim;
+                    vg.checkComputePSO;
+                } dim *= 2;
+            } dim = 2;
+            if( ImGui.Selectable( "Resolution X" )) { vg.sim_work_group_size[0] = vg.sim_domain[0]; vg.checkComputePSO; }
+            foreach( i; 0 .. 8 ) {
+                sprintf( label.ptr, "Resolution X / %d", dim );
+                if( ImGui.Selectable( label.ptr  )) { vg.sim_work_group_size[0] = vg.sim_domain[0] / dim; vg.checkComputePSO; }
+                dim *= 2;
+            } ImGui.EndPopup();
+        }
+
+
+
+        /*
+        //////////////////////////////////////////////////////////////////////////////////////////////
+        // Work Group Size alternative version when we can use multi dim work group sizes in shader //
+        //////////////////////////////////////////////////////////////////////////////////////////////
+        if( dimensions == 0
+            ? ImGui.DragInt2( "Work Group Size", cast( int* )( & vg.sim_work_group_size[0] ), drag_step, 1, 1024 )
+            : ImGui.DragInt3( "Work Group Size", cast( int* )( & vg.sim_work_group_size[0] ), drag_step, 1, 1024 ))
+            vg.checkComputeParams;
+
+
+        if( ImGui.BeginPopupContextItem( "Work Group Size Context Menu" )) {
+            import core.stdc.stdio : sprintf;
+            char[24]    label;
+            char[3]     dir = [ 'X', 'Y', 'Z' ];
+            float       click_range = 0.5 / ( 2 + dimensions ); 
+            float       mouse_pos_x = ImGui.GetMousePosOnOpeningCurrentPopup.x;
+
+            foreach( j; 0 .. 2 + dimensions ) {
+                if(( j * click_range * main_win_size.x < mouse_pos_x ) && ( mouse_pos_x < ( j + 1 ) * click_range * main_win_size.x )) {
+                    uint dim = 1;
+                    sprintf( label.ptr, "Group Size %c", dir[j] );
+                    ImGui.Text( label.ptr  );
+                    ImGui.Separator;
+                    foreach( i; 0 .. 11 ) {
+                        sprintf( label.ptr, "Size %c: %d##1", dir[j], dim );
+                        if( ImGui.Selectable( label.ptr )) {
+                            vg.sim_work_group_size[j] = dim;
+                            vg.checkComputePSO;
+                        } dim *= 2;
+                    } ImGui.Separator;
+
+                    sprintf( label.ptr, "Grid Res %c", dir[j] );
+                    if( ImGui.Selectable( label.ptr )) {
+                        vg.sim_work_group_size[j] = vg.sim_domain[j];
+                        vg.checkComputePSO;
+                    }
+
+                    dim = 1;
+                    foreach( i; 0 .. 8 ) {
+                        sprintf( label.ptr, "Grid Res %c / %d", dir[j], dim );
+                        if( ImGui.Selectable( label.ptr  )) { 
+                            vg.sim_work_group_size[j] = vg.sim_domain[j] / dim;
+                            vg.checkComputePSO;
+                        } dim *= 2;
+                    }
                 }
-                if( ImGui.Selectable( "Zero Viscosity" )) {
-                    vg.sim_wall_velocity = 0.001; vg.updateWallVelocity;
-                    vg.compute_ubo.collision_frequency = 2; 
-                    vg.sim_relaxation_rate = 0.5;
-                    vg.updateViscosity;
-                } ImGui.EndPopup();
             }
 
-            // wall velocity
-            if( ImGui.DragFloat( "Wall Velocity", vg.sim_wall_velocity, 0.001f )) {
-                vg.updateWallVelocity;
-                vg.updateComputeUBO;
+            if( 0.5 * main_win_size.x < mouse_pos_x ) {
+                uint dim = 4 - 2 * dimensions;
+                ImGui.Text( dimensions == 0 ? "Group Size XY" : "Group Size XYZ" );
+                ImGui.Separator;
+                const( char* )[2] vol = [ "XY", "XYZ" ];
+                foreach( i; 0 .. 4 ) {
+                    sprintf( label.ptr, "Size %s: %d ^ %d##1", vol[ dimensions ], dim, 2 + dimensions );
+                    if( ImGui.Selectable( label.ptr )) {
+                        vg.sim_work_group_size[ 0 .. 2 + dimensions ] = dim;
+                        vg.checkComputePSO; }
+                    dim *= 2;
+                } ImGui.Separator;
+
+                sprintf( label.ptr, "Grid Res %s", vol[ dimensions ] );
+                if( ImGui.Selectable( label.ptr )) {
+                    vg.sim_work_group_size[ 0 .. 2 + dimensions ] = vg.sim_domain[ 0 .. 2 + dimensions ];
+                    vg.checkComputePSO;
+                }
+
+                dim = 2;
+                foreach( i; 0 .. 8 ) {
+                    sprintf( label.ptr, "Grid Res %s / %d", vol[ dimensions ], dim, 2 + dimensions, dim );
+                    if( ImGui.Selectable( label.ptr  )) {
+                        vg.sim_work_group_size[ 0 .. 2 + dimensions ] = vg.sim_domain[ 0 .. 2 + dimensions ] / dim;
+                        vg.checkComputePSO;
+                    } dim *= 2;
+                }
+            } ImGui.EndPopup();
+        }
+        */
+        ImGui.Separator;
+
+
+        //
+        // Shader or Function choice
+        //
+        if( compute_device == 1 ) {
+            // Shader Choice
+            
+            ImGui.Spacing;
+            ImGui.SetCursorPosX( 8 );
+            ImGui.Text( "Compute Shader" );
+            //ImGui.Spacing;
+
+            // select init shader
+            static int init_shader_index = 0;
+            ImGui.PushItemWidth( ImGui.GetWindowWidth * 0.75 );
+            if( ImGui.Combo( "Initialize", & init_shader_index, //"shader/init_D2Q9.comp\0\0" )
+                init_shader_start_index == size_t.max
+                    ? "None found!"
+                    : shader_names_ptr[ init_shader_index ] )
+                ) {
+                if( init_shader_start_index != size_t.max ) {
+                    vg.sim_init_shader_dirty = !compareShaderNamesAndReplace( 
+                        shader_names_ptr[ init_shader_start_index + init_shader_index ], vg.sim_init_shader
+                    );
+                }
             }
 
-            // kinematic viscosity
-            if( ImGui.DragFloat( "Kinematic Viscosity", vg.sim_viscosity, 0.001f )) {
-                vg.updateTauOmega;
+            // update init shader list when hovering over Combo
+            if( ImGui.IsItemHovered ) {
+                if( hasShaderDirChanged ) {
+                    parseShaderDirectory;
+                    // a new shader might replace the shader at the current index
+                    // when we would actually use the ImGui.Combo and select this new shader
+                    // it would not be registered
+                    if( init_shader_start_index != size_t.max ) {     // might all have been deleted
+                        vg.sim_init_shader_dirty = !compareShaderNamesAndReplace(
+                            shader_names_ptr[ init_shader_start_index + init_shader_index ], vg.sim_init_shader
+                        );
+                    }    
+                }
             }
 
-            // collision algorithm
-            if( ImGui.Combo(    // Combo Collision Algorithms
-                "Collision Algorithm", cast( int* )( & vg.sim_algorithm ),
-                "SRT-LBGK\0TRT\0MRT\0Cascaded\0\0" )
-            ) {
-                import resources : createComputeResources;
-                vg.createComputeResources;
+            //if( ImGui.Selectable( "Parse Init Shader" )) {
+            //    vg.createCompBoltzmannPipeline( true, false, false );
+            //}
+
+            ImGui.Spacing;
+
+            // select loop shader
+            static int loop_shader_index = 0;
+            if( ImGui.Combo( "Simulate", & loop_shader_index, //"shader/loop_D2Q9_channel_flow.comp\0\0" )
+                loop_shader_start_index == size_t.max
+                    ? "None found!"
+                    : shader_names_ptr[ loop_shader_start_index ] )
+                ) {
+                if( loop_shader_start_index != size_t.max ) {
+                    vg.sim_loop_shader_dirty = !compareShaderNamesAndReplace(
+                        shader_names_ptr[ loop_shader_start_index + loop_shader_index ], vg.sim_loop_shader
+                    );
+                }
+            }
+            
+            // update loop shader list when hovering over Combo
+            if( ImGui.IsItemHovered ) {
+                if( hasShaderDirChanged ) {
+                    parseShaderDirectory;   // see comment in IsItemHovered above
+                    if( loop_shader_start_index != size_t.max ) {
+                        vg.sim_loop_shader_dirty = !compareShaderNamesAndReplace( 
+                            shader_names_ptr[ loop_shader_start_index + loop_shader_index ], vg.sim_loop_shader
+                        );
+                    }
+                }
             }
 
+            //if( ImGui.Selectable( "Parse Loop Shader" )) {
+            //    vg.createCompBoltzmannPipeline( false, true, false );
+            //}
 
-            // simulation details tree node
-            if( ImGui.TreeNode( "Simulation Details" )) {
+            ImGui.PopItemWidth;
 
-                // set width of items and their label - aligned visually with 8 pixels
-                ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
+        } else {
+            int func = 0;
 
-                if( ImGui.DragFloat2( "Spatial/Temporal Unit", & vg.sim_unit_spatial, 0.001f )) {  // next value in struct is vg.sim_unit_temporal
-                    vg.sim_speed_of_sound = vg.sim_unit_speed_of_sound * vg.sim_unit_spatial / vg.sim_unit_temporal;
-                    vg.updateTauOmega;
+            ImGui.SetCursorPosX( 8 );
+            ImGui.Text( "CPU Function" );
+            ImGui.Separator;
+
+            int init_and_loop;
+            ImGui.PushItemWidth( ImGui.GetWindowWidth() * 0.75 );
+            ImGui.Combo( "Initialize", & init_and_loop, "D2Q9 Density One\0\0" );
+            ImGui.Separator;
+            ImGui.Combo( "Simulate", & init_and_loop, "D2Q9 Lid Driven Cavity\0\0" );
+            ImGui.PopItemWidth;
+        }
+
+        collapsingTerminator;
+    }
+
+
+
                 }
  
                 if( ImGui.DragFloat( "Relaxation Rate Tau",  vg.sim_relaxation_rate, 0.001f, 0, 2 )) {
