@@ -497,14 +497,17 @@ auto ref createComputeResources( ref VDrive_State vd ) {
     return vd;
 }
 
-    //Meta_Specialization meta_sc;
-    Meta_SC!( 2 ) meta_sc;
 
 
 auto ref createCompBoltzmannPipeline( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim = false ) {
+
+    // create Meta_Specialization struct with static data array
+    Meta_SC!( 4 ) meta_sc;
     meta_sc
-        .addMapEntry( MapEntry32( vd.sim_work_group_size_x ))   // default constantID is 0, next would be 1
-        .addMapEntry( MapEntry32( 1 + 255 ), 3 )                // latter is the constantID, must be passed in, otherwise its 1
+        .addMapEntry( MapEntry32( vd.sim_work_group_size[0] ))  // default constantID is 0, next would be 1
+        .addMapEntry( MapEntry32( vd.sim_work_group_size[1] ))  // default constantID is 1, next would be 2
+        .addMapEntry( MapEntry32( vd.sim_work_group_size[2] ))  // default constantID is 2, next would be 3
+        .addMapEntry( MapEntry32( 1 + 255 ), 3 )                // latter is the constantID, must be passed in if the current constant id does not correspond
         .construct;
 
 
