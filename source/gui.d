@@ -39,10 +39,10 @@ struct VDrive_Gui_State {
     };
 
     // gui helper and cache sim settings
-    float       sim_relaxation_rate = 1;                    // tau
-    float       sim_viscosity       = 0.1666666666666667;   // at a relaxation rate of 1 and lattice units x, t = 1
-    float       sim_wall_velocity   = 0;
     float[3]    sim_display_scale = [ 1, 1, 1 ];
+    float       sim_relaxation_rate;    // tau
+    float       sim_viscosity;          // at a relaxation rate of 1 and lattice units x, t = 1
+    float       sim_wall_velocity;
 
     bool        draw_gui = true;
 }
@@ -181,9 +181,15 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
     resources.createMemoryObjects( vg );
 
     // initialize VDrive_Gui_State member from VDrive_State member
-    vg.sim_wall_velocity    = vg.compute_ubo.wall_velocity * vg.sim_speed_of_sound * vg.sim_speed_of_sound;
-    vg.sim_relaxation_rate  = 1 / vg.compute_ubo.collision_frequency;
-    vg.sim_display_scale    = vg.simDisplayScale( 2 );
+    vg.sim_domain               = vg.vd.sim_domain;
+    vg.sim_layers               = vg.vd.sim_layers;
+    vg.sim_work_group_size      = vg.vd.sim_work_group_size;
+    vg.sim_use_double           = vg.vd.sim_use_double;
+    vg.sim_use_3_dim            = vg.vd.sim_use_3_dim;
+    vg.sim_wall_velocity        = vg.compute_ubo.wall_velocity * vg.sim_speed_of_sound * vg.sim_speed_of_sound;
+    vg.sim_relaxation_rate      = 1 / vg.compute_ubo.collision_frequency;
+    vg.sim_display.scale        = vg.simDisplayScale( 2 + vg.vd.sim_use_3_dim );
+    vg.sim_display.lines_norm[] = 1.0f / vg.sim_domain[];
     vg.updateViscosity;
     
 
