@@ -300,9 +300,9 @@ auto ref createRenderResources( ref VDrive_Gui_State vg ) {
     }
 
     // use one command buffer for device resource initialization
-    import vdrive.command : allocateCommandBuffer, commandBufferBeginInfo;
+    import vdrive.command : allocateCommandBuffer, createCmdBufferBI;
     auto cmd_buffer = vg.allocateCommandBuffer( vg.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
-    auto cmd_buffer_bi = commandBufferBeginInfo( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
+    auto cmd_buffer_bi = createCmdBufferBI( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
     vkBeginCommandBuffer( cmd_buffer, &cmd_buffer_bi );
 
     // record image layout transition to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
