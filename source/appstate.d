@@ -132,11 +132,14 @@ struct VDrive_State {
     Compute_UBO*    compute_ubo;
     Display_UBO*    display_ubo;
 
-    ubyte           sim_ping_pong           = 1;
-    ubyte           sim_ping_pong_scale     = 8;
-    bool            sim_step                = false;
-    bool            sim_play                = false; 
 
+    // flags Todo(pp): create a proper uint32_t flag structure
+    bool            sim_shader_double       = false;
+    bool            sim_use_double          = false;
+    bool            sim_use_3_dim           = false;
+    bool            sim_use_cpu             = false;
+
+    bool            export_as_vector        = false;
 
 
     // window resize callback result
@@ -258,25 +261,23 @@ void drawInit( ref VDrive_State vd ) {
 }
 
 
-void draw( ref VDrive_State vd ) {
+void drawSim( ref VDrive_State vd ) {
+    vd.sim_ping_pong = vd.sim_index % 2;    // compute new ping_pong value
+    ++vd.sim_index;                         // increase the counter
+    vd.draw;                                // let vulkan dance
+}
 
-/*
-    // submit the current lucien command buffer
-    vd.submit_info.pCommandBuffers = &vd.cmd_buffers[ vd.next_image_index ]; //imgui_cmd_buffer;//&cmd_buffers[ next_image_index ];
-    vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-/*/
-    // react to sim step event
-    if( vd.sim_play || vd.sim_step ) {
-        vd.sim_step = false;
-        vd.submit_info.commandBufferCount = 2;
-        vd.sim_ping_pong = cast( ubyte )( 1 - vd.sim_ping_pong );
-    }
+
+
+void draw( ref VDrive_State vd ) @system {
 
     VkCommandBuffer[2] cmd_buffers = [ vd.cmd_buffers[ vd.next_image_index ], vd.sim_cmd_buffers[ vd.sim_ping_pong ]];
     vd.submit_info.pCommandBuffers = cmd_buffers.ptr;
     vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-    vd.submit_info.commandBufferCount = 1;
-//*/
+
+    // exclude the compute buffer for the next sim step
+    // module gui.draw might reenable it
+    //vd.submit_info.commandBufferCount = 1;
 
 
     // present rendered image
