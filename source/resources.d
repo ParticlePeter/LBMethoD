@@ -270,65 +270,72 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         meta_descriptor_ptr = & meta_descriptor;
     }
 
-    
-    vd.sim_image.sampler    = vd.createSampler;
-    vd.sim_sampler_nearest  = vd.createSampler( VK_FILTER_NEAREST, VK_FILTER_NEAREST );
 
+    vd.sim_image.sampler = vd.createSampler; //( VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT, VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT );
+
+    // Note(pp): immutable does not filter properly, either driver bug or module descriptor bug
+    // Todo(pp): debug the issue
     vd.descriptor = ( *meta_descriptor_ptr )    // VDrive_State.descriptor is a Core_Descriptor
         .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
         .addBufferInfo( vd.xform_ubo_buffer.buffer )
 
         .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
-            .addTexelBufferView( vd.sim_buffer_view )
+        .addTexelBufferView( vd.sim_buffer_view )
+
         .addLayoutBinding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT )
-            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
-        .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT ) // immutable does not filter properly, either driver bug or module descriptor bug
-            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
-            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_sampler_nearest )
-        .addLayoutBinding( 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT )
-            .addBufferInfo( vd.compute_ubo_buffer.buffer )
+        .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
+
+        .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT )
+        .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
+
+        .addLayoutBinding( 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
+        .addBufferInfo( vd.compute_ubo_buffer.buffer )
+
         .addLayoutBinding( 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT )
-            .addBufferInfo( vd.display_ubo_buffer.buffer )
+        .addBufferInfo( vd.display_ubo_buffer.buffer )
+
         .construct
         .reset;
 
     // prepare simulation data descriptor update
+    // necessary when we recreate resources and have to rebind them to our descriptors
     vd.sim_descriptor_update( vd )
         .addBindingUpdate( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
-            .addTexelBufferView( vd.sim_buffer_view )
+        .addTexelBufferView( vd.sim_buffer_view )
+
         .addBindingUpdate( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE )
-            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
+        .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
+
         .addBindingUpdate/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ) // immutable does not filter properly, either driver bug or module descriptor bug
-            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
-            .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_sampler_nearest )
+        .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
+
+
         .attachSet( vd.descriptor.descriptor_set );
 
+
+
 }
 
 
-auto ref resetComputePipeline( ref VDrive_State vd ) {
+auto ref updateDescriptorSet( ref VDrive_State vd ) {
 
-    uint32_t[3] image_extent = [ vd.sim_image.extent.width, vd.sim_image.extent.height, vd.sim_image.extent.depth ];
+    //vd.graphics_queue.vkQueueWaitIdle;
 
-    // check if the last layer and domain settings differ from the recently used, if not return from this function
-    if( vd.sim_domain != image_extent ) {
-    // || vd.sim_layers != vd.sim_buffer_views.length   // Todo(pp): fix this logic
+    // update the descriptor
+    vd.sim_descriptor_update.texel_buffer_views[0]    = vd.sim_buffer_view;             // populations buffer and optionally other data like temperature
+    vd.sim_descriptor_update.texel_buffer_views[1]    = vd.sim_particle_buffer_view;    // particles to visualize LBM velocity
+    vd.sim_descriptor_update.image_infos[0].imageView = vd.sim_image.image_view;        // image view for writing from compute shader
+    vd.sim_descriptor_update.image_infos[1].imageView = vd.sim_image.image_view;        // image view for reading in display fragment shader with linear sampling
+    vd.sim_descriptor_update.update;
 
-        vd.graphics_queue.vkQueueWaitIdle;
-        vd.createSimMemoryObjects;
+    // Note(pp):
+    // it would be more efficient to create another descriptor update for the sim_buffer_particle_view
+    // it will most likely not be updated with the other resources and vice versa
+    // but ... what the heck ... for now ... we won't update both of them often enough
 
-        // update the descriptor
-        vd.sim_descriptor_update.texel_buffer_views[0]    = vd.sim_buffer_view;         // populations buffer and optionally other data like temperature
-        vd.sim_descriptor_update.image_infos[0].imageView = vd.sim_image.image_view;    // image view for writing from compute shader
-        vd.sim_descriptor_update.image_infos[1].imageView = vd.sim_image.image_view;    // image view for reading in display fragment shader with linear sampling
-        vd.sim_descriptor_update.image_infos[2].imageView = vd.sim_image.image_view;    // image view for reading in display fragment shader with nearest sampling
-        vd.sim_descriptor_update.update;
-
-    }
-
-    vd.createComputeResources;   
-
+    return vd;
 }
+
 
 
 
@@ -753,7 +760,6 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.host_visible_memory.unmapMemory.destroyResources;
 
     // compute resources
-    vd.destroy( vd.sim_sampler_nearest );
     vd.destroy( vd.sim_buffer_view );
     vd.sim_image.destroyResources;
     vd.sim_buffer.destroyResources;
