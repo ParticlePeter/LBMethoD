@@ -44,6 +44,14 @@ struct VDrive_Gui_State {
     float       sim_viscosity;          // at a relaxation rate of 1 and lattice units x, t = 1
     float       sim_wall_velocity;
 
+    struct Sim_Display {                // std140 conform
+      align( 1 ):
+        float[3]    scale       = [ 1, 1, 1 ];
+        ubyte       lines_axis  = 0;
+        ubyte[3]    lines_count = [ 0, 0, 0 ];
+        float[3]    lines_norm  = [ 1, 1, 1 ];
+    }
+
     Sim_Display sim_display;
 
     // compute parameters
@@ -1586,35 +1594,97 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
 
 
+    ////////////////////////
+    // Display Parameters //
+    ////////////////////////
+
+    if( ImGui.CollapsingHeader( "Display Parameter" )) {
+        ImGui.Separator;
+        // specify display parameter
+        if( ImGui.Combo(
+            "Display Property", cast( int* )( & vg.display_ubo.display_property ),
+            "Density\0Velocity X\0Velocity Y\0Velocity Magnitude\0Velocity Gradient\0Velocity Curl\0\0"
+        ))  vg.updateDisplayUBO;
+
+        if( ImGui.BeginPopupContextItem( "Display Property Context Menu" )) {
+            if( ImGui.Selectable( "Parse Display Shader" )) {
+                vg.createGraphicsPipeline;
+                vg.createVelocityLinePipeline;
+            } ImGui.EndPopup();
+        }
+
+        if( ImGui.DragFloat( "Amp Display Property", & vg.display_ubo.amplify_property, 0.001f, 0, 255 )) vg.updateDisplayUBO;
+
+        if( ImGui.BeginPopupContextItem( "Amp Display Property Context Menu" )) {
+            if( ImGui.Selectable( "1" ))    { vg.display_ubo.amplify_property = 1;      vg.updateDisplayUBO; }
+            if( ImGui.Selectable( "10" ))   { vg.display_ubo.amplify_property = 10;     vg.updateDisplayUBO; }
+            if( ImGui.Selectable( "100" ))  { vg.display_ubo.amplify_property = 100;    vg.updateDisplayUBO; }
+            if( ImGui.Selectable( "1000" )) { vg.display_ubo.amplify_property = 1000;   vg.updateDisplayUBO; }
+            ImGui.EndPopup();
+        }
+        
+        if( ImGui.DragInt( "Color Layers", cast( int* )( & vg.display_ubo.color_layers ), 0.1f, 0, 255 )) vg.updateDisplayUBO;
+
+        ImGui.Separator;
+
+        // Todo(pp): currently the lines are not drawn when the UI is turned off
+        // -> move / copy line settings into VDrive_State and include in createResizedCommands
+
+
+
+        // velocity lines tree node
+        if( ImGui.TreeNode( "Velocity Lines" )) {
+
+            // set width of items and their label - aligned visually with 8 pixels
+            ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
+
+            int[3] grid_lines = void;
+            foreach( i, ref gl; grid_lines )
+                gl = vg.sim_display.lines_count[ i ];
+
+
+            if( ImGui.DragInt2( "Velocity Lines Count", grid_lines.ptr, 0.1, 0, 255 )) {
+                foreach( i, gl; grid_lines ) {
+                    gl = gl < 0 ? 0 : gl > 255 ? 255 : gl;
+                    vg.sim_display.lines_count[ i ] = cast( ubyte )( gl & 255 );
+                }
+            }
+            static int line_type = 0;
+            if( ImGui.RadioButton( "Points", &line_type, 1 ))   vg.createVelocityLinePipeline( true );
+
+            ImGui.SameLine;
+            ImGui.SetCursorPosX( main_win_size.x * 0.25 + 6 );
+            if( ImGui.RadioButton( "Lines", &line_type, 0 ))    vg.createVelocityLinePipeline( false );
+
+            ImGui.SameLine;
+            ImGui.SetCursorPosX( main_win_size.x * 0.5 + 8 );
+            ImGui.Text( "Velocity Lines Type" );
+
+            ImGui.PopItemWidth;
+            ImGui.TreePop;
+        }
+
+        ImGui.Separator;
+
+        // particles tree node
+        if( ImGui.TreeNode( "Particles" )) {
+
+            // set width of items and their label - aligned visually with 8 pixels
+            ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
+
+
+            ImGui.PopItemWidth;
+            ImGui.TreePop;
         }
 
 
 
-        ////////////////////////
-        // Display Parameters //
-        ////////////////////////
 
-        if( ImGui.CollapsingHeader( "Display Parameter" )) {
-            // specify display parameter
-            if( ImGui.Combo(
-                "Display Property", cast( int* )( & vg.display_ubo.display_property ),
-                "Density\0Velocity Magnitude\0Velocity Gradient\0Velocity Curl\0\0" 
-            ))  vg.updateDisplayUBO;
+        collapsingTerminator;
+    }
 
-            if( ImGui.BeginPopupContextItem( "Display Property Context Menu" )) {
-                import resources : createGraphicsPipeline;
-                if( ImGui.Selectable( "Parse Display Shader" )) vg.createGraphicsPipeline;
-                ImGui.EndPopup();
-            }
 
-            if( ImGui.DragFloat( "Amp Display Property", vg.display_ubo.amplify_property, 0.001f, 0, 256 )) vg.updateDisplayUBO;
 
-            if( ImGui.BeginPopupContextItem( "Amp Display Property Context Menu" )) {
-                if( ImGui.Selectable( "1" ))    { vg.display_ubo.amplify_property = 1;      vg.updateDisplayUBO; }
-                if( ImGui.Selectable( "10" ))   { vg.display_ubo.amplify_property = 10;     vg.updateDisplayUBO; }
-                if( ImGui.Selectable( "100" ))  { vg.display_ubo.amplify_property = 100;    vg.updateDisplayUBO; }
-                if( ImGui.Selectable( "1000" )) { vg.display_ubo.amplify_property = 1000;   vg.updateDisplayUBO; }
-                ImGui.EndPopup();
             }
         }
 
