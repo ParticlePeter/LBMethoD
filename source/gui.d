@@ -1988,12 +1988,24 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
 
     // turn gui on or off with tab key
     // Todo(pp): this should work only if not in text edit mode
-    if( key == GLFW_KEY_TAB ) {
-        vg.draw_gui = !vg.draw_gui;
+    switch( key ) {
+        case GLFW_KEY_F1 :
+        vg.draw_gui ^= 1 ;
         if( !vg.draw_gui ) {
-            import resources : createResizedCommands;
             vg.vd.createResizedCommands;   // create draw loop runtime commands, only used without gui
-        }
+        } break;
+
+        case GLFW_KEY_F2 :
+        show_imgui_examples ^= 1;
+        break;
+
+        case GLFW_KEY_P :
+        try {
+            vg.vd.createVelocityLinePipeline;
+        } catch( Exception ) {}
+        break;
+
+        default : break;
     }
 }
 
