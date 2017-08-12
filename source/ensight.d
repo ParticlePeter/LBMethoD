@@ -102,8 +102,6 @@ void ensStoreCase(
     uint                    step_size, 
     Export_Time_Set_Data*   time_set_data = null
     ) {
-    import std.outbuffer;
-    import std.typecons : scoped;
 
     ///////////////
     // case file //
@@ -128,6 +126,26 @@ void ensStoreCase(
     auto caseVarPath = options.outVar.leftJustify( options.outVar.length + options.padding, '*' ); 
 
     try {
+
+        //
+        // target directory
+        //
+        import std.stdio;
+        import std.path : dirName;
+        import std.file : exists, mkdirRecurse;
+    
+        // check if target directory exists and possibly create it
+        if(!options.output.dirName.exists )
+            //options.output..dirName.mkdir;
+            options.output.dirName.mkdirRecurse;
+
+
+        //
+        // Output Buffer
+        //
+        import std.outbuffer;
+        import std.typecons : scoped;
+
         auto caseData = scoped!OutBuffer;
         caseData.writefln( "FORMAT" );
         caseData.writefln( "type:                  ensight gold\n" );

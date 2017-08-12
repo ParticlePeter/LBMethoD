@@ -96,15 +96,6 @@ auto ref exportSim( ref VDrive_Gui_State vg ) {
     setDrawFuncSim( & drawExportWait );
     vg.drawCmdBufferCount = 2;
 
-    // check if target directory exists and possibly create it
-//    import std.stdio;
-//    import std.path : dirName, pathSplitter;
-//    import std.file : exists, mkdir, mkdirRecurse;
-//    
-//    if(!vg.ve.case_file_name.dirName.exists )
-//        //vg.ve.case_file_name.dirName.mkdir;
-//        vg.ve.case_file_name.dirName.mkdirRecurse;
-
     // setup ensight options
     import std.string : fromStringz;
     import std.conv : to;
