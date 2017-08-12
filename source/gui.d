@@ -12,6 +12,9 @@ import vdrive.memory;
 import vdrive.pipeline;
 
 import appstate;
+import cpustate;
+import exportstate;
+import resources;
 
 private {
 
@@ -23,8 +26,14 @@ private {
 
 
 struct VDrive_Gui_State {
-    VDrive_State    vd;
-    alias           vd this;
+    alias               vd this;
+    VDrive_State        vd;
+    VDrive_Export_State ve;
+    VDrive_Cpu_State    vc;
+
+
+
+    
 
     // gui resources
     Core_Pipeline               gui_graphics_pso;
@@ -1684,13 +1693,98 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
 
 
+    ////////////////////
+    // Export Ensight //
+    ////////////////////
+
+    if( ImGui.CollapsingHeader( "Export Ensight" )) {
+        ImGui.Separator;
+        import cpustate;
+
+        int sim_index = cast( int )vg.sim_index;
+        ImGui.PushStyleColor( ImGuiCol_Text, disabled_text );
+        ImGui.DragInt( "Simulation Index", & sim_index );
+        ImGui.PopStyleColor( 1 );
+        ImGui.Separator;
+
+        ImGui.DragInt( "Start Index", & vg.ve.start_index,  0.1, 0 );
+        ImGui.DragInt( "Step Count",  & vg.ve.step_count,   0.1, 1 );
+        ImGui.DragInt( "Every Nth Step", & vg.ve.step_size, 0.1, 1 );
+        ImGui.Separator;
+
+        ImGui.InputText( "Case File Name", vg.ve.case_file_name.ptr, vg.ve.case_file_name.length );
+        ImGui.InputText( "Var Name",  vg.ve.variable_name.ptr, 9 );
+        ImGui.SameLine;
+        ImGui.SetCursorPosX( 10 + ImGui.GetCursorPosX );
+        ImGui.Checkbox( "is Vector", & vg.vd.export_as_vector );
+        ImGui.Combo( "File Format", & cast( int )vg.ve.file_format, "Ascii\0Binary\0\0" );
+        ImGui.Separator;
+
+
+        if( !vg.sim_use_cpu ) {
+            ImGui.Spacing;
+            ImGui.Text( "Export Shader" );
+
+            // select export shader
+            static int export_shader_index = 0;
+            ImGui.PushItemWidth( ImGui.GetWindowWidth * 0.75 );
+            if( ImGui.Combo( "Export", & export_shader_index, //"shader/export_from_image.comp\0\0" )
+                export_shader_start_index == size_t.max
+                    ? "None found!"
+                    : shader_names_ptr[ export_shader_start_index ] )
+                ) {
+                if( export_shader_start_index != size_t.max ) {
+                    auto export_shader_dirty = !compareShaderNamesAndReplace( 
+                        shader_names_ptr[ export_shader_start_index + export_shader_index ], vg.export_shader
+                    );
+                }
             }
+
+            // update init shader list when hovering over Combo
+            if( ImGui.IsItemHovered ) {
+                if( hasShaderDirChanged ) {
+                    parseShaderDirectory;
+                    // a new shader might replace the shader at the current index
+                    // when we would actually use the ImGui.Combo and select this new shader
+                    // it would not be registered
+                    if( export_shader_start_index != size_t.max ) {     // might all have been deleted
+                        auto export_shader_dirty = !compareShaderNamesAndReplace(
+                            shader_names_ptr[ export_shader_start_index + export_shader_index ], vg.export_shader
+                        );
+                    }    
+                }
+            } collapsingTerminator;
         }
 
-        // Bottom Transport Controls
-        //transportControls;
+        // Execute the data export
+        if( ImGui.Button( "Export Data", button_size_1 )) {
 
-    } ImGui.End();
+            // reset simulation if we past the export step index
+            if( vg.ve.start_index < vg.sim_index ) {
+                vg.simReset;
+            }
+
+            // assign export appropriate function
+            if( vg.sim_use_cpu ) {
+                // Todo(pp): each category (e.g. export, cpu ) should have its own set of
+                // play, pause, step, reset functions. If selecting a category all of them
+                // should be assigned and Gui module should know of only the four function pointer
+                // implement it!
+                if( vg.sim_use_double ) {
+                    draw_func = & cpuStepDExport;
+                } else {
+                    draw_func = & cpuStepFExport;
+                }
+            } else {
+                // double or float does not matter, export is allways float
+                vg.exportSim;
+            }
+        } collapsingTerminator;
+    }
+
+    ImGui.End();
+
+
 
     // 2. Show another simple window, this time using an explicit Begin/End pair
     if( show_another_window ) {
