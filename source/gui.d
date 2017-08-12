@@ -1242,9 +1242,6 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
 
 
-        ///////////////////////////
-        // Simulation Parameters //
-        ///////////////////////////
         //
         // Work Group Size
         //
@@ -1454,68 +1451,141 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
 
 
-                }
- 
-                if( ImGui.DragFloat( "Relaxation Rate Tau",  vg.sim_relaxation_rate, 0.001f, 0, 2 )) {
-                    vg.compute_ubo.collision_frequency = 1 / vg.sim_relaxation_rate;
-                    vg.updateViscosity;
-                    vg.updateComputeUBO;
-                }
+    ///////////////////////////
+    // Simulation Parameters //
+    ///////////////////////////
 
-                if( ImGui.DragFloat( "Collison Frequency", vg.compute_ubo.collision_frequency, 0.001f, 0, 2 )) {
-                    vg.sim_relaxation_rate = 1 / vg.compute_ubo.collision_frequency;
-                    vg.updateViscosity;
-                    vg.updateComputeUBO;
+    if( ImGui.CollapsingHeader( "Simulation Parameter" )) {
+        // preset settings context menu
+        if( ImGui.BeginPopupContextItem( "Simulation Parameter Context Menu" )) {
+            if( ImGui.Selectable( "Unit Parameter" )) {
+                vg.sim_wall_velocity = 0.05; vg.updateWallVelocity;
+                vg.compute_ubo.collision_frequency = vg.sim_relaxation_rate = 1; vg.updateViscosity;
+            }
+            if( ImGui.Selectable( "Zero Viscosity" )) {
+                vg.sim_wall_velocity = 0.001; vg.updateWallVelocity;
+                vg.compute_ubo.collision_frequency = 2;
+                vg.sim_relaxation_rate = 0.5;
+                vg.updateViscosity;
+                if( vg.sim_algorithm != 4 ) {
+                    vg.sim_algorithm  = 4;
+                    vg.createCompBoltzmannPipeline( false, true );
                 }
-                ImGui.PopItemWidth;
-                ImGui.TreePop;
+            }
+            if( ImGui.Selectable( "Crazy Cascades" )) {
+                vg.sim_wall_velocity = 0.5; vg.updateWallVelocity;
+                vg.compute_ubo.collision_frequency = 0.8;
+                vg.sim_relaxation_rate = 1.25;
+                vg.updateViscosity;
+                if( vg.sim_algorithm != 4 ) {
+                    vg.sim_algorithm  = 4;
+                    vg.createCompBoltzmannPipeline( false, true );
+                }
+                // set resolution to 1024 * 1024
+
+            } ImGui.EndPopup();
+        }
+
+        ImGui.Separator;
+
+        // kinematic viscosity
+        if( ImGui.DragFloat( "Kinematic Viscosity", & vg.sim_viscosity, 0.001f, 0.0f, 1000.0f, "%.8f", 2.0f )) {
+            vg.updateTauOmega;
+        }
+
+        // wall velocity
+        if( ImGui.DragFloat( "Wall Velocity", & vg.sim_wall_velocity, 0.001f )) {
+            vg.updateWallVelocity;
+            vg.updateComputeUBO;
+        }
+
+        // collision algorithm
+        if( ImGui.Combo( "Collision Algorithm", cast( int* )( & vg.sim_algorithm ), "SRT-LBGK\0TRT\0MRT\0Cascaded\0Cascaded Drag\0\0" )) {
+            vg.createCompBoltzmannPipeline( false, true );
+        }
+
+        ImGui.Separator;
+
+        // simulation details tree node
+        if( ImGui.TreeNode( "Simulation Details" )) {
+
+            // set width of items and their label - aligned visually with 8 pixels
+            ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
+
+            if( ImGui.DragFloat2( "Spatial/Temporal Unit", & vg.sim_unit_spatial, 0.001f )) {  // next value in struct is vg.sim_unit_temporal
+                vg.sim_speed_of_sound = vg.sim_unit_speed_of_sound * vg.sim_unit_spatial / vg.sim_unit_temporal;
+                vg.updateTauOmega;
             }
 
-
-            // reynolds number tree node
-            if( ImGui.TreeNode( "Reynolds Number" )) {
-
-                // set width of items and their label - aligned visually with 8 pixels
-                ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
-
-                static float typical_vel = 0.05;
-                ImGui.DragFloat( "Typical Velocity U",  typical_vel, 0.001f );
-                if( ImGui.BeginPopupContextItem( "Typical Velocity Context Menu" )) {
-                    if( ImGui.Selectable( "Wall Velocity" )) { typical_vel = vg.sim_wall_velocity; }
-                    ImGui.EndPopup();
-                }
-
-                static float typical_len = 1;
-                ImGui.DragFloat( "Typical Length L", typical_len, 0.001f );
-
-                auto next_win_size = ImVec2( 200, 60 ); ImGui.SetNextWindowSize( next_win_size );
-                if( ImGui.BeginPopupContextItem( "Typical Length Context Menu" )) {
-                    
-                    if( ImGui.Selectable( "Spatial Lattice Unit" )) { typical_len = vg.sim_unit_spatial; }
-                    ImGui.Separator;
-
-                    ImGui.Columns( 2, "Typical Length Context Columns", true );
-
-                    if( ImGui.Selectable( "Lattice X" )) { typical_len = vg.sim_domain[0]; }
-                    ImGui.NextColumn();
-                    if( ImGui.Selectable( "Lattice Y" )) { typical_len = vg.sim_domain[1]; }
-                    ImGui.NextColumn();
-
-                    if( ImGui.Selectable( "Domain X" )) { typical_len = vg.sim_domain[0] * vg.sim_unit_spatial; }
-                    ImGui.NextColumn();
-                    if( ImGui.Selectable( "Domain Y" )) { typical_len = vg.sim_domain[1] * vg.sim_unit_spatial; }
-                    ImGui.NextColumn();
-
-                    ImGui.EndPopup;
-                }
-
-
-                float re = typical_vel * typical_len / vg.sim_viscosity;
-                ImGui.DragFloat( "Re", re, 0.001f );
-
-                ImGui.PopItemWidth;
-                ImGui.TreePop;
+            if( ImGui.DragFloat( "Relaxation Rate Tau",& vg.sim_relaxation_rate, 0.001f, 0, 2 )) {
+                vg.compute_ubo.collision_frequency = 1 / vg.sim_relaxation_rate;
+                vg.updateViscosity;
+                vg.updateComputeUBO;
             }
+
+            if( ImGui.DragFloat( "Collision Frequency", & vg.compute_ubo.collision_frequency, 0.001f, 0, 2 )) {
+                vg.sim_relaxation_rate = 1 / vg.compute_ubo.collision_frequency;
+                vg.updateViscosity;
+                vg.updateComputeUBO;
+            }
+            ImGui.PopItemWidth;
+            ImGui.TreePop;
+        }
+
+        ImGui.Separator;
+
+        // Reynolds number tree node
+        if( ImGui.TreeNode( "Reynolds Number" )) {
+
+            // set width of items and their label - aligned visually with 8 pixels
+            ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
+
+            static float typical_vel = 0.05;
+            ImGui.DragFloat( "Typical Velocity U", & typical_vel, 0.001f );
+            if( ImGui.BeginPopupContextItem( "Typical Velocity Context Menu" )) {
+                if( ImGui.Selectable( "Wall Velocity" )) { typical_vel = vg.sim_wall_velocity; }
+                ImGui.EndPopup();
+            }
+
+            static float typical_len = 1;
+            ImGui.DragFloat( "Typical Length L", & typical_len, 0.001f );
+
+            auto next_win_size = ImVec2( 200, 60 ); ImGui.SetNextWindowSize( next_win_size );
+            if( ImGui.BeginPopupContextItem( "Typical Length Context Menu" )) {
+
+                if( ImGui.Selectable( "Spatial Lattice Unit" )) { typical_len = vg.sim_unit_spatial; }
+                ImGui.Separator;
+
+                ImGui.Columns( 2, "Typical Length Context Columns", true );
+
+                if( ImGui.Selectable( "Lattice X" )) { typical_len = vg.sim_domain[0]; }
+                ImGui.NextColumn();
+                if( ImGui.Selectable( "Lattice Y" )) { typical_len = vg.sim_domain[1]; }
+                ImGui.NextColumn();
+
+                if( ImGui.Selectable( "Domain X" )) { typical_len = vg.sim_domain[0] * vg.sim_unit_spatial; }
+                ImGui.NextColumn();
+                if( ImGui.Selectable( "Domain Y" )) { typical_len = vg.sim_domain[1] * vg.sim_unit_spatial; }
+                ImGui.NextColumn();
+
+                ImGui.EndPopup;
+            }
+
+            float re = typical_vel * typical_len / vg.sim_viscosity;
+            if( ImGui.DragFloat( "Re", & re, 0.001f )) {
+                vg.sim_viscosity = typical_vel * typical_len / re;
+                vg.updateTauOmega;
+            }
+
+            ImGui.PopItemWidth;
+            ImGui.TreePop;
+        }
+        
+        collapsingTerminator;
+    }
+
+
+
         }
 
 
