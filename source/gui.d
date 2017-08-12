@@ -1714,34 +1714,9 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
 
     ImGui.Render;
-
-    return vg;
 }
 
 
-
-auto ref destroyResources( ref VDrive_Gui_State vg ) {
-
-    // forward to appstate destroyResources, this also calls device.vkDeviceWaitIdle;
-    import resources : resources_destroyResources = destroyResources;
-    vg.resources_destroyResources;
-
-    // now destroy all remaining gui resources
-    foreach( i; 0 .. vg.GUI_QUEUED_FRAMES ) {
-        vg.gui_vtx_buffers[ i ].destroyResources;
-        vg.gui_idx_buffers[ i ].destroyResources;
-    }
-
-    // descriptor set and layout is destroyed in module resources
-    import vdrive.state, vdrive.pipeline;
-    vg.destroy( vg.cmd_pool );
-    vg.destroy( vg.gui_graphics_pso );
-    vg.gui_font_tex.destroyResources;
-
-    ImGui.Shutdown;
-
-    return vg;
-}
 
 
 
@@ -1964,6 +1939,7 @@ void guiMouseButtonCallback( GLFWwindow* window, int button, int val, int mod ) 
     inputMouseButtonCallback( window, button, val, mod );
 }
 
+
 void guiScrollCallback( GLFWwindow*, double /*xoffset*/, double yoffset ) {
     g_MouseWheel += cast( float )yoffset; // Use fractional mouse wheel, 1.0 unit 5 lines.
 }
@@ -2008,7 +1984,7 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
     if( key == GLFW_KEY_KP_ENTER && mod == GLFW_MOD_ALT ) {
         io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
         main_win_size.y = vg.vd.windowHeight;       // this sets the window gui height to the window height
-    } else 
+    } else
 
     // turn gui on or off with tab key
     // Todo(pp): this should work only if not in text edit mode
@@ -2021,10 +1997,9 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
     }
 }
 
-
 /// Callback Function for capturing window resize events
 void guiWindowSizeCallback( GLFWwindow * window, int w, int h ) {
-    auto io = & ImGui.GetIO();  
+    auto io = & ImGui.GetIO();
     auto vg = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData
     io.DisplaySize  = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
     main_win_size.y = vg.vd.windowHeight;           // this sets the window gui height to the window height
