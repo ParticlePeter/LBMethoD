@@ -91,8 +91,16 @@ struct VDrive_State {
     VkBufferView                sim_buffer_view;        // arbitrary count of buffer views, dynamic resizing is not that easy as we would have to recreate the descriptor set each time
     Meta_Buffer                 compute_ubo_buffer;
     VkMappedMemoryRange         compute_ubo_flush;
+
+
+    // visualization resources
     Meta_Buffer                 display_ubo_buffer;
     VkMappedMemoryRange         display_ubo_flush;
+    uint32_t                    sim_particle_count = 16 * 1024;
+    Meta_Buffer                 sim_particle_buffer;
+    VkBufferView                sim_particle_buffer_view;
+    Core_Pipeline               comp_part_pso;
+    Core_Pipeline               draw_part_pso;
     Core_Pipeline               draw_line_pso;
 
 

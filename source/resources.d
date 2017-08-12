@@ -4,6 +4,7 @@ import erupted;
 
 import vdrive;
 import appstate;
+import particle;
 
 import dlsl.matrix;
 
@@ -294,6 +295,12 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         .addLayoutBinding( 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT )
         .addBufferInfo( vd.display_ubo_buffer.buffer )
 
+        .addLayoutBinding( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
+        .addTexelBufferView( vd.sim_particle_buffer_view )
+
+        .addLayoutBinding( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
+        .addTexelBufferView( vd.sim_particle_buffer_view )
+
         .construct
         .reset;
 
@@ -309,10 +316,18 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         .addBindingUpdate/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ) // immutable does not filter properly, either driver bug or module descriptor bug
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
 
+        .addBindingUpdate( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
+        .addTexelBufferView( vd.sim_particle_buffer_view )
 
         .attachSet( vd.descriptor.descriptor_set );
 
 
+    // this one is solely for export data purpose to be absolute lazy about resource construction
+    // which is only necessary if we export at all, and then just before the export
+    vd.export_descriptor_update( vd )
+        .addBindingUpdate( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
+        .addTexelBufferView( vd.export_buffer_view )
+        .attachSet( vd.descriptor.descriptor_set );
 
 }
 
@@ -478,6 +493,7 @@ auto ref createRenderResources( ref VDrive_State vd ) {
     // create the graphics pipeline, can be called multiple time to parse shader at runtime
     vd.createGraphicsPipeline;
     vd.createVelocityLinePipeline;
+    vd.createParticleDrawPipeline;
 
     // create all resources for the compute pipeline
     return vd.createComputeResources;
@@ -493,6 +509,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
 
     vd.compute_cache = vd.createPipelineCache;
     vd.createCompBoltzmannPipeline( true, true );
+    vd.createParticleCompPipeline( true, true );
 
     return vd;
 }
@@ -828,6 +845,8 @@ auto ref destroyResources( ref VDrive_State vd ) {
 
     vd.device.vkDeviceWaitIdle;
 
+    vd.destroyParticles;
+
     // swapchain, swapchain and present image views
     vd.swapchain.destroyResources;
 
@@ -863,6 +882,14 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.destroy( vd.rendered_semaphore );
     foreach( ref fence; vd.submit_fence )
         vd.destroy( fence );
+
+
+    // export resources
+    if( vd.comp_export_pso.is_constructed ) vd.destroy( vd.comp_export_pso );
+    if( vd.export_buffer.is_constructed ) vd.export_buffer.destroyResources;
+    if( vd.export_buffer_view != VK_NULL_HANDLE ) vd.destroy( vd.export_buffer_view );
+
+
 
     return vd;
 }
