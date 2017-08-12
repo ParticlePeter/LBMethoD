@@ -1,0 +1,103 @@
+// --- COMP ---
+#version 450 core
+
+// specialization constants for local work group size
+layout( local_size_x_id = 0 ) in;
+//layout( local_size_y_id = 1 ) in;
+//layout( local_size_z_id = 2 ) in;
+
+// local work group defaults, when constants are not defined
+layout( local_size_x = 256 ) in;
+layout( local_size_y =   1 ) in;
+layout( local_size_z =   1 ) in;
+
+// populations 1 single buffered rest velocity, 8 double buffered link velocities
+layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
+
+// velocity and density write target, will be rendered as texture in next pass
+layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict writeonly image2D vel_rho_img;
+
+
+// population indices
+// 6 2 5 //
+//  \|/  //
+// 3-0-1 //
+//  /|\  //
+// 7 4 8 //
+
+
+// Directions:          R       E       N       W       S       NE      NW      SW      SE
+const float[9] pw = {   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 };
+
+
+////////////////////////////////////////////////////////
+// Common Indices and Counts for VkImage and VkBuffer //
+////////////////////////////////////////////////////////
+
+// shortcut to imageSize, the Domain of the computation, same as Global Size
+//#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
+#define D imageSize( vel_rho_img )
+
+// define global equivalent for gl_LocalInvocationIndex
+#define UI gl_GlobalInvocationID.x
+
+// U and I are also the index velocity population index
+#define I int( UI )
+
+#define X ( I % D.x )
+#define Y ( I / D.x )
+//#define Z ( I / ( imageSize( vel_rho_img ).x * imageSize( vel_rho_img ).y )
+
+// derived total count of nodes
+int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
+
+
+// main simulation function
+void main( void ) {
+
+    // Init velocities and densities
+    imageStore( vel_rho_img, ivec2( X, Y ), vec4( 0, 0, 0, 1 ));
+
+    // init all distribution f(unctions) with equilibrium, p = population
+    for( int p = 0; p < 9; ++p )  {
+        imageStore( popul_buffer, p * cell_count + I, vec4( pw[ p ] ));
+        //if( p > 0 ) imageStore( popul_buffer, ( p + 8 ) * cell_count + I, vec4( pw[ p ] ));
+    }
+}   // main
+
+
+
+// Directions   :   R   N   S   E   W   NE  SW  SE  NW
+// Cascaded     :   R   NW  W   SW  S   SE  E   NE  N
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// alternative access method using multi dim local work group size, currently not working properly //
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/*
+// shortcut to imageSize, the Domain of the computation, same as Global Size
+#define Domain ivec3( gl_WorkGroupSize * gl_NumWorkGroups )
+#define D ( Domain )
+//#define D imageSize( vel_rho_img )
+
+#define GID ivec3( gl_GlobalInvocationID )
+// define gl_WorkGroupIndex equivalent to gl_LocalInvocationIndex
+// this is confirmed on CPU, where is the crux ???
+uint work_group_index = 
+    gl_WorkGroupID.z * gl_NumWorkGroups.z * gl_NumWorkGroups.y +
+    gl_WorkGroupID.y * gl_NumWorkGroups.x +
+    gl_WorkGroupID.x;
+
+// define linearization of the whole domain
+int I = int(
+    gl_WorkGroupSize.z *
+    gl_WorkGroupSize.y *
+    gl_WorkGroupSize.x * work_group_index + gl_LocalInvocationIndex );
+
+
+#define X int( GID.x )
+#define Y int( GID.y )
+//#define Z ( I / ( imageSize( vel_rho_img ).x * imageSize( vel_rho_img ).y )
+*/
