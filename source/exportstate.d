@@ -67,7 +67,7 @@ void drawExport( ref VDrive_Gui_State vg ) nothrow @system {
 
         // update indexes and ping pong
         vg.sim_index = vg.ve.start_index + vg.ve.export_index * vg.ve.step_size;
-        vg.sim_ping_pong = ( vg.ve.start_index + vg.ve.export_index ) % vg.vd.MAX_FRAMES;
+        vg.sim_ping_pong = ( vg.ve.start_index + vg.ve.export_index ) % 2;
         vg.ve.export_index++;
 
     } else {
