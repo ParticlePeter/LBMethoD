@@ -39,7 +39,6 @@ struct VDrive_Gui_State {
     };
 
     // gui helper and cache sim settings
-    float[3]    sim_display_scale = [ 1, 1, 1 ];
     float       sim_relaxation_rate;    // tau
     float       sim_viscosity;          // at a relaxation rate of 1 and lattice units x, t = 1
     float       sim_wall_velocity;
@@ -1746,6 +1745,9 @@ auto ref destroyResources( ref VDrive_Gui_State vg ) {
 
 
 
+/////////////////////////////////////////////////////////////
+// Callback for C++ ImGui lib, in particular draw function //
+/////////////////////////////////////////////////////////////
 
 extern( C++ ):
 
@@ -1836,17 +1838,57 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
-    // bind graphics lucien pipeline
+    // bind lbmd graphics pso
     cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.graphics_pso.pipeline );
 
     // push constant the sim display scale
-    cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, vg.sim_display_scale.ptr );
+    cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, vg.sim_display.scale.ptr );
 
     // buffer-less draw with build in gl_VertexIndex exclusively to generate position and texcoord data
-    cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count ,instance count ,first vertex ,first instance
+    cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
 
 
+
+
+    // bind lbmd velocity lines pso
+    if( vg.sim_display.lines_count[0] > 0 || vg.sim_display.lines_count[1] > 0 ) {
+
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso.pipeline );
+
+        // push constant the sim display scale and lines axis
+        vg.sim_display.lines_axis = 0;
+        cmd_buffer.vkCmdPushConstants( vg.draw_line_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
+
+        if( vg.sim_display.lines_count[0] > 0 ) // buffer-less draw with build in gl_VertexIndex exclusively to generate position and texcoord data
+            // the X lines run from top to bottom and repeat in X direction, hence their vertex count is the Y sim_domain
+            cmd_buffer.vkCmdDraw( vg.vd.sim_domain[1] + 1, vg.sim_display.lines_count[0], 0, 0 ); // vertex count, instance count, first vertex, first instance
+
+        if( vg.sim_display.lines_count[1] > 0 ) {
+            vg.sim_display.lines_axis = 1;
+            // the Y lines run from left to right and repeat in Y direction, hence their vertex count is the X sim_domain
+            cmd_buffer.vkCmdPushConstants( vg.draw_line_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
+            cmd_buffer.vkCmdDraw( vg.vd.sim_domain[0] + 1, vg.sim_display.lines_count[1], 0, 0 ); // vertex count, instance count, first vertex, first instance
+        }
+    }   
+
+
+    VkDeviceSize vertex_offset;
+    /*    // bind draw particle pipeline
+    cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_part_pso.pipeline );
+    cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer           // bind descriptor set
+        VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
+        vg.draw_part_pso.pipeline_layout,   // VkPipelineLayout             layout
+        0,                                  // uint32_t                     firstSet
+        1,                                  // uint32_t                     descriptorSetCount
+        &vg.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
+        0,                                  // uint32_t                     dynamicOffsetCount
+        null                                // const( uint32_t )*           pDynamicOffsets
+    );
+    
+    cmd_buffer.vkCmdBindVertexBuffers( 0, 1, & vg.sim_particle_buffer.buffer, & vertex_offset );
+    cmd_buffer.vkCmdDraw( 2 * vg.vd.sim_particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+    */
 
 
 
@@ -1854,7 +1896,6 @@ void drawGuiData( ImDrawData* draw_data ) {
     cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.gui_graphics_pso.pipeline );
 
     // bind vertex and index buffer
-    VkDeviceSize vertex_offset;
     cmd_buffer.vkCmdBindVertexBuffers( 0, 1, & vg.gui_vtx_buffers[ vg.next_image_index ].buffer, & vertex_offset );
     cmd_buffer.vkCmdBindIndexBuffer( vg.gui_idx_buffers[ vg.next_image_index ].buffer, 0, VK_INDEX_TYPE_UINT16 );
 
@@ -1891,6 +1932,13 @@ void drawGuiData( ImDrawData* draw_data ) {
 
     // end the render pass
     cmd_buffer.vkCmdEndRenderPass;
+
+    /*
+    // bind comp particle pipeline
+    cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vg.comp_part_pso.pipeline );
+    cmd_buffer.vkCmdPushConstants( vg.comp_part_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 2 * float.sizeof, vg.sim_display.scale.ptr );
+    cmd_buffer.vkCmdDispatch( 16, 1, 1 );   // dispatch compute command
+    */
 
     // finish recording
     cmd_buffer.vkEndCommandBuffer;
