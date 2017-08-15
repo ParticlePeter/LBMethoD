@@ -32,9 +32,6 @@ struct VDrive_Gui_State {
     VDrive_Cpu_State    vc;
 
 
-
-    
-
     // gui resources
     Core_Pipeline               gui_graphics_pso;
     Meta_Image                  gui_font_tex;
@@ -171,7 +168,7 @@ auto ref initImgui( ref VDrive_Gui_State vg ) {
     style.Colors[ ImGuiCol_ScrollbarGrabHovered ]   = ImVec4( 0.22f, 0.35f, 0.50f, 1.00f ); //ImVec4( 0.50f, 0.50f, 0.50f, 1.00f );
     style.Colors[ ImGuiCol_ScrollbarGrabActive ]    = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.00f, 0.50f, 1.00f, 1.00f );
     style.Colors[ ImGuiCol_ComboBg ]                = ImVec4( 0.20f, 0.20f, 0.20f, 1.00f ); //ImVec4( 0.20f, 0.20f, 0.20f, 1.00f );
-    style.Colors[ ImGuiCol_CheckMark ]              = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.90f, 0.90f, 0.90f, 1.00f );
+    style.Colors[ ImGuiCol_CheckMark ]              = ImVec4( 0.41f, 0.65f, 0.94f, 1.00f ); //ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.90f, 0.90f, 0.90f, 1.00f );
     style.Colors[ ImGuiCol_SliderGrab ]             = ImVec4( 1.00f, 1.00f, 1.00f, 0.25f ); //ImVec4( 1.00f, 1.00f, 1.00f, 0.25f );
     style.Colors[ ImGuiCol_SliderGrabActive ]       = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.00f, 0.50f, 1.00f, 1.00f );
     style.Colors[ ImGuiCol_Button ]                 = ImVec4( 0.16f, 0.26f, 0.38f, 1.00f ); //ImVec4( 0.40f, 0.40f, 0.40f, 1.00f );
@@ -242,7 +239,7 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
     }
 
     // even though the allocated memory range seems to be \0 initialized we set the last char to \0 to be sure
-    device_names[ devices_char_count ] = '\0';  // we allocated devices_char_count + 1, hence no -1 required 
+    device_names[ devices_char_count ] = '\0';  // we allocated devices_char_count + 1, hence no -1 required
 
 
     // initialize VDrive_Gui_State member from VDrive_State member
@@ -275,10 +272,10 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
 
         uint gl_LocalInvocationIndex =
             gl_LocalInvocationID.z * gl_WorkGroupSize.x * gl_WorkGroupSize.y +
-            gl_LocalInvocationID.y * gl_WorkGroupSize.x + 
+            gl_LocalInvocationID.y * gl_WorkGroupSize.x +
             gl_LocalInvocationID.x;
 
-        uint gl_WorkGroupIndex = 
+        uint gl_WorkGroupIndex =
             gl_WorkGroupID.z * gl_NumWorkGroups.z * gl_NumWorkGroups.y +
             gl_WorkGroupID.y * gl_NumWorkGroups.x +
             gl_WorkGroupID.x;
@@ -287,7 +284,7 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
 
 
             //gl_WorkGroupID.z * gl_WorkGroupSize.z + gl_LocalInvocationID.z * Domain.x * Domain.y + // in the 2D case gl_GlobalInvocationID.z is const and 0
-            //gl_WorkGroupID.y * gl_WorkGroupSize.y + gl_LocalInvocationID.y * Domain.x + 
+            //gl_WorkGroupID.y * gl_WorkGroupSize.y + gl_LocalInvocationID.y * Domain.x +
             //gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
 
         //writeln( "         gl_WorkGroupID : ", gl_WorkGroupID );
@@ -530,7 +527,7 @@ auto ref resizeRenderResources( ref VDrive_Gui_State vg ) {
 
 
 ////////////////////////////////////
-// Exit destroying alll resources // 
+// Exit destroying alll resources //
 ////////////////////////////////////
 
 auto ref destroyResources( ref VDrive_Gui_State vg ) {
@@ -562,7 +559,7 @@ auto ref destroyResources( ref VDrive_Gui_State vg ) {
 
 
 //////////////////////////
-// Initial on time draw // 
+// Initial on time draw //
 //////////////////////////
 
 auto ref drawInit( ref VDrive_Gui_State vg ) {
@@ -614,17 +611,18 @@ private void drawStep( ref VDrive_Gui_State vg ) nothrow @system {
 }
 
 
+
 ///////////////////////////////////
-// Loop draw called in main loop // 
+// Loop draw called in main loop //
 ///////////////////////////////////
 
 void draw( ref VDrive_Gui_State vg ) {
 
-    // record next command buffer asynchronous 
-    if( vg.draw_gui )   // this can't be a function pointer as well 
-        vg.drawGui;     // as we wouldn't know what else has to be drawn (drawFunc or drawFuncSim etc. )
+    // record next command buffer asynchronous
+    if( vg.draw_gui )   // this can't be a function pointer as well
+        vg.drawGui;     // as we wouldn't know what else has to be drawn (drawFunc or drawFuncPlay etc. )
 
-    // call function pointer 
+    // call function pointer
     vg.draw_func;
 }
 
@@ -666,7 +664,7 @@ private {
 
 
     void checkComputeParams( ref VDrive_Gui_State vg ) {
-        vg.sim_compute_dirty = 
+        vg.sim_compute_dirty =
             ( vg.vd.sim_use_double  != vg.sim_use_double )
         ||  ( vg.vd.sim_use_3_dim   != vg.sim_use_3_dim )
         ||  ( vg.vd.sim_domain != vg.sim_domain )
@@ -675,7 +673,7 @@ private {
 
     void checkComputePSO( ref VDrive_Gui_State vg ) {
         vg.sim_work_group_dirty = vg.vd.sim_work_group_size != vg.sim_work_group_size;
-    } 
+    }
 
     void updateTauOmega( ref VDrive_Gui_State vg ) {
         float speed_of_sound_squared = vg.sim_speed_of_sound * vg.sim_speed_of_sound;
@@ -726,7 +724,7 @@ private {
 
 
     /////////////////////////////////////////////////////////////////////////////////////
-    // store available shader names concatenated and pointer into it as dynamic arrays //  
+    // store available shader names concatenated and pointer into it as dynamic arrays //
     /////////////////////////////////////////////////////////////////////////////////////
 
     import vdrive.util.array;
@@ -781,7 +779,7 @@ private {
         size_t last_shader_count;
         if( 0 < shader_names_ptr.length ) {
             last_start_pointer = shader_names_ptr[0];
-        
+
             // get distances of init shaders
             foreach( i, ptr; shader_names_ptr.data[ 1 .. $ ] )
                 shader_names_ptr[ i ] = cast( const( char* ))( ptr - shader_names_ptr[ i ] );
@@ -794,7 +792,7 @@ private {
 
 
         //
-        // append loop shader 
+        // append loop shader
         //
         loop_shader_start_index = dirEntries( path_to_dir, SpanMode.shallow )
             .filter!( f => f.name.startsWith( "shader\\loop_" ))
@@ -871,7 +869,7 @@ private {
         // set the location to the last valid start pointer
         shader_names_ptr[ $ - 1 ] = shader_names_combined.ptr + shader_names_combined.length - cast( int )shader_names_ptr[ $ - 1 ];
 
-        //auto reconstruct_ptr = 
+        //auto reconstruct_ptr =
         // now patch shader_names_ptr going backwards from index last_shader_count
         // fixing previous pointers with distances stored starting a last_shader_count - 1
         foreach_reverse( i, ptr; shader_names_ptr.data[ 1 .. $ ] ) {
@@ -893,7 +891,7 @@ private {
         import std.algorithm : cmp;
         import std.string : fromStringz;
         import std.path : extension, stripExtension;
-        
+
         bool equal = cmp( gui_shader.fromStringz, sim_shader.stripExtension ) == 0;
         if( !equal ) sim_shader = gui_shader.fromStringz.to!string ~ sim_shader.extension;
         import std.stdio;
@@ -1048,7 +1046,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
         if( ImGui.Button( "Another Window", button_size_3 )) show_another_window ^= 1;
         ImGui.SameLine;
         if( ImGui.Button( "Style Editor", button_size_3 )) show_style_editor ^= 1;
-        
+
         if( ImGui.ImGui.GetIO().Framerate < minFramerate ) minFramerate = ImGui.ImGui.GetIO().Framerate;
         if( ImGui.ImGui.GetIO().Framerate > maxFramerate ) maxFramerate = ImGui.ImGui.GetIO().Framerate;
         if( resetFrameMax < 100 ) {
@@ -1080,7 +1078,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             }
         }
         ImGui.PopItemWidth;
-        
+
         collapsingTerminator;
     }
 
@@ -1121,7 +1119,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             import core.stdc.stdio : sprintf;
             char[24]    label;
             char[3]     dir = [ 'X', 'Y', 'Z' ];
-            float       click_range = 0.5 / ( 2 + dimensions ); 
+            float       click_range = 0.5 / ( 2 + dimensions );
             float       mouse_pos_x = ImGui.GetMousePosOnOpeningCurrentPopup.x;
 
             foreach( j; 0 .. 2 + dimensions ) {
@@ -1197,7 +1195,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
 
         // Apply button for all the settings within Compute Parameter
-        // If more then work group size has changed rebuild sim_buffer 
+        // If more then work group size has changed rebuild sim_buffer
         // If the simulation dimensions has not changed we do not need to rebuild sim_image
         // Update the descriptor set, rebuild compute command buffers and reset cpu data if running on cpu
         // We also update the scale of the display plane and normalization factors for the velocity lines
@@ -1217,7 +1215,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                     vg.createSimImage;
                 vg.updateDescriptorSet;
 
-                // recreate lattice boltzmann pipeline with possibly new shaders 
+                // recreate lattice boltzmann pipeline with possibly new shaders
                 vg.createCompBoltzmannPipeline( vg.sim_init_shader_dirty, vg.sim_loop_shader_dirty );
                 vg.sim_init_shader_dirty = vg.sim_loop_shader_dirty = false;
 
@@ -1301,7 +1299,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             import core.stdc.stdio : sprintf;
             char[24]    label;
             char[3]     dir = [ 'X', 'Y', 'Z' ];
-            float       click_range = 0.5 / ( 2 + dimensions ); 
+            float       click_range = 0.5 / ( 2 + dimensions );
             float       mouse_pos_x = ImGui.GetMousePosOnOpeningCurrentPopup.x;
 
             foreach( j; 0 .. 2 + dimensions ) {
@@ -1327,7 +1325,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                     dim = 1;
                     foreach( i; 0 .. 8 ) {
                         sprintf( label.ptr, "Grid Res %c / %d", dir[j], dim );
-                        if( ImGui.Selectable( label.ptr  )) { 
+                        if( ImGui.Selectable( label.ptr  )) {
                             vg.sim_work_group_size[j] = vg.sim_domain[j] / dim;
                             vg.checkComputePSO;
                         } dim *= 2;
@@ -1373,7 +1371,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
         //
         if( compute_device == 1 ) {
             // Shader Choice
-            
+
             ImGui.Spacing;
             ImGui.SetCursorPosX( 8 );
             ImGui.Text( "Compute Shader" );
@@ -1388,7 +1386,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                     : shader_names_ptr[ init_shader_index ] )
                 ) {
                 if( init_shader_start_index != size_t.max ) {
-                    vg.sim_init_shader_dirty = !compareShaderNamesAndReplace( 
+                    vg.sim_init_shader_dirty = !compareShaderNamesAndReplace(
                         shader_names_ptr[ init_shader_start_index + init_shader_index ], vg.sim_init_shader
                     );
                 }
@@ -1405,7 +1403,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                         vg.sim_init_shader_dirty = !compareShaderNamesAndReplace(
                             shader_names_ptr[ init_shader_start_index + init_shader_index ], vg.sim_init_shader
                         );
-                    }    
+                    }
                 }
             }
 
@@ -1428,13 +1426,13 @@ void drawGui( ref VDrive_Gui_State vg ) {
                     );
                 }
             }
-            
+
             // update loop shader list when hovering over Combo
             if( ImGui.IsItemHovered ) {
                 if( hasShaderDirChanged ) {
                     parseShaderDirectory;   // see comment in IsItemHovered above
                     if( loop_shader_start_index != size_t.max ) {
-                        vg.sim_loop_shader_dirty = !compareShaderNamesAndReplace( 
+                        vg.sim_loop_shader_dirty = !compareShaderNamesAndReplace(
                             shader_names_ptr[ loop_shader_start_index + loop_shader_index ], vg.sim_loop_shader
                         );
                     }
@@ -1596,7 +1594,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             ImGui.PopItemWidth;
             ImGui.TreePop;
         }
-        
+
         collapsingTerminator;
     }
 
@@ -1630,7 +1628,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             if( ImGui.Selectable( "1000" )) { vg.display_ubo.amplify_property = 1000;   vg.updateDisplayUBO; }
             ImGui.EndPopup();
         }
-        
+
         if( ImGui.DragInt( "Color Layers", cast( int* )( & vg.display_ubo.color_layers ), 0.1f, 0, 255 )) vg.updateDisplayUBO;
 
         ImGui.Separator;
@@ -1734,7 +1732,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                     : shader_names_ptr[ export_shader_start_index ] )
                 ) {
                 if( export_shader_start_index != size_t.max ) {
-                    auto export_shader_dirty = !compareShaderNamesAndReplace( 
+                    auto export_shader_dirty = !compareShaderNamesAndReplace(
                         shader_names_ptr[ export_shader_start_index + export_shader_index ], vg.export_shader
                     );
                 }
@@ -1751,7 +1749,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                         auto export_shader_dirty = !compareShaderNamesAndReplace(
                             shader_names_ptr[ export_shader_start_index + export_shader_index ], vg.export_shader
                         );
-                    }    
+                    }
                 }
             } collapsingTerminator;
         }
@@ -1939,7 +1937,7 @@ void drawGuiData( ImDrawData* draw_data ) {
             cmd_buffer.vkCmdPushConstants( vg.draw_line_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
             cmd_buffer.vkCmdDraw( vg.vd.sim_domain[0] + 1, vg.sim_display.lines_count[1], 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
-    }   
+    }
 
 
     VkDeviceSize vertex_offset;
@@ -1954,7 +1952,7 @@ void drawGuiData( ImDrawData* draw_data ) {
         0,                                  // uint32_t                     dynamicOffsetCount
         null                                // const( uint32_t )*           pDynamicOffsets
     );
-    
+
     cmd_buffer.vkCmdBindVertexBuffers( 0, 1, & vg.sim_particle_buffer.buffer, & vertex_offset );
     cmd_buffer.vkCmdDraw( 2 * vg.vd.sim_particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
     */
@@ -2091,6 +2089,19 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
 
         case GLFW_KEY_F2 :
         show_imgui_examples ^= 1;
+        break;
+
+        case GLFW_KEY_F5 :
+        if( isPlaying( *vg )) simPause( *vg );
+        else                  simPlay(  *vg );
+        break;
+
+        case GLFW_KEY_F6 :
+        simStep( *vg );
+        break;
+
+        case GLFW_KEY_F7 :
+        simReset( *vg );
         break;
 
         case GLFW_KEY_P :
