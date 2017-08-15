@@ -153,6 +153,21 @@ struct VDrive_State {
     Display_UBO*    display_ubo;
 
 
+    // profile stop watch
+    import std.datetime.stopwatch;
+    StopWatch stop_watch;
+    nothrow {
+        void resetStopWatch()       { stop_watch.reset; }
+        void startStopWatch()       { stop_watch.start; }
+        void stopStopWatch()        { stop_watch.stop; }
+        long getStopWatch_nsecs()   { return stop_watch.peek.total!"nsecs"; }
+        long getStopWatch_hnsecs()  { return stop_watch.peek.total!"hnsecs"; }
+        long getStopWatch_usecs()   { return stop_watch.peek.total!"usecs"; }
+        long getStopWatch_msecs()   { return stop_watch.peek.total!"msecs"; }
+    }
+
+
+
     // flags Todo(pp): create a proper uint32_t flag structure
     bool            sim_shader_double       = false;
     bool            sim_use_double          = false;
@@ -326,3 +341,93 @@ void draw( ref VDrive_State vd ) @system {
 
 }
 
+//*
+void profileCompute( ref VDrive_State vd ) @system {
+
+    vd.sim_ping_pong = vd.sim_index % 2;    // compute new ping_pong value
+    ++vd.sim_index;                         // increase the counter
+
+    // edit submmit info for compute work
+    with( vd.submit_info ) {
+        signalSemaphoreCount    = 0;
+        pSignalSemaphores       = null;
+        pCommandBuffers = & vd.sim_cmd_buffers[ vd.sim_ping_pong ];
+    }
+
+    // profile compute work
+    vd.startStopWatch;
+    vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );  // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
+    vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max ); // wait for finished compute
+    vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
+    vd.stopStopWatch;
+
+    // edit submmit info for display work
+    with( vd.submit_info ) {
+        waitSemaphoreCount      = 0;
+        pWaitSemaphores         = null;
+        pWaitDstStageMask       = null;
+        signalSemaphoreCount    = 1;
+        pSignalSemaphores       = &vd.rendered_semaphore;
+        pCommandBuffers         = & vd.cmd_buffers[ vd.next_image_index ];
+    }
+
+    vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );  // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
+    //vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max ); // wait for finished compute
+    //vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
+
+    // present rendered image
+    vd.present_info.pImageIndices = &vd.next_image_index;
+    vd.swapchain.present_queue.vkQueuePresentKHR( &vd.present_info );
+
+
+    // check if window was resized and handle the case
+    if( vd.window_resized ) {
+        vd.window_resized = false;
+        vd.recreateSwapchain;
+        import resources : createResizedCommands;
+        vd.createResizedCommands;
+    } else if( vd.tb.dirty ) {
+        vd.updateWVPM;  // this happens anyway in recreateSwapchain
+        //import core.stdc.stdio : printf;
+        //printf( "%d\n", (*( vd.wvpm ))[0].y );
+    }
+
+    // acquire next swapchain image
+    vd.device.vkAcquireNextImageKHR( vd.swapchain.swapchain, uint64_t.max, vd.acquired_semaphore, VK_NULL_HANDLE, &vd.next_image_index );
+
+    // wait for finished drawing
+    vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );
+    vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
+
+    // edit submmit info to default settings
+    with( vd.submit_info ) {
+        waitSemaphoreCount      = 1;
+        pWaitSemaphores         = &vd.acquired_semaphore;
+        pWaitDstStageMask       = &vd.submit_wait_stage_mask;   // configured before entering createResources func
+    }
+}
+
+
+/*/
+void profileCompute( ref VDrive_State vd ) @system {
+
+
+    vd.sim_ping_pong = vd.sim_index % 2;    // compute new ping_pong value
+    ++vd.sim_index;                         // increase the counter
+
+    vd.startStopWatch;
+
+    VkSubmitInfo submit_info;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = & vd.sim_cmd_buffers[ vd.sim_ping_pong ];
+    vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
+    vd.graphics_queue.vkQueueWaitIdle;
+
+    //vd.graphics_queue.vkQueueSubmit( 1, &submit_info, vd.profile_fence );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
+    //vd.device.vkWaitForFences( 1, &vd.profile_fence, VK_TRUE, uint64_t.max );
+    //vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
+
+    vd.stopStopWatch;
+
+}
+//*/

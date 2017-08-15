@@ -6,7 +6,7 @@ import std.parallelism;
 import data_grid;
 import exportstate;
 
-import gui : setDrawFunc;
+import gui : setSimFuncPlay, setSimFuncPause, setDefaultSimFuncs;
 import dlsl.vector;
 
 
@@ -64,7 +64,7 @@ ref VDrive_Gui_State cpuInit( ref VDrive_Gui_State vg ) {
     vg.sim_image.flushMappedMemoryRange;
 
     //vg.sim_index = 0;
-    vg.ve.store_index = -1; 
+    vg.ve.store_index = -1;
 
     return vg;
 }
@@ -83,11 +83,10 @@ ref VDrive_Gui_State cpuReset( ref VDrive_Gui_State vg ) {
     if( vg.vc.current_buffer_mem_size < old_buffer_mem_size )
         vg.vc.current_buffer_mem_size = old_buffer_mem_size;
 
-    
+
     bool must_init;
     import core.stdc.stdlib : malloc, free;
     if( vg.sim_use_double ) {
-        setDrawFunc( & cpuStepD );
         if( vg.vc.popul_buffer_f !is null ) {
             if( old_buffer_mem_size < vg.vc.current_buffer_mem_size ) { // 2 * float.sizeof = double.sizeof
                 free( cast( void* )vg.vc.popul_buffer_f );
@@ -106,7 +105,7 @@ ref VDrive_Gui_State cpuReset( ref VDrive_Gui_State vg ) {
         }
 
     } else {    // vg.sim_use_double = false;
-        setDrawFunc( & cpuStepF );
+        vg.setSimFuncPlay( & cpuSimF_Play );
         if( vg.vc.popul_buffer_d !is null ) {
             if( old_cell_count * 2 < vg.vc.cell_count ) { // 2 * float.sizeof = double.sizeof
                 free( cast( void* )vg.vc.popul_buffer_d );
@@ -131,7 +130,7 @@ ref VDrive_Gui_State cpuReset( ref VDrive_Gui_State vg ) {
     vg.ve.grid.minDomain = vec4( 0 );
     vg.ve.grid.maxDomain = vec4( 1 );
     vg.ve.grid.cellCount = uvec4( vg.sim_domain, 0 );
-    
+
     return vg;
 }
 
@@ -141,20 +140,36 @@ auto ref cpuFree( ref VDrive_Gui_State vg ) {
     import core.stdc.stdlib : free;
     free( cast( void* )vg.vc.popul_buffer_f ); vg.vc.popul_buffer_f = null;
     free( cast( void* )vg.vc.popul_buffer_d ); vg.vc.popul_buffer_d = null;
-    
+
     vg.vc.cell_count = 0;
 
     return vg;
 }
 
 
-alias cpuStepF = cpuStep!( float,  false );
-alias cpuStepD = cpuStep!( double, false );
-alias cpuStepFExport = cpuStep!( float,  true );
-alias cpuStepDExport = cpuStep!( double, true );
+void setCpuSimFuncs( ref VDrive_Gui_State vg ) nothrow @system {
+    if( vg.sim_use_double ) {
+        vg.setSimFuncPlay( & cpuSimD_Play );
+        vg.setSimFuncProfile( & cpuSimD_Profile );
+    } else {
+        vg.setSimFuncPlay( & cpuSimF_Play );
+        vg.setSimFuncProfile( & cpuSimF_Profile );
+    }
+
+    vg.setSimFuncPause;                 // set default pause function
+    vg.sim_play_cmd_buffer_count = 1;   // submit only the graphics display buffer
+}
 
 
-void cpuStep( T, bool EXPORT )( ref VDrive_Gui_State vg ) nothrow @system {
+alias cpuSimF_Play      = cpuSim!( float,  false );
+alias cpuSimD_Play      = cpuSim!( double, false );
+alias cpuSimF_Export    = cpuSim!( float,  true );
+alias cpuSimD_Export    = cpuSim!( double, true );
+alias cpuSimF_Profile   = cpuSim!( float,  false, true );
+alias cpuSimD_Profile   = cpuSim!( double, false, true );
+
+
+void cpuSim( T, bool EXPORT, bool PROFILE = false )( ref VDrive_Gui_State vg ) nothrow @system {
 
     float    omega = vg.compute_ubo.collision_frequency;
     float    wall_velocity = vg.compute_ubo.wall_velocity;
@@ -186,6 +201,9 @@ void cpuStep( T, bool EXPORT )( ref VDrive_Gui_State vg ) nothrow @system {
 
     ubyte pong = vg.vc.ping;
     vg.vc.ping = cast( ubyte )( 8 - vg.vc.ping );
+
+    static if( PROFILE )
+        vg.startStopWatch;
 
     //foreach( I, ref cell; parallel( popul_buffer[ 0 .. vg.vc.cell_count ], vg.sim_work_group_size[0] )) {
     for( int I = 0; I < vg.vc.cell_count; ++I ) {
@@ -244,19 +262,19 @@ void cpuStep( T, bool EXPORT )( ref VDrive_Gui_State vg ) nothrow @system {
         ];
 
         // Collide - inlining is not working properly, hence manually
-        f[0] = f[0] * ( 1 - omega ) + f_eq[0] * omega; // mix( f[0], f_eq[0], omega ); 
-        f[1] = f[1] * ( 1 - omega ) + f_eq[1] * omega; // mix( f[1], f_eq[1], omega ); 
-        f[2] = f[2] * ( 1 - omega ) + f_eq[2] * omega; // mix( f[2], f_eq[2], omega ); 
-        f[3] = f[3] * ( 1 - omega ) + f_eq[3] * omega; // mix( f[3], f_eq[3], omega ); 
-        f[4] = f[4] * ( 1 - omega ) + f_eq[4] * omega; // mix( f[4], f_eq[4], omega ); 
-        f[5] = f[5] * ( 1 - omega ) + f_eq[5] * omega; // mix( f[5], f_eq[5], omega ); 
-        f[6] = f[6] * ( 1 - omega ) + f_eq[6] * omega; // mix( f[6], f_eq[6], omega ); 
-        f[7] = f[7] * ( 1 - omega ) + f_eq[7] * omega; // mix( f[7], f_eq[7], omega ); 
+        f[0] = f[0] * ( 1 - omega ) + f_eq[0] * omega; // mix( f[0], f_eq[0], omega );
+        f[1] = f[1] * ( 1 - omega ) + f_eq[1] * omega; // mix( f[1], f_eq[1], omega );
+        f[2] = f[2] * ( 1 - omega ) + f_eq[2] * omega; // mix( f[2], f_eq[2], omega );
+        f[3] = f[3] * ( 1 - omega ) + f_eq[3] * omega; // mix( f[3], f_eq[3], omega );
+        f[4] = f[4] * ( 1 - omega ) + f_eq[4] * omega; // mix( f[4], f_eq[4], omega );
+        f[5] = f[5] * ( 1 - omega ) + f_eq[5] * omega; // mix( f[5], f_eq[5], omega );
+        f[6] = f[6] * ( 1 - omega ) + f_eq[6] * omega; // mix( f[6], f_eq[6], omega );
+        f[7] = f[7] * ( 1 - omega ) + f_eq[7] * omega; // mix( f[7], f_eq[7], omega );
         f[8] = f[8] * ( 1 - omega ) + f_eq[8] * omega; // mix( f[8], f_eq[8], omega );
 
         // compute 2D coordinates X and Y;
         size_t X = I % D_x;
-        size_t Y = I / D_x; 
+        size_t Y = I / D_x;
 
         // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
         if( Y == D_y - 1 /*|| Y == 0*/ ) {
@@ -286,6 +304,9 @@ void cpuStep( T, bool EXPORT )( ref VDrive_Gui_State vg ) nothrow @system {
 
     }
 
+    static if( PROFILE )
+        vg.stopStopWatch;
+
     static if( EXPORT ) {
         if( vg.ve.grid.cellCount.w - 1 <= vg.ve.store_index ) {
             vg.cpuExport;
@@ -293,10 +314,14 @@ void cpuStep( T, bool EXPORT )( ref VDrive_Gui_State vg ) nothrow @system {
     }
 
     import vdrive.memory;
-    vg.sim_image.flushMappedMemoryRange;
+    //vg.sim_image.flushMappedMemoryRange;
+    vg.sim_stage_buffer.flushMappedMemoryRange;
 
     // sim index is now controled through the draw_step function like this one
     ++vg.sim_index;
+
+    import appstate;
+    vg.vd.draw;                                // let vulkan dance
 
 }
 
@@ -321,11 +346,11 @@ auto ref cpuExport( ref VDrive_Gui_State vg ) @system nothrow {
 //        writeln( vg.vc.grid[ i ] );
 
     // assign non export function
-    //if( vg.sim_use_double ) setDrawFunc( & cpuStepD );
-    //else                    setDrawFunc( & cpuStepF );
+    //if( vg.sim_use_double ) setSimFuncPlay( & cpuSimD_Play );
+    //else                    setSimFuncPlay( & cpuSimF_Play );
 
     // stop simulation
-    setDrawFunc;
+    vg.setDefaultSimFuncs;
 
     vg.ve.grid.ensStore( options );
 }

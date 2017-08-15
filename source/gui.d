@@ -64,6 +64,13 @@ struct VDrive_Gui_State {
     uint32_t    sim_layers;
     uint32_t[3] sim_work_group_size;
 
+    // count of command buffers to be drawn when in play mode
+    uint32_t    sim_play_cmd_buffer_count;
+
+    uint32_t    sim_profile_step_size = 1;
+    uint32_t    sim_profile_step_count = 1000;
+    uint32_t    sim_profile_step_index;
+
     bool        sim_use_double;
     bool        sim_use_3_dim;
     bool        sim_compute_dirty;
@@ -71,6 +78,7 @@ struct VDrive_Gui_State {
     bool        sim_loop_shader_dirty;
     bool        sim_work_group_dirty;
     bool        draw_gui = true;
+    bool        sim_profile_mode = false;
 
 }
 
@@ -193,12 +201,11 @@ auto ref initImgui( ref VDrive_Gui_State vg ) {
     style.Colors[ ImGuiCol_TextSelectedBg ]         = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.00f, 0.50f, 1.00f, 1.00f );
     style.Colors[ ImGuiCol_ModalWindowDarkening ]   = ImVec4( 0.20f, 0.20f, 0.20f, 0.35f ); //ImVec4( 0.20f, 0.20f, 0.20f, 0.35f );
 
-    
+
 
     // as this is the first func called, without requiring any VDrive state
-    // we use the oportunity to setup the drawFunc function pointer
-    draw_func = & drawFunc;
-    draw_func_sim = & drawFuncSim;
+    // we use the oportunity to setup all the drawFunc function pointers
+    vg.setDefaultSimFuncs;
 
     return vg;
 }
@@ -570,44 +577,161 @@ auto ref drawInit( ref VDrive_Gui_State vg ) {
 
 
 
-//////////////////////////////////////////////////////////
-// Step draw called in (loop) draw and with step button // 
-//////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+// Draw function pointer for play, pause and profile //
+///////////////////////////////////////////////////////
 
 //
 // Actually a function pointer so that we can set it with the purpose of cpu sim or export
 //
 alias Draw_Func = void function( ref VDrive_Gui_State vg ) nothrow @system;
 private Draw_Func draw_func;
-private Draw_Func draw_func_sim;
+private Draw_Func draw_func_play;
+private Draw_Func draw_func_pause;
+private Draw_Func draw_func_profile;
+private Draw_Func draw_func_play_backup;
 
-void setDrawFunc( Draw_Func func = null ) nothrow @system {
+
+void setDefaultSimFuncs( ref VDrive_Gui_State vg ) nothrow @system {
+    draw_func_play      = & drawFuncPlay;
+    draw_func_pause     = & drawFuncPause;
+    draw_func_profile   = & drawFuncProfile;
+
+    vg.sim_play_cmd_buffer_count = 2;
+
+    if( vg.sim_profile_mode ) {
+        vg.swapPlayProfile;
+    }
+    vg.simPause;
+}
+
+/*
+void setSimFunc( Draw_Func func = null ) nothrow @system {
     if( func )  draw_func = func;
     else        draw_func = & drawFunc;
 }
+*/
 
-void setDrawFuncSim( Draw_Func func = null ) nothrow @system {
-    if( func )  draw_func_sim = func;
-    else        draw_func_sim = & drawFuncSim;
+void setSimFuncPlay( ref VDrive_Gui_State vg, Draw_Func func = null ) nothrow @system {
+    if( func is null )  draw_func_play = & drawFuncPlay;
+    else                draw_func_play = func;
+
+    if( vg.sim_profile_mode ) {
+        vg.swapPlayProfile;
+    }
+
+    vg.simPlay;
 }
 
-// this is the default draw_func function, we need it outside of VDrive_State
-// now we can perfectly control single stepping through the gui
-// Todo(pp): try if this stuff should better be in VDrive_State
-private void drawFuncSim( ref VDrive_Gui_State vg ) nothrow @system {
-    appstate.drawSim( vg.vd );
+void setSimFuncPause( ref VDrive_Gui_State vg, Draw_Func func = null ) nothrow @system {
+    if( func is null )  draw_func_pause = & drawFuncPause;
+    else                draw_func_pause = func;
+    vg.simPause;
 }
 
-private void drawFunc( ref VDrive_Gui_State vg ) nothrow @system {
-    appstate.draw( vg.vd );
+void setSimFuncProfile( ref VDrive_Gui_State vg, Draw_Func func = null ) nothrow @system {
+    if( func is null )  draw_func_profile = & drawFuncProfile;
+    else                draw_func_profile = func;
+
+    if( vg.sim_profile_mode ) {
+        vg.swapPlayProfile;
+    }
 }
 
-private void drawStep( ref VDrive_Gui_State vg ) nothrow @system {
-    vg.drawCmdBufferCount = 2;
-    appstate.drawSim( vg.vd );
-    vg.drawCmdBufferCount = 1;
-    draw_func = & drawFunc;
 
+private {
+    // this is the default draw_func function, we need it outside of VDrive_State
+    // now we can perfectly control single stepping through the gui
+    // we must wrap the VDrive_State functions as they require a VDrive_State reference
+    // but other functions require the whole VDrive_Gui_State
+    void drawFunc( ref VDrive_Gui_State vg ) nothrow @system {
+        appstate.draw( vg.vd );
+    }
+
+    void drawFuncPlay( ref VDrive_Gui_State vg ) nothrow @system {
+        appstate.drawSim( vg.vd );
+    }
+
+    void drawFuncPause( ref VDrive_Gui_State vg ) nothrow @system {
+        appstate.draw( vg.vd );
+    }
+
+    void drawFuncProfile( ref VDrive_Gui_State vg ) nothrow @system {
+        appstate.profileCompute( vg.vd );
+    }
+
+
+
+    void drawStep(ref VDrive_Gui_State vg ) nothrow @system {
+        vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count;
+        vg.draw_func_play;
+        vg.drawCmdBufferCount = 1;
+        draw_func = draw_func_pause;
+    }
+
+    void drawProfile( ref VDrive_Gui_State vg ) nothrow @system {
+        vg.sim_profile_step_index += vg.sim_profile_step_size;
+        vg.draw_func_profile;
+
+        if( 0 < vg.sim_profile_step_count && vg.sim_profile_step_index >= vg.sim_profile_step_count ) {
+            //swap
+            vg.simPause;
+        }
+    }
+
+    void swapPlayProfile( ref VDrive_Gui_State vg ) nothrow @system {
+        draw_func_play_backup = draw_func_play;
+        draw_func_play = & drawProfile;
+        vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count = 1;
+    }
+
+    void swapProfilePlay( ref VDrive_Gui_State vg ) nothrow @system {
+        draw_func_play = draw_func_play_backup;
+        vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count = 2;
+    }
+
+
+    //
+    // transport control funcs
+    //
+    void simPause( ref VDrive_Gui_State vg ) nothrow @system {
+        draw_func = draw_func_pause;
+        vg.drawCmdBufferCount = 1;
+    }
+
+    void simPlay( ref VDrive_Gui_State vg ) nothrow @system {
+        if( vg.sim_profile_mode && vg.sim_profile_step_count <= vg.sim_profile_step_index ) {
+            vg.sim_profile_step_index = 0;
+            vg.resetStopWatch;
+        }
+        draw_func = draw_func_play;
+        vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count;
+    }
+
+    void simStep( ref VDrive_Gui_State vg ) nothrow @system {
+        if( !vg.isPlaying ) {
+            draw_func = & drawStep;
+        }
+    }
+
+    void simReset( ref VDrive_Gui_State vg ) nothrow @system {
+        if( vg.sim_profile_mode ) {
+            vg.sim_profile_step_index = 0;
+            vg.resetStopWatch;
+        }
+        vg.sim_index = 0;
+        try {
+            if( vg.sim_use_cpu ) {
+                vg.cpuInit;
+            } else {
+                vg.createCompBoltzmannPipeline( false, false, true );  // rebuild init pipeline, rebuild loop pipeline, reset domain
+            }
+        } catch( Exception ) {}
+    }
+
+    bool isPlaying( ref VDrive_Gui_State vg ) nothrow @system {
+        return draw_func !is draw_func_pause;
+    }
 }
 
 
@@ -917,38 +1041,6 @@ private {
         return false;
     }
 
-
-
-    //
-    // transport control funcs
-    //
-    void simPause( ref VDrive_Gui_State vg ) {
-        draw_func = & drawFunc;
-        vg.drawCmdBufferCount = 1;
-    }
-    void simPlay( ref VDrive_Gui_State vg ) {
-        draw_func = & drawFuncSim;
-        vg.drawCmdBufferCount = 2;
-    }
-    void simStep( ref VDrive_Gui_State vg ) {
-        if( !isPlaying ) {
-            draw_func = & drawStep;
-        }
-    }
-    void simReset( ref VDrive_Gui_State vg ) {
-        vg.sim_index = 0;
-        if( vg.sim_use_cpu ) {
-            vg.cpuInit;
-        } else {
-            vg.createCompBoltzmannPipeline( false, false, true );  // rebuild init pipeline, rebuild loop pipeline, reset domain
-        }
-    }
-    bool isPlaying() {
-        return draw_func == draw_func_sim;
-    }
-
-
-
     //
     // window flags for the main UI window
     //
@@ -1016,10 +1108,10 @@ void drawGui( ref VDrive_Gui_State vg ) {
     ImGui.Begin( "Main Window", null, window_flags );
 
     // create transport controls at top of window
-    if( isPlaying ) { if( ImGui.Button( "Pause", button_size_3 )) simPause( vg ); }
-    else            { if( ImGui.Button( "Play",  button_size_3 )) simPlay(  vg ); }
-    ImGui.SameLine;   if( ImGui.Button( "Step",  button_size_3 )) simStep(  vg );
-    ImGui.SameLine;   if( ImGui.Button( "Reset", button_size_3 )) simReset( vg );
+    if( vg.isPlaying ) { if( ImGui.Button( "Pause", button_size_3 )) simPause( vg ); }
+    else               { if( ImGui.Button( "Play",  button_size_3 )) simPlay(  vg ); }
+    ImGui.SameLine;      if( ImGui.Button( "Step",  button_size_3 )) simStep(  vg );
+    ImGui.SameLine;      if( ImGui.Button( "Reset", button_size_3 )) simReset( vg );
     ImGui.Separator;
 
     // create transport controls at top of window
@@ -1070,9 +1162,10 @@ void drawGui( ref VDrive_Gui_State vg ) {
         if( ImGui.Combo( "Device", & compute_device, device_names )) {
             if( compute_device == 0 ) {
                 vg.cpuReset;
+                vg.setCpuSimFuncs;
                 vg.sim_use_cpu = true;
             } else {
-                //vg.cpuFree;
+                vg.setDefaultSimFuncs;
                 vg.sim_use_cpu = false;
                 vg.sim_use_double &= vg.sim_shader_double;
             }
@@ -1691,6 +1784,52 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
 
 
+    ////////////////////////
+    // Profile Simulation //
+    ////////////////////////
+
+    if( ImGui.CollapsingHeader( "Profile Simulation" )) {
+        ImGui.Separator;
+
+        //static int checkbox_offset = 160;
+        //ImGui.DragInt( "Checkbox Offset", & checkbox_offset );
+        ImGui.SetCursorPosX( 160 );
+
+        if( ImGui.Checkbox( "Enable Profiling", & vg.sim_profile_mode )) {
+
+            vg.simPause;    // currently sim is crashing we don't enter pause mode
+
+            if( vg.sim_profile_mode )   vg.swapPlayProfile;
+            else                        vg.swapProfilePlay;
+        }
+
+
+        ImGui.DragInt( "Profile Step Count", cast( int* )( & vg.sim_profile_step_count ));
+
+        int sim_index = cast( int )vg.sim_profile_step_index;
+        //ImGui.PushStyleColor( ImGuiCol_Text, disabled_text );
+        ImGui.DragInt( "Profile Step Index", & sim_index );
+        //ImGui.DragInt( "Duration", & duration );
+        //ImGui.DragFloat( "Average Per Step", & avg_per_step, 0.001f );
+        //ImGui.PopStyleColor( 1 );
+
+        import core.stdc.stdio : sprintf;
+        char[24] buffer;
+
+        long duration = vg.getStopWatch_hnsecs;
+        sprintf( buffer.ptr, "%d", duration );
+        ImGui.InputText( "Duration (hnsecs)", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
+
+        double  avg_per_step    = duration / cast( double )vg.sim_profile_step_index;
+        sprintf( buffer.ptr, "%f", avg_per_step );
+        ImGui.InputText( "Avg. / Step (hnsecs)", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
+
+        collapsingTerminator;
+    }
+
+
+
+
     ////////////////////
     // Export Ensight //
     ////////////////////
@@ -1769,9 +1908,9 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 // should be assigned and Gui module should know of only the four function pointer
                 // implement it!
                 if( vg.sim_use_double ) {
-                    draw_func = & cpuStepDExport;
+                    draw_func = & cpuSimD_Export;
                 } else {
-                    draw_func = & cpuStepFExport;
+                    draw_func = & cpuSimF_Export;
                 }
             } else {
                 // double or float does not matter, export is allways float

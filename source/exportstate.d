@@ -13,7 +13,7 @@ struct VDrive_Export_State {
     Data_Grid       grid;
     int             start_index     = 0;
     int             step_count      = 200;
-    int             step_size       = 4;
+    int             step_size       = 5;
     int             store_index     = -1;
     char[256]       case_file_name  = "ensight/LDC_D2Q9";
     char[12]        variable_name   = "velocity\0\0\0\0";
@@ -31,10 +31,12 @@ void drawExportWait( ref VDrive_Gui_State vg ) nothrow @system {
         vg.vd.drawSim;
     // now draw with the export version
     } else {
-        setDrawFuncSim( & drawExport );
-        setDrawFunc( & drawExport );
+        //setDrawFuncSim( & drawExport );
+        //setDrawFunc( & drawExport );
+        vg.setSimFuncPlay( & drawExport );
+        vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count = 1;
         vg.createExportCommands;        // create export commands now
-        //vg.drawExport;                  // call once as this would be the expected step now
+        vg.drawExport;                  // call once as we skipped drawSim above
     }
 }
 
@@ -55,7 +57,9 @@ void drawExport( ref VDrive_Gui_State vg ) nothrow @system {
     if( vg.ve.export_index < vg.ve.step_count ) {
         
         // here we must draw explicitely appstate draw func! othervise we would loop, as gui.draw calls drawExport
-        vg.vd.draw;
+        //vg.vd.draw;
+        vg.sim_profile_step_index += vg.ve.step_size;
+        vg.vd.profileCompute;
 
         // invlidate
         vg.export_buffer.invalidateMappedMemoryRange;
@@ -74,11 +78,17 @@ void drawExport( ref VDrive_Gui_State vg ) nothrow @system {
         // recreate original vd.sim_cmd_buffers
         // don't reset or recreate the pipeline
         // attach set vd.draw as new draw_func
-        try { vg.createCompBoltzmannPipeline( false, false, false ); } catch( Exception ) {}
-        vg.drawCmdBufferCount = 1;  // don't draw compute buffers
-        setDrawFuncSim;             // this assigns the default     sim drawFunc
-        setDrawFunc;                // this assigns the default non-sim drawFunc
-        vg.vd.draw;                 // draw once as expected here
+        try {
+            vg.createCompBoltzmannPipeline( false, false, false );
+        } catch( Exception ) {}
+
+        // set default function pointer for play, step, pause
+        // this also pauses the playback
+        vg.setDefaultSimFuncs;
+
+        // draw the graphics display once
+        // otherwisethis draw would be omitted, and the gui rebuild immediatelly      
+        vg.vd.draw;
 
     }
 }
@@ -87,14 +97,17 @@ void drawExport( ref VDrive_Gui_State vg ) nothrow @system {
 auto ref exportSim( ref VDrive_Gui_State vg ) {
     
     // create vulkan resources
-    vg.drawCmdBufferCount = 1;
     vg.createExportBuffer;
     vg.createExportPipeline;
     vg.createExportCommands;
     
-    setDrawFunc( & drawExportWait );
-    setDrawFuncSim( & drawExportWait );
-    vg.drawCmdBufferCount = 2;
+    // setup export draw function
+    vg.setSimFuncPlay( & drawExportWait );
+
+    // initialize profile data
+    vg.sim_profile_step_index = 0;
+    vg.resetStopWatch;
+
 
     // setup ensight options
     import std.string : fromStringz;
@@ -104,7 +117,8 @@ auto ref exportSim( ref VDrive_Gui_State vg ) {
         variable    : vg.ve.variable_name,
         format      : vg.ve.file_format,
         overwrite   : true,
-    };options.set_default_options;
+    };
+    options.set_default_options;
 
     // setup domain parameter
     if( vg.sim_use_3_dim ) vg.sim_domain[2] = 1;
