@@ -12,8 +12,8 @@ import initialize;
 
 int main() {
 
-    import core.stdc.stdlib : malloc;
-    void* scratch = malloc( 1024 );
+    //import core.stdc.stdlib : malloc;
+    //void* scratch = malloc( 1024 );
 
     import core.stdc.stdio : printf;
     printf( "\n" );
