@@ -284,25 +284,33 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
 
     // Note(pp): immutable does not filter properly, either driver bug or module descriptor bug
     // Todo(pp): debug the issue
-    vd.descriptor = ( *meta_descriptor_ptr )    // VDrive_State.descriptor is a Core_Descriptor
+    ( *meta_descriptor_ptr )    // VDrive_State.descriptor is a Core_Descriptor
+
+        // XForm_UBO
         .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
         .addBufferInfo( vd.xform_ubo_buffer.buffer )
 
+        // Main Compute Buffer for poupulations
         .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
         .addTexelBufferView( vd.sim_buffer_view )
 
+        // Image to store macroscopic variables ( velocity, density ) from simulation compute shaders
         .addLayoutBinding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT )
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
 
+        // Sampler to read from macroscopic image in lines, display and export shaders
         .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT )
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
 
+        // Compute UBO for compute parameter
         .addLayoutBinding( 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
         .addBufferInfo( vd.compute_ubo_buffer.buffer )
 
+        // Display UBO for display parameter
         .addLayoutBinding( 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT )
         .addBufferInfo( vd.display_ubo_buffer.buffer )
 
+        // Particles Buffer, not used yet
         .addLayoutBinding( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
         .addTexelBufferView( vd.sim_particle_buffer_view )
 
@@ -311,8 +319,12 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         //.addTexelBufferView( vd.export_buffer_view[0] );
         //.addTexelBufferView( vd.export_buffer_view[1] );
 
-        .construct
-        .reset;
+    // The app crashes here in construct sometimes, and it is not clear why
+    // In Debug mode we see that some undefined exception is thrown, which cannot be catched here
+    // The error seems to be unrelated to this section, check all the steps taken before this occures
+    // Exit Code: -1073740940 (FFFFFFFFC0000374)
+    vd.descriptor = ( *meta_descriptor_ptr ).construct.reset;
+
 
     // prepare simulation data descriptor update
     // necessary when we recreate resources and have to rebind them to our descriptors
