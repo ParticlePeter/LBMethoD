@@ -306,8 +306,10 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         .addLayoutBinding( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
         .addTexelBufferView( vd.sim_particle_buffer_view )
 
-        .addLayoutBinding( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
-        .addTexelBufferView( vd.sim_particle_buffer_view )
+        // Export Buffer views, these will be set and written when export is activated
+        .addLayoutBinding( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 2 );
+        //.addTexelBufferView( vd.export_buffer_view[0] );
+        //.addTexelBufferView( vd.export_buffer_view[1] );
 
         .construct
         .reset;
@@ -333,8 +335,10 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
     // this one is solely for export data purpose to be absolute lazy about resource construction
     // which is only necessary if we export at all, and then just before the export
     vd.export_descriptor_update( vd )
+    //  .addBindingUpdate( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 2 )  // Todo(pp): This variant should work, but it doesn't, see exportstate line 221
         .addBindingUpdate( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
-        .addTexelBufferView( vd.export_buffer_view )
+        .addTexelBufferView( vd.export_buffer_view[0] )
+        .addTexelBufferView( vd.export_buffer_view[1] )
         .attachSet( vd.descriptor.descriptor_set );
 
 }
@@ -894,9 +898,11 @@ auto ref destroyResources( ref VDrive_State vd ) {
 
 
     // export resources
-    if( vd.comp_export_pso.is_constructed ) vd.destroy( vd.comp_export_pso );
-    if( vd.export_buffer.is_constructed ) vd.export_buffer.destroyResources;
-    if( vd.export_buffer_view != VK_NULL_HANDLE ) vd.destroy( vd.export_buffer_view );
+    import exportstate;
+    vd.destroyExportResources;
+    //if( vd.comp_export_pso.is_constructed ) vd.destroy( vd.comp_export_pso );
+    //if( vd.export_buffer[0].is_constructed ) vd.export_buffer[0].destroyResources;
+    //if( vd.export_buffer_view[0] != VK_NULL_HANDLE ) vd.destroy( vd.export_buffer_view[0] );
 
 
 

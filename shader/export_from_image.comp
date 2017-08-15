@@ -40,7 +40,7 @@ layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict readonly image2D vel_rho_img;
 
 // velocity and density write target, will be rendered as texture in next pass
-layout( binding = 8, r32f /*rgba16f*/ ) uniform restrict writeonly imageBuffer export_buffer;
+layout( binding = 8, r32f /*rgba16f*/ ) uniform restrict writeonly imageBuffer export_buffer[2];
 
 
 // population indices
@@ -69,9 +69,10 @@ const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
 //#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
 #define D imageSize( vel_rho_img )
 
-// define access indices for the population buffers
-#define ping ( 8 * pc.ping )
-#define pong ( 8 -    ping )
+// define access indices for the export buffers
+#define PCPING pc.ping
+#define PING ( 8 * PCPING )
+#define PONG ( 8 -   PING )
 
 
 
@@ -103,8 +104,6 @@ const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
 int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
 #define buffer_size ( pc.values_per_cell * cell_count )  // count of elements in the passed in buffer, required for periodic boundary conditions
 
-// buffer offsets coresponding streaming ( in 2D so far )
-int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
 
 
 
@@ -135,10 +134,14 @@ void main( void ) {
     vec2  vel = ( vec2(f[1],f[2]) - vec2(f[3],f[4]) + vec2(f[5]) - vec2(f[7]) + vec2(f[8],f[6]) - vec2(f[6],f[8])) / rho;
 */
 
-    vec3 vel = imageLoad( vel_rho_img, ivec2( X, Y ) ).rgb;
-    imageStore( export_buffer,                  I, vec4( vel.x ));
-    imageStore( export_buffer,     cell_count + I, vec4( vel.y ));
-    imageStore( export_buffer, 2 * cell_count + I, vec4(     0 ));  // vel.z
+    vec3 vel = imageLoad( vel_rho_img, ivec2( X, Y )).rgb;
+    imageStore( export_buffer[ PCPING ],                  I, vec4( vel.x ));
+    imageStore( export_buffer[ PCPING ],     cell_count + I, vec4( vel.y ));
+    imageStore( export_buffer[ PCPING ], 2 * cell_count + I, vec4(     0 ));  // vel.z
+
+    //eb[ pc.ping ].export_buffer[                  I ] = vel.x;
+    //eb[ pc.ping ].export_buffer[     cell_count + I ] = vel.y;
+    //eb[ pc.ping ].export_buffer[ 2 * cell_count + I ] =     0;
 
 
 }   // main

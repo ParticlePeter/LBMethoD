@@ -62,17 +62,17 @@ void drawExport( ref VDrive_Gui_State vg ) nothrow @system {
         vg.vd.profileCompute;
 
         // invlidate
-        vg.export_buffer.invalidateMappedMemoryRange;
+        vg.export_buffer[ vg.ve.export_index % 2 ].invalidateMappedMemoryRange;
 
         // now we have to export the data
         // best way is to write it out raw
-        vg.export_data[ 0 .. vg.export_memory.memSize ]
+        vg.export_data[ vg.ve.export_index % 2 ][ 0 .. vg.export_size ]
             .ensRawWriteBinaryVarFile( vg.ve.var_file_name, vg.ve.export_index );
 
         // update indexes and ping pong
-        vg.sim_index = vg.ve.start_index + vg.ve.export_index * vg.ve.step_size;
         vg.sim_ping_pong = ( vg.ve.start_index + vg.ve.export_index ) % 2;
-        vg.ve.export_index++;
+        ++vg.ve.export_index;
+        vg.sim_index = vg.ve.start_index + vg.ve.export_index * vg.ve.step_size;
 
     } else {
         // recreate original vd.sim_cmd_buffers
@@ -143,7 +143,8 @@ auto ref exportSim( ref VDrive_Gui_State vg ) {
     vg.ve.export_index = 0;
 
     // set a Export_Binary_Variable_Header in the beginning
-    vg.ve.variable_name.ptr.ensGetBinaryVarHeader( vg.export_data );
+    vg.ve.variable_name.ptr.ensGetBinaryVarHeader( vg.export_data[0] );
+    vg.ve.variable_name.ptr.ensGetBinaryVarHeader( vg.export_data[1] );
 
     return vg;
 
@@ -172,35 +173,71 @@ auto ref createExportBuffer( ref VDrive_State vd ) {
     if( vd.export_memory.memory != VK_NULL_HANDLE )
         vd.export_memory.destroyResources;             // destroy old memory
 
-    if( vd.export_buffer.buffer != VK_NULL_HANDLE )
-        vd.export_buffer.destroyResources;          // destroy old buffer
+    if( vd.export_buffer[0].buffer != VK_NULL_HANDLE )
+        vd.export_buffer[0].destroyResources;          // destroy old buffer
 
-    if( vd.export_buffer_view   != VK_NULL_HANDLE )
-        vd.destroy( vd.export_buffer_view );        // destroy old buffer view
+    if( vd.export_buffer_view[0]   != VK_NULL_HANDLE )
+        vd.destroy( vd.export_buffer_view[0] );        // destroy old buffer view
 
+    if( vd.export_buffer[1].buffer != VK_NULL_HANDLE )
+        vd.export_buffer[1].destroyResources;          // destroy old buffer
 
-    // create memory less buffer and get its alignment requirement
-    auto aligned_offset = vd.export_buffer( vd )
+    if( vd.export_buffer_view[1]   != VK_NULL_HANDLE )
+        vd.destroy( vd.export_buffer_view[1] );        // destroy old buffer view
+
+    //
+    // as we are computing in a ping pong fashion we need two export buffers
+    // othervise we get race conditions when writing into one buffer from the compute shaders
+    //
+
+    // create first memory less buffer and get its alignment requirement
+    auto aligned_offset_0 = vd.export_buffer[0]( vd )
         .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_mem_size )
         .alignedOffset( header_size );
 
-    // create memory with additional space for header
+    // create second memory less buffer and get its alignment requirement
+    auto aligned_offset_1 = vd.export_buffer[1]( vd )
+        .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_mem_size )
+        .alignedOffset( aligned_offset_0 + vd.export_buffer[0].memSize + header_size );
+
+    //import std.stdio;
+    //writeln( "header_size      : ", header_size );
+    //writeln( "aligned_offset_0 : ", aligned_offset_0 );
+    //writeln( "aligned_offset_1 : ", aligned_offset_1 );
+    //writeln( "buffer_mem_size  : ", buffer_mem_size );
+    //writeln( "memSize_0        : ", vd.export_buffer[0].memSize );
+    //writeln( "memSize_1        : ", vd.export_buffer[1].memSize );
+    //writeln;
+
+    // create memory with additional spaces for two headers
     vd.export_memory( vd )
-        .create( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, aligned_offset + buffer_mem_size );
+        .create( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, aligned_offset_1 + vd.export_buffer[1].memSize );
 
-    // bind memory with offset to buffer
-    vd.export_buffer( vd )
-        .bindMemory( vd.export_memory.memory, aligned_offset );
+    // bind memory with offset to first buffer
+    vd.export_buffer[0]
+        .bindMemory( vd.export_memory.memory, aligned_offset_0 );
 
-    // bind buffer to buffer view
-    vd.export_buffer_view = vd.createBufferView( vd.export_buffer.buffer, VK_FORMAT_R32_SFLOAT );
+    // bind memory with offset to first buffer
+    vd.export_buffer[1]
+        .bindMemory( vd.export_memory.memory, aligned_offset_1 );
+
+    // bind two buffers to two buffer views
+    vd.export_buffer_view[0] = vd.createBufferView( vd.export_buffer[0].buffer, VK_FORMAT_R32_SFLOAT );
+    vd.export_buffer_view[1] = vd.createBufferView( vd.export_buffer[1].buffer, VK_FORMAT_R32_SFLOAT );
 
     // update the descriptor with buffer 
-    vd.export_descriptor_update.texel_buffer_views[0] = vd.export_buffer_view;  // export target buffer
+    vd.export_descriptor_update.texel_buffer_views[0] = vd.export_buffer_view[0];  // export target buffer
+    vd.export_descriptor_update.texel_buffer_views[1] = vd.export_buffer_view[1];  // export target buffer
     vd.export_descriptor_update.update;
 
-    // map the whole memory 
-    vd.export_data = vd.export_memory.mapMemory;
+    // map first and second memory ranges, including the aligned headers
+    vd.export_size = header_size + buffer_mem_size;
+    auto mapped_memory = vd.export_memory.mapMemory; 
+    vd.export_data[0]  = mapped_memory + aligned_offset_0 - header_size;    //vd.export_memory.mapMemory( vd.export_size, aligned_offset_0 - header_size );    // size, offset
+    vd.export_data[1]  = mapped_memory + aligned_offset_1 - header_size;    //vd.export_memory.mapMemory( vd.export_size, aligned_offset_1 - header_size );    // size, offset
+
+
+    //vd.export_mapped_range[0]
 
     return vd;
 
@@ -243,8 +280,8 @@ auto ref createExportCommands( ref VDrive_Gui_State vd ) {
     VkBufferMemoryBarrier sim_buffer_memory_barrier = {
         srcAccessMask       : VK_ACCESS_SHADER_WRITE_BIT,
         dstAccessMask       : VK_ACCESS_SHADER_READ_BIT,
-        srcQueueFamilyIndex : vd.graphics_queue_family_index,
-        dstQueueFamilyIndex : vd.graphics_queue_family_index,
+        srcQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
+        dstQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
         buffer              : vd.sim_buffer.buffer,
         offset              : 0,
         size                : VK_WHOLE_SIZE,
@@ -256,8 +293,8 @@ auto ref createExportCommands( ref VDrive_Gui_State vd ) {
         dstAccessMask       : VK_ACCESS_SHADER_READ_BIT,
         oldLayout           : VK_IMAGE_LAYOUT_GENERAL,
         newLayout           : VK_IMAGE_LAYOUT_GENERAL,
-        srcQueueFamilyIndex : vd.graphics_queue_family_index,
-        dstQueueFamilyIndex : vd.graphics_queue_family_index,
+        srcQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
+        dstQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
         image               : vd.sim_image.image,
         subresourceRange    : {
             aspectMask          : VK_IMAGE_ASPECT_COLOR_BIT,    // VkImageAspectFlags  aspectMask;
@@ -272,9 +309,9 @@ auto ref createExportCommands( ref VDrive_Gui_State vd ) {
     VkBufferMemoryBarrier export_buffer_memory_barrier = {
         srcAccessMask       : VK_ACCESS_SHADER_WRITE_BIT,
         dstAccessMask       : VK_ACCESS_HOST_READ_BIT,
-        srcQueueFamilyIndex : vd.graphics_queue_family_index,
-        dstQueueFamilyIndex : vd.graphics_queue_family_index,
-        buffer              : vd.export_buffer.buffer,
+        srcQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
+        dstQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
+        //buffer              : vd.export_buffer.buffer,
         offset              : 0,
         size                : VK_WHOLE_SIZE,
     };
@@ -315,6 +352,7 @@ auto ref createExportCommands( ref VDrive_Gui_State vd ) {
 
         cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );   // dispatch compute command
 
+        export_buffer_memory_barrier.buffer = vd.export_buffer[i].buffer;
         cmd_buffer.vkCmdPipelineBarrier(
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,       // VkPipelineStageFlags                 srcStageMask,                                    
             VK_PIPELINE_STAGE_HOST_BIT,                 // VkPipelineStageFlags                 dstStageMask,                        
@@ -379,10 +417,14 @@ auto ref createExportCommands( ref VDrive_Gui_State vd ) {
 
 
 
-auto ref destroyExport( ref VDrive_State vd ) {
+auto ref destroyExportResources( ref VDrive_State vd ) {
     // export resources
     if( vd.comp_export_pso.is_constructed ) vd.destroy( vd.comp_export_pso );
     if( vd.export_memory.is_constructed ) vd.export_memory.destroyResources;
-    if( vd.export_buffer.is_constructed ) vd.export_buffer.destroyResources;
-    if( vd.export_buffer_view != VK_NULL_HANDLE ) vd.destroy( vd.export_buffer_view );
+    if( vd.export_buffer[0].is_constructed ) vd.export_buffer[0].destroyResources;
+    if( vd.export_buffer[1].is_constructed ) vd.export_buffer[1].destroyResources;
+//  if( vd.export_buffer[0].buffer != VK_NULL_HANDLE ) vd.export_buffer[0].destroyResources;
+//  if( vd.export_buffer[1].buffer != VK_NULL_HANDLE ) vd.export_buffer[1].destroyResources;
+    if( vd.export_buffer_view[0] != VK_NULL_HANDLE ) vd.destroy( vd.export_buffer_view[0] );
+    if( vd.export_buffer_view[1] != VK_NULL_HANDLE ) vd.destroy( vd.export_buffer_view[1] );
 }

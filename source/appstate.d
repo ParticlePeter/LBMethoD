@@ -110,10 +110,12 @@ struct VDrive_State {
     // export resources
     Core_Pipeline               comp_export_pso;
     Meta_Memory                 export_memory;
-    Meta_Buffer                 export_buffer;
-    VkBufferView                export_buffer_view;
+    Meta_Buffer[2]              export_buffer;
+    VkBufferView[2]             export_buffer_view;
     Meta_Descriptor_Update      export_descriptor_update;  // update only the export descriptor
-    void*                       export_data;
+    VkDeviceSize                export_size;
+    void*[2]                    export_data;
+    VkMappedMemoryRange[2]      export_mapped_range;       
 
 
     /////////////////////////////////////////////////

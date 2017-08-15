@@ -40,7 +40,7 @@ layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict readonly image2D vel_rho_img;
 
 // velocity and density write target, will be rendered as texture in next pass
-layout( binding = 8, r32f /*rgba16f*/ ) uniform restrict writeonly imageBuffer export_buffer;
+layout( binding = 8, r32f /*rgba16f*/ ) uniform restrict writeonly imageBuffer export_buffer[2];
 
 
 // population indices
@@ -69,9 +69,10 @@ const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
 //#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
 #define D imageSize( vel_rho_img )
 
-// define access indices for the population buffers
-#define ping ( 8 * pc.ping )
-#define pong ( 8 -    ping )
+// define access indices for the export buffers
+#define PCPING pc.ping
+#define PING ( 8 * PCPING )
+#define PONG ( 8 -   PING )
 
 
 
@@ -80,12 +81,12 @@ const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
 //////////////////////////////////////////
 
 // We use one rest position and two times the stream populations due to double buffering
-// loading populations p with variable ping = 0 V 8 and storing with pong = 8 V 0
+// loading populations p with variable PING = 0 V 8 and storing with pong = 8 V 0
 // All populations are stored in one contignuous float array/buffer
 // first come N rest populations then N east, N north, ...etc.,
 // With the index variable I = [0..N) we can reach individual velocities of population intervall at p
 // We load and store rest populations with index I
-// load stream populations index ( ping + 1 ) * N + I and store with ( pong + 1 ) * N + I
+// load stream populations index ( PING + 1 ) * N + I and store with ( pong + 1 ) * N + I
 // with this we reach the population of any node
 // the 2D output image is accessed simply with ivec2( X, Y )
 
@@ -117,28 +118,26 @@ void main( void ) {
     // 3-0-1 //
     //  /|\  //
     // 7 4 8 //
-/*
+
     // load populations including streaming in a gather fashion
     float f[9] = {
         imageLoad( popul_buffer,                                                                                                           I ).r,
-        imageLoad( popul_buffer, ( X ==       0 )                  ? ( ping + 3 ) * cell_count + I : ( ping + 1 ) * cell_count -       1 + I ).r,
-        imageLoad( popul_buffer, ( Y == D.y - 1 )                  ? ( ping + 4 ) * cell_count + I : ( ping + 2 ) * cell_count + D.x     + I ).r,
-        imageLoad( popul_buffer, ( X == D.x - 1 )                  ? ( ping + 1 ) * cell_count + I : ( ping + 3 ) * cell_count +       1 + I ).r,
-        imageLoad( popul_buffer, ( Y ==       0 )                  ? ( ping + 2 ) * cell_count + I : ( ping + 4 ) * cell_count - D.x     + I ).r,
-        imageLoad( popul_buffer, ( X ==       0 || Y == D.y - 1 )  ? ( ping + 7 ) * cell_count + I : ( ping + 5 ) * cell_count + D.x - 1 + I ).r,
-        imageLoad( popul_buffer, ( Y == D.y - 1 || X == D.x - 1 )  ? ( ping + 8 ) * cell_count + I : ( ping + 6 ) * cell_count + D.x + 1 + I ).r,
-        imageLoad( popul_buffer, ( X == D.x - 1 || Y ==       0 )  ? ( ping + 5 ) * cell_count + I : ( ping + 7 ) * cell_count - D.x + 1 + I ).r,
-        imageLoad( popul_buffer, ( Y ==       0 || X ==       0 )  ? ( ping + 6 ) * cell_count + I : ( ping + 8 ) * cell_count - D.x - 1 + I ).r,
+        imageLoad( popul_buffer, ( X ==       0 )                  ? ( PING + 3 ) * cell_count + I : ( PING + 1 ) * cell_count -       1 + I ).r,
+        imageLoad( popul_buffer, ( Y == D.y - 1 )                  ? ( PING + 4 ) * cell_count + I : ( PING + 2 ) * cell_count + D.x     + I ).r,
+        imageLoad( popul_buffer, ( X == D.x - 1 )                  ? ( PING + 1 ) * cell_count + I : ( PING + 3 ) * cell_count +       1 + I ).r,
+        imageLoad( popul_buffer, ( Y ==       0 )                  ? ( PING + 2 ) * cell_count + I : ( PING + 4 ) * cell_count - D.x     + I ).r,
+        imageLoad( popul_buffer, ( X ==       0 || Y == D.y - 1 )  ? ( PING + 7 ) * cell_count + I : ( PING + 5 ) * cell_count + D.x - 1 + I ).r,
+        imageLoad( popul_buffer, ( Y == D.y - 1 || X == D.x - 1 )  ? ( PING + 8 ) * cell_count + I : ( PING + 6 ) * cell_count + D.x + 1 + I ).r,
+        imageLoad( popul_buffer, ( X == D.x - 1 || Y ==       0 )  ? ( PING + 5 ) * cell_count + I : ( PING + 7 ) * cell_count - D.x + 1 + I ).r,
+        imageLoad( popul_buffer, ( Y ==       0 || X ==       0 )  ? ( PING + 6 ) * cell_count + I : ( PING + 8 ) * cell_count - D.x - 1 + I ).r,
     };
-*/
+
     float rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
     vec2  vel = ( vec2(f[1],f[2]) - vec2(f[3],f[4]) + vec2(f[5]) - vec2(f[7]) + vec2(f[8],f[6]) - vec2(f[6],f[8])) / rho;
 
-    vec3 vel = imageLoad( vel_rho_img, ivec2( X, Y ) ).rgb;
-    imageStore( export_buffer,                  I, vec4( vel.x ));
-    imageStore( export_buffer,     node_count + I, vec4( vel.y ));
-    imageStore( export_buffer, 2 * node_count + I, vec4(     0 ));  // vel.z
-
+    imageStore( export_buffer[ PCPING ],                  I, vec4( vel.x ));
+    imageStore( export_buffer[ PCPING ],     cell_count + I, vec4( vel.y ));
+    imageStore( export_buffer[ PCPING ], 2 * cell_count + I, vec4(     0 ));  // vel.z
 
 }   // main
 
