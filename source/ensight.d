@@ -32,7 +32,7 @@ auto ref set_default_options( ref Export_Options options ) {
         options.outGeo = basename.setExtension( "geo" );
 
     else if( options.outGeo.extension == "" )                           // use the default .case extension
-        options.outGeo = basename.setExtension( "geo" );
+        options.outGeo = options.outGeo.setExtension( "geo" );
 
     if( options.outVar == "" ) {                                        // derive var filepath from caseFilepath and variable name
         options.variable[ 8 ] = '\0';
@@ -40,7 +40,7 @@ auto ref set_default_options( ref Export_Options options ) {
     }
 
     else if( options.outGeo.extension == "" )                           // use the default .case extension
-        options.outVar = basename.setExtension( "var_" );
+        options.outVar = options.outVar.setExtension( options.variable.ptr.fromStringz.to!string ~ "_" );
 
     import core.stdc.stdio : printf;
     printf( "\n" );
@@ -131,7 +131,7 @@ void ensStoreCase(
         // target directory
         //
         import std.stdio;
-        import std.path : dirName;
+        import std.path : dirName, baseName;
         import std.file : exists, mkdirRecurse;
     
         // check if target directory exists and possibly create it
@@ -151,10 +151,10 @@ void ensStoreCase(
         caseData.writefln( "type:                  ensight gold\n" );
 
         caseData.writefln( "GEOMETRY" );
-        caseData.writefln( "model:                 %s\n", options.outGeo );
+        caseData.writefln( "model:                 %s\n", options.outGeo.baseName );
 
         caseData.writefln( "VARIABLE" );
-        caseData.writefln( "vector per node: 1     %s %s\n", options.variable.ptr.fromStringz, caseVarPath );
+        caseData.writefln( "vector per node: 1     %s %s\n", options.variable.ptr.fromStringz, caseVarPath.baseName );
 
         //caseData.writeln;
         caseData.writefln( "TIME" );
