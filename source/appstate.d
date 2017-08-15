@@ -121,7 +121,7 @@ struct VDrive_State {
     /////////////////////////////////////////////////
 
     // compute parameters
-    uint32_t[3] sim_domain                  = [ 256, 64, 1 ];
+    uint32_t[3] sim_domain                  = [ 256, 25, 1 ];   // [ 256, 64, 1 ];
     uint32_t    sim_layers                  = 17;
     uint32_t[3] sim_work_group_size         = [ 256, 1, 1 ];
     uint32_t    sim_ping_pong               = 1;
@@ -140,7 +140,7 @@ struct VDrive_State {
     float           sim_speed_of_sound      = sim_unit_speed_of_sound;
     float           sim_unit_spatial        = 1;
     float           sim_unit_temporal       = 1;
-    uint32_t        sim_algorithm           = 4; //3;
+    uint32_t        sim_algorithm           = 0; //3;
     uint32_t        sim_index               = 0;
 
     struct Display_UBO {
@@ -159,16 +159,11 @@ struct VDrive_State {
     bool            sim_use_3_dim           = false;
     bool            sim_use_cpu             = false;
 
-    bool            export_as_vector        = false;
+    bool            export_as_vector        = true;
 
 
     // window resize callback result
     bool            window_resized          = false;
-
-
-
-
-
 }
 
 
@@ -260,6 +255,10 @@ void drawCmdBufferCount( ref VDrive_State vd, uint32_t count ) {
    vd.submit_info.commandBufferCount = count;
 }
 
+uint32_t drawCmdBufferCount( ref VDrive_State vd ) {
+   return vd.submit_info.commandBufferCount;
+}
+
 
 void drawInit( ref VDrive_State vd ) {
     // check if window was resized and handle the case
@@ -281,7 +280,7 @@ void drawInit( ref VDrive_State vd ) {
 }
 
 
-void drawSim( ref VDrive_State vd ) {
+void drawSim( ref VDrive_State vd ) @system {
     vd.sim_ping_pong = vd.sim_index % 2;    // compute new ping_pong value
     ++vd.sim_index;                         // increase the counter
     vd.draw;                                // let vulkan dance
