@@ -1724,6 +1724,13 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         if( ImGui.DragInt( "Color Layers", cast( int* )( & vg.display_ubo.color_layers ), 0.1f, 0, 255 )) vg.updateDisplayUBO;
 
+        static int z_layer = 0;
+        if( vg.sim_use_3_dim ) {
+            if( ImGui.DragInt( "Z-Layer", & z_layer, 0.1f, 0, vg.sim_domain[2] - 1 )) {
+                z_layer = 0 > z_layer ? 0 : z_layer >= vg.sim_domain[2] ? vg.sim_domain[2] - 1 : z_layer;
+            }
+        }
+
         ImGui.Separator;
 
         // Todo(pp): currently the lines are not drawn when the UI is turned off
