@@ -92,6 +92,9 @@ struct VDrive_State {
     Meta_Buffer                 compute_ubo_buffer;
     VkMappedMemoryRange         compute_ubo_flush;
 
+    Meta_Buffer                 sim_stage_buffer;
+
+
 
     // visualization resources
     Meta_Buffer                 display_ubo_buffer;

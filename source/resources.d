@@ -193,7 +193,7 @@ auto ref createSimImage( ref VDrive_State vd ) {
             image_format,
             vd.sim_domain[0], vd.sim_domain[1], vd.sim_use_3_dim ? vd.sim_domain[1] : 0,    // through the 0 we request a VK_IMAGE_TYPE_2D
             1, 1, // mip levels and array layers
-            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_SAMPLE_COUNT_1_BIT,
             GREG ? VK_IMAGE_TILING_OPTIMAL : VK_IMAGE_TILING_LINEAR
             )
@@ -221,18 +221,26 @@ auto ref createSimImage( ref VDrive_State vd ) {
     auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
     vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
 
-    // map the image after the layout transition, according to validation layers
-    // only GENERAL or PREINITIALIZED layouts should be used for memory mapping
-    if( !GREG )
-        vd.sim_image_ptr = cast( float* )vd.sim_image.mapMemory;
+    // staging buffer for cpu computed velocity copy to the sim_image
+    if( vd.sim_stage_buffer.is_constructed ) {
+        vd.graphics_queue.vkQueueWaitIdle;
+        vd.sim_stage_buffer.destroyResources;  // destroy old image and its view, keeping the sampler
+    }
 
+    uint32_t buffer_size = 2 * vd.sim_domain[0] * vd.sim_domain[1];     // only in 2D and with VK_FORMAT_R32G32_SFLOAT
+    uint32_t buffer_mem_size = buffer_size * float.sizeof.toUint;
+
+    vd.sim_image_ptr = cast( float* )( vd.sim_stage_buffer( vd )
+        .create( VK_BUFFER_USAGE_TRANSFER_SRC_BIT, buffer_mem_size )
+        .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
+        .mapMemory );
 
     return vd;
 }
 
 
 
-enum GREG = false;
+enum GREG = true;
 
 /// create or recreate simulation memory, buffers and images
 auto ref createSimMemoryObjects( ref VDrive_State vd ) {
@@ -863,6 +871,7 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.sim_buffer.destroyResources;
     if( vd.sim_memory.memory != VK_NULL_HANDLE )
         vd.sim_memory.destroyResources;
+    vd.sim_stage_buffer.destroyResources;
 
     // render setup
     vd.render_pass.destroyResources;
