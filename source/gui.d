@@ -2022,6 +2022,52 @@ void drawGuiData( ImDrawData* draw_data ) {
     // begin the command buffer
     cmd_buffer.vkBeginCommandBuffer( &vg.gui_cmd_buffer_bi );
 
+
+
+
+
+    // Copy CPU buffer data to the gpu image
+    if( vg.vd.sim_use_cpu && ( *vg ).isPlaying ) {
+
+        // record image layout transition to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        cmd_buffer.recordTransition(
+            vg.sim_image.image,
+            vg.sim_image.subresourceRange,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_ACCESS_SHADER_READ_BIT,
+            VK_ACCESS_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+        );
+
+        // record a buffer to image copy
+        auto subresource_range = vg.sim_image.subresourceRange;
+        VkBufferImageCopy buffer_image_copy = {
+            imageSubresource: {
+                aspectMask      : subresource_range.aspectMask,
+                baseArrayLayer  : subresource_range.baseArrayLayer,
+                layerCount      : subresource_range.layerCount },
+            imageExtent     : vg.sim_image.extent,
+        };
+        cmd_buffer.vkCmdCopyBufferToImage( vg.sim_stage_buffer.buffer, vg.sim_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &buffer_image_copy );
+
+        // record image layout transition to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        cmd_buffer.recordTransition(
+            vg.sim_image.image,
+            vg.sim_image.subresourceRange,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_ACCESS_TRANSFER_WRITE_BIT,
+            VK_ACCESS_SHADER_READ_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+        );
+    }
+
+
+
+
     // begin the render pass
     cmd_buffer.vkCmdBeginRenderPass( &vg.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
 
