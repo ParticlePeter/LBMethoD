@@ -167,7 +167,7 @@ void main( void ) {
 
         // load populations including streaming in a gather fashion
         float f[9] = {
-            imageLoad( popul_buffer,                                                                                                           I ).r,
+            imageLoad( popul_buffer,                                                                                                                                                             I ).r,
             imageLoad( popul_buffer, ( X ==       0 ) ? ( ping + 1 ) * cell_count + D.x - 1 + I                                                          : ( ping + 1 ) * cell_count -       1 + I ).r,
             imageLoad( popul_buffer, ( Y == D.y - 1 ) ? ( ping + 4 ) * cell_count + I                                                                    : ( ping + 2 ) * cell_count + D.x     + I ).r,
             imageLoad( popul_buffer, ( X == D.x - 1 ) ? ( ping + 3 ) * cell_count - D.x + 1 + I                                                          : ( ping + 3 ) * cell_count +       1 + I ).r,
@@ -374,7 +374,7 @@ void main( void ) {
 
 
         // Handle inlet on the left wall and outlet on the right wall
-        if( X == 0 || X == D.x - 1 ) {
+        if( X == 0 /*|| X == D.x - 1*/ ) {
             f[1] += 2 * pw[1] * rho * wall_velocity; // f[1] +=
             f[3] -= 2 * pw[3] * rho * wall_velocity; // f[3] -=
             f[5] += 2 * pw[5] * rho * wall_velocity; // f[5] +=
@@ -389,6 +389,7 @@ void main( void ) {
         //  /|\  //
         // 7 4 8 //
         
+        /*
         // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
         if( Y == 0 || Y == D.y - 1 ) {
             f[1] -= 2 * pw[2] * rho * wall_velocity; // f[2] -=
@@ -398,7 +399,7 @@ void main( void ) {
             f[7] += 2 * pw[7] * rho * wall_velocity; // f[7] +=
             f[8] -= 2 * pw[8] * rho * wall_velocity; // f[8] -=
         }
-        
+        */
 
 
         imageStore( popul_buffer,                             I, vec4( f[0] ));
