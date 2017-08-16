@@ -1,0 +1,384 @@
+// --- COMP ---
+#version 450 core
+
+// input uniforms
+layout( push_constant ) uniform Push_Constant {
+    int ping;
+    int values_per_cell;
+} pc;
+
+// uniform buffer
+layout( std140, binding = 5 ) uniform Compute_UBO {
+    float omega;            // collision frequency
+    float wall_velocity;
+};
+
+// specialization constants for local work group size
+layout( local_size_x_id = 0 ) in;
+//layout( local_size_y_id = 1 ) in;
+//layout( local_size_z_id = 2 ) in;
+
+// local work group defaults, when constants are not defined
+layout( local_size_x = 256 ) in;
+layout( local_size_y =   1 ) in;
+layout( local_size_z =   1 ) in;
+
+// specialization constants for init or loop phase
+layout( constant_id = 3 ) const uint ALGORITHM = 0;
+#define LOOP_SRT_LBGK       0
+#define LOOP_TRT            1
+#define LOOP_MRT            2
+#define LOOP_CASCADED       3
+#define LOOP_CASCADED_DRAG  4
+
+
+// populations 1 single buffered rest velocity, 8 double buffered link velocities
+layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
+
+// velocity and density write target, will be rendered as texture in next pass
+layout( binding = 3, rgba32f ) uniform restrict writeonly image2DArray vel_rho_img;
+
+
+// population indices
+// 6 2 5 //
+//  \|/  //
+// 3-0-1 //
+//  /|\  //
+// 7 4 8 //
+
+
+// Directions:          R       E       N       W       S       NE      NW      SW      SE
+//                      0       1       2       3       4       5       6       7       8       9       10      11      12      13      14
+// Directions:          R       +X      -X      +Y      -Y      +Z     -Z       +X+Y+Z  -X-Y-Z  +X+Y-Z  -X-Y+Z  +X-Y+Z  -X+Y-Z  -X+Y+Z  +X-Y-Z
+const float[15] pw = {  2.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72 };
+
+
+
+////////////////////////////////////////////////////////
+// Common Indices and Counts for VkImage and VkBuffer //
+////////////////////////////////////////////////////////
+
+// shortcut to imageSize, the Domain of the computation, same as Global Size
+//#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
+#define D imageSize( vel_rho_img )
+
+// define access indices for the population buffers
+#define ping ( 8 * pc.ping )
+#define pong ( 8 -    ping )
+
+
+
+//////////////////////////////////////////
+// Indices and Counts if using VkBuffer //
+//////////////////////////////////////////
+
+// We use one rest position and two times the stream populations due to double buffering
+// loading populations p with variable ping = 0 V 8 and storing with pong = 8 V 0
+// All populations are stored in one contignuous float array/buffer
+// first come N rest populations then N east, N north, ...etc.,
+// With the index variable I = [0..N) we can reach individual velocities of population intervall at p
+// We load and store rest populations with index I
+// load stream populations index ( ping + 1 ) * N + I and store with ( pong + 1 ) * N + I
+// with this we reach the population of any node
+// the 3D output image is accessed simply with ivec3( X, Y, Z )
+
+// define global equivalent for gl_LocalInvocationIndex
+#define UI gl_GlobalInvocationID.x
+
+// U and I are also the index velocity population index
+#define I int( UI )
+
+#define X ( I % D.x )
+#define Y ( I / D.x )
+#define Z ( I / ( D.x * D.y ))
+
+// derived total count of nodes
+int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
+#define buffer_size ( pc.values_per_cell * cell_count )  // count of elements in the passed in buffer, required for periodic boundary conditions
+
+
+// main simulation function
+void main( void ) {
+
+    // population indices, +Z, 0Z, -Z
+    // Z = 1 //     // Z = 0 //     // Z= -1 //
+    // ===================================== // 
+    // 13  7 //     //   3   //     // 12  9 //
+    //  \ /  //     //   |   //     //  \ /  //
+    //   5   //     // 2-0-1 //     //   6   //
+    //  / \  //     //   |   //     //  / \  //
+    // 10 11 //     //   4   //     // 8  14 //
+
+    //                      0       1       2       3       4       5       6       7       8       9       10      11      12      13      14
+    // Directions:          R       +X      -X      +Y      -Y      +Z     -Z       +X+Y+Z  -X-Y-Z  +X+Y-Z  -X-Y+Z  +X-Y+Z  -X+Y-Z  -X+Y+Z  +X-Y-Z
+
+    #define OX 1
+    #define OY D.x
+    #define OZ ( D.x * D.y )
+    // load populations including streaming in a gather fashion
+    float f[9] = {                              // bounce back                                                      // inlet / outlet                                   // streaming
+        imageLoad( popul_buffer,                                                                                                                                                                  I ).r,
+        imageLoad( popul_buffer,                                                                     ( X ==       0 ) ? ( ping +  1 ) * cell_count + OY - OX + I : ( ping + 1 ) * cell_count -            1 + I ).r,
+        imageLoad( popul_buffer,                                                                     ( X == D.x - 1 ) ? ( ping +  2 ) * cell_count - OY + OX + I : ( ping + 2 ) * cell_count +            1 + I ).r,
+        imageLoad( popul_buffer, ( Y ==       0 ) ? ( ping + 4 ) * cell_count + I                                                                                     : ( ping + 3 ) * cell_count - D.x          + I ).r,
+        imageLoad( popul_buffer, ( Y == D.y - 1 ) ? ( ping + 3 ) * cell_count + I                                                                                     : ( ping + 4 ) * cell_count + D.x          + I ).r,
+        imageLoad( popul_buffer, ( Z ==       0 ) ? ( ping + 5 ) * cell_count + I                                                                                     : ( ping + 5 ) * cell_count - D.x * D.y    + I ).r,
+        imageLoad( popul_buffer, ( Z == D.z - 1 ) ? ( ping + 6 ) * cell_count + I                                                                                     : ( ping + 6 ) * cell_count + D.x * D.y    + I ).r,
+
+        imageLoad( popul_buffer, ( Y == D.y - 1 || Z == D.z - 1 ) ? ( ping +  8 ) * cell_count + I : ( X ==       0 ) ? ( ping +  7 ) * cell_count - OX - OY - OZ + I : ( ping + 5 ) * cell_count + D.x - 1 + I ).r,
+        imageLoad( popul_buffer, ( Y ==       0 || Z ==       0 ) ? ( ping +  7 ) * cell_count + I : ( X == D.x - 1 ) ? ( ping +  8 ) * cell_count + OX + OY + OZ + I : ( ping + 6 ) * cell_count + D.x + 1 + I ).r,
+        imageLoad( popul_buffer, ( Y == D.y - 1 || Z ==       0 ) ? ( ping + 10 ) * cell_count + I : ( X == D.x - 1 ) ? ( ping +  9 ) * cell_count - OX - OY + OZ + I : ( ping + 7 ) * cell_count - D.x + 1 + I ).r,
+        imageLoad( popul_buffer, ( Y ==       0 || Z == D.z - 1 ) ? ( ping +  9 ) * cell_count + I : ( X ==       0 ) ? ( ping + 10 ) * cell_count + OX + OY - OZ + I : ( ping + 8 ) * cell_count - D.x - 1 + I ).r,
+
+        imageLoad( popul_buffer, ( Y ==       0 || Z == D.z - 1 ) ? ( ping + 12 ) * cell_count + I : ( X ==       0 ) ? ( ping + 11 ) * cell_count - OX + OY - OZ + I : ( ping + 5 ) * cell_count + D.x - 1 + I ).r,
+        imageLoad( popul_buffer, ( Y == D.y - 1 || Z ==       0 ) ? ( ping + 11 ) * cell_count + I : ( X == D.x - 1 ) ? ( ping + 12 ) * cell_count + OX - OY + OZ + I : ( ping + 6 ) * cell_count + D.x + 1 + I ).r,
+        imageLoad( popul_buffer, ( Y == D.y - 1 || Z == D.z - 1 ) ? ( ping + 14 ) * cell_count + I : ( X == D.x - 1 ) ? ( ping + 13 ) * cell_count + OX - OY - OZ + I : ( ping + 7 ) * cell_count - D.x + 1 + I ).r,
+        imageLoad( popul_buffer, ( Y ==       0 || Z ==       0 ) ? ( ping + 13 ) * cell_count + I : ( X ==       0 ) ? ( ping + 14 ) * cell_count - OX + OY + OZ + I : ( ping + 8 ) * cell_count - D.x - 1 + I ).r,
+    };
+
+    vec3 vel = ( vec3(f[1],f[3],f[5]) - vec3(f[2],f[4],f[6]) + vec3(f[7]) - vec3(f[8]) + vec3(f[9],f[9],f[10]) - vec3(f[10],f[10],f[9]) + vec3(f[14],f[13],f[13] - vec3(f[13],f[14],f[14])) / rho;
+    //vec3 vel = vec3(    f[1] - f[2] + f[7] - f[8] + f[ 9] - f[10] + f[14] - f[13],
+    //                    f[3] - f[4] + f[7] - f[8] + f[ 9] - f[10] + f[13] - f[14],
+    //                    f[5] - f[6] + f[7] - f[8] + f[10] - f[ 9] + f[13] - f[14] ) / rho;
+
+    // store velocities and densities in image
+    imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vel, 0, rho ));
+
+
+    if( ALGORITHM == LOOP_SRT_LBGK )
+    {
+
+        // population indices, +Z, 0Z, -Z
+        // Z = 1 //     // Z = 0 //     // Z= -1 //
+        // ===================================== // 
+        // 13  7 //     //   3   //     // 12  9 //
+        //  \ /  //     //   |   //     //  \ /  //
+        //   5   //     // 2-0-1 //     //   6   //
+        //  / \  //     //   |   //     //  / \  //
+        // 10 11 //     //   4   //     // 8  14 //
+
+        //                      0       1       2       3       4       5       6       7       8       9       10      11      12      13      14
+        // Directions:          R       +X      -X      +Y      -Y      +Z     -Z       +X+Y+Z  -X-Y-Z  +X+Y-Z  -X-Y+Z  +X-Y+Z  -X+Y-Z  -X+Y+Z  +X-Y-Z
+
+
+        // compute equilibrium
+        #define PXPYPZ ( vel.x + vel.y + vel.z )
+        #define PXPYMZ ( vel.x + vel.y - vel.z )
+        #define PXMYPZ ( vel.x - vel.y + vel.z )
+        #define MXPYPZ (-vel.x + vel.y - vel.z )
+        #define VX2_45 ( 4.5 * vel.x * vel.x )
+        #define VY2_45 ( 4.5 * vel.y * vel.y )
+        #define VZ2_45 ( 4.5 * vel.z * vel.z )
+        #define PXPYPZ_2_45 ( 4.5 * PXPYPZ * PXPYPZ )
+        #define PXPYMZ_2_45 ( 4.5 * PXPYMZ * PXPYMZ )
+        #define PXMYPZ_2_45 ( 4.5 * PXMYPZ * PXMYPZ )
+        #define MXPYPZ_2_45 ( 4.5 * MXPYPZ * MXPYPZ )
+        #define V_D_V ( 1.5 * dot( vel, vel ))
+
+        float f_eq[15] = {                                    // #define SQ(x) ((x) * (x))
+            pw[ 0] * rho * ( 1                            - V_D_V ), // pw[0] * rho * (1                                                                     - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[ 1] * rho * ( 1 + 3 * vel.x  + VX2_45      - V_D_V ), // pw[1] * rho * (1 + 3 * ( vel.x)                  + 4.5 * SQ( vel.x)                  - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[ 2] * rho * ( 1 - 3 * vel.x  + VY2_45      - V_D_V ), // pw[2] * rho * (1 + 3 * (-vel.x)                  + 4.5 * SQ(-vel.x)                  - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[ 3] * rho * ( 1 + 3 * vel.y  + VZ2_45      - V_D_V ), // pw[3] * rho * (1 + 3 * ( vel.y)                  + 4.5 * SQ( vel.y)                  - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[ 4] * rho * ( 1 - 3 * vel.y  + VX2_45      - V_D_V ), // pw[4] * rho * (1 + 3 * (-vel.y)                  + 4.5 * SQ(-vel.y)                  - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[ 5] * rho * ( 1 + 3 * vel.z  + VY2_45      - V_D_V ), // pw[3] * rho * (1 + 3 * ( vel.z)                  + 4.5 * SQ( vel.z)                  - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[ 6] * rho * ( 1 - 3 * vel.z  + VZ2_45      - V_D_V ), // pw[4] * rho * (1 + 3 * (-vel.z)                  + 4.5 * SQ(-vel.z)                  - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[ 7] * rho * ( 1 + 3 * PXPYPZ + PXPYPZ_2_45 - V_D_V ), // pw[5] * rho * (1 + 3 * ( vel.x + vel.y + vel.z ) + 4.5 * SQ( vel.x + vel.y + vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[ 8] * rho * ( 1 - 3 * PXPYPZ + PXPYPZ_2_45 - V_D_V ), // pw[6] * rho * (1 + 3 * (-vel.x - vel.y - vel.z ) + 4.5 * SQ(-vel.x - vel.y - vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[ 9] * rho * ( 1 - 3 * PXPYMZ + PXPYMZ_2_45 - V_D_V ), // pw[7] * rho * (1 + 3 * ( vel.x + vel.y - vel.z ) + 4.5 * SQ( vel.x + vel.y - vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[10] * rho * ( 1 + 3 * PXPYMZ + PXPYMZ_2_45 - V_D_V )  // pw[8] * rho * (1 + 3 * (-vel.x - vel.y + vel.z ) + 4.5 * SQ(-vel.x - vel.y + vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[11] * rho * ( 1 + 3 * PXMYPZ + PXMYPZ_2_45 - V_D_V ), // pw[5] * rho * (1 + 3 * ( vel.x - vel.y + vel.z ) + 4.5 * SQ( vel.x - vel.y + vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[12] * rho * ( 1 - 3 * PXMYPZ + PXMYPZ_2_45 - V_D_V ), // pw[6] * rho * (1 + 3 * (-vel.x + vel.y - vel.z ) + 4.5 * SQ(-vel.x + vel.y - vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[13] * rho * ( 1 + 3 * MXPYPZ + MXPYPZ_2_45 - V_D_V ), // pw[5] * rho * (1 + 3 * (-vel.x + vel.y + vel.z ) + 4.5 * SQ(-vel.x + vel.y + vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+            pw[14] * rho * ( 1 - 3 * MXPYPZ + MXPYPZ_2_45 - V_D_V ), // pw[6] * rho * (1 + 3 * (+vel.x - vel.y - vel.z ) + 4.5 * SQ(+vel.x - vel.y - vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+        };
+
+
+        // Collide - might be optimized if using f0 and 2 * vec4
+        f[ 0] = mix( f[ 0], f_eq[ 0], omega ); //f[ 0] * ( 1 - omega ) + f_eq[ 0] * omega;
+        f[ 1] = mix( f[ 1], f_eq[ 1], omega ); //f[ 1] * ( 1 - omega ) + f_eq[ 1] * omega;
+        f[ 2] = mix( f[ 2], f_eq[ 2], omega ); //f[ 2] * ( 1 - omega ) + f_eq[ 2] * omega;
+        f[ 3] = mix( f[ 3], f_eq[ 3], omega ); //f[ 3] * ( 1 - omega ) + f_eq[ 3] * omega;
+        f[ 4] = mix( f[ 4], f_eq[ 4], omega ); //f[ 4] * ( 1 - omega ) + f_eq[ 4] * omega;
+        f[ 5] = mix( f[ 5], f_eq[ 5], omega ); //f[ 5] * ( 1 - omega ) + f_eq[ 5] * omega;
+        f[ 6] = mix( f[ 6], f_eq[ 6], omega ); //f[ 6] * ( 1 - omega ) + f_eq[ 6] * omega;
+        f[ 7] = mix( f[ 7], f_eq[ 7], omega ); //f[ 7] * ( 1 - omega ) + f_eq[ 7] * omega;
+        f[ 8] = mix( f[ 8], f_eq[ 8], omega ); //f[ 8] * ( 1 - omega ) + f_eq[ 8] * omega;
+        f[ 9] = mix( f[ 9], f_eq[ 9], omega ); //f[ 9] * ( 1 - omega ) + f_eq[ 9] * omega;
+        f[10] = mix( f[10], f_eq[10], omega ); //f[10] * ( 1 - omega ) + f_eq[10] * omega;
+        f[11] = mix( f[11], f_eq[11], omega ); //f[11] * ( 1 - omega ) + f_eq[11] * omega;
+        f[12] = mix( f[12], f_eq[12], omega ); //f[12] * ( 1 - omega ) + f_eq[12] * omega;
+        f[13] = mix( f[13], f_eq[13], omega ); //f[13] * ( 1 - omega ) + f_eq[13] * omega;
+        f[14] = mix( f[14], f_eq[14], omega ); //f[14] * ( 1 - omega ) + f_eq[14] * omega;
+
+    }
+
+
+
+    else if( ALGORITHM == LOOP_TRT )
+    {
+        // compute equilibrium
+        #define X_P_Y ( vel.x + vel.y )
+        #define X_M_Y ( vel.x - vel.y )
+        #define V_X_2 ( 4.5 * vel.x * vel.x )
+        #define V_Y_2 ( 4.5 * vel.y * vel.y )
+        #define XPY_2 ( 4.5 * X_P_Y * X_P_Y )
+        #define XMY_2 ( 4.5 * X_M_Y * X_M_Y )
+        #define V_D_V ( 1.5 * dot( vel, vel ))
+
+        float f_eq[9] = {                                    // #define SQ(x) ((x) * (x))
+            pw[0] * rho * ( 1                     - V_D_V ), // pw[0] * rho * (1                                                   - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[1] * rho * ( 1 + 3 * vel.x + V_X_2 - V_D_V ), // pw[1] * rho * (1 + 3 * ( vel.x)         + 4.5 * SQ( vel.x)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[2] * rho * ( 1 + 3 * vel.y + V_Y_2 - V_D_V ), // pw[2] * rho * (1 + 3 * ( vel.y)         + 4.5 * SQ( vel.y)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[3] * rho * ( 1 - 3 * vel.x + V_X_2 - V_D_V ), // pw[3] * rho * (1 + 3 * (-vel.x)         + 4.5 * SQ(-vel.x)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[4] * rho * ( 1 - 3 * vel.y + V_Y_2 - V_D_V ), // pw[4] * rho * (1 + 3 * (-vel.y)         + 4.5 * SQ(-vel.y)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[5] * rho * ( 1 + 3 * X_P_Y + XPY_2 - V_D_V ), // pw[5] * rho * (1 + 3 * ( vel.x + vel.y) + 4.5 * SQ( vel.x + vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[6] * rho * ( 1 - 3 * X_M_Y + XMY_2 - V_D_V ), // pw[6] * rho * (1 + 3 * (-vel.x + vel.y) + 4.5 * SQ(-vel.x + vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[7] * rho * ( 1 - 3 * X_P_Y + XPY_2 - V_D_V ), // pw[7] * rho * (1 + 3 * (-vel.x - vel.y) + 4.5 * SQ(-vel.x - vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y))),
+            pw[8] * rho * ( 1 + 3 * X_M_Y + XMY_2 - V_D_V )  // pw[8] * rho * (1 + 3 * ( vel.x - vel.y) + 4.5 * SQ( vel.x - vel.y) - 1.5 * (SQ(vel.x) + SQ(vel.y)))
+        };
+
+
+        float f_p[9];
+        f_p[0] = f[0];
+        f_p[1] = 0.5 * ( f[1] + f[3] );
+        f_p[2] = 0.5 * ( f[2] + f[4] );
+        f_p[3] = f_p[1];
+        f_p[4] = f_p[2];
+        f_p[5] = 0.5 * ( f[5] + f[7] );
+        f_p[6] = 0.5 * ( f[6] + f[8] );
+        f_p[7] = f_p[5];
+        f_p[8] = f_p[6];
+
+        float f_m[9];
+        f_m[0] = 0;
+        f_m[1] = 0.5 * ( f[1] - f[3] );
+        f_m[2] = 0.5 * ( f[2] - f[4] );
+        f_m[3] = - f_m[1];
+        f_m[4] = - f_m[2];
+        f_m[5] = 0.5 * ( f[5] - f[7] );
+        f_m[6] = 0.5 * ( f[6] - f[8] );
+        f_m[7] = - f_m[5];
+        f_m[8] = - f_m[6];
+
+        float f_eq_p[9];
+        f_eq_p[0] = f_eq[0];
+        f_eq_p[1] = 0.5 * ( f_eq[1] + f_eq[3] );
+        f_eq_p[2] = 0.5 * ( f_eq[2] + f_eq[4] );
+        f_eq_p[3] = f_eq_p[1];
+        f_eq_p[4] = f_eq_p[2];
+        f_eq_p[5] = 0.5 * ( f_eq[5] + f_eq[7] );
+        f_eq_p[6] = 0.5 * ( f_eq[6] + f_eq[8] );
+        f_eq_p[7] = f_eq_p[5];
+        f_eq_p[8] = f_eq_p[6];
+
+        float f_eq_m[9];
+        f_eq_m[0] = 0;
+        f_eq_m[1] = 0.5 * ( f_eq[1] - f_eq[3] );
+        f_eq_m[2] = 0.5 * ( f_eq[2] - f_eq[4] );
+        f_eq_m[3] = - f_eq_m[1];
+        f_eq_m[4] = - f_eq_m[2];
+        f_eq_m[5] = 0.5 * ( f_eq[5] - f_eq[7] );
+        f_eq_m[6] = 0.5 * ( f_eq[6] - f_eq[8] );
+        f_eq_m[7] = - f_eq_m[5];
+        f_eq_m[8] = - f_eq_m[6];
+
+        #define omega_p omega
+        #define Lambda 0.25
+        float omega_m = ( 4 - omega_p ) / ( 4 * Lambda * omega_p + 2 - omega_p );
+        // Collide - might be optimized if using f0 and 2 * vec4
+        f[0] = f[0] - omega_p * ( f_p[0] - f_eq_p[0] ) - omega_m * ( f_m[0] - f_eq_m[0] ); //f[0] * ( 1 - omega ) + f_eq[0] * omega;
+        f[1] = f[1] - omega_p * ( f_p[1] - f_eq_p[1] ) - omega_m * ( f_m[1] - f_eq_m[1] ); //f[1] * ( 1 - omega ) + f_eq[1] * omega;
+        f[2] = f[2] - omega_p * ( f_p[2] - f_eq_p[2] ) - omega_m * ( f_m[2] - f_eq_m[2] ); //f[2] * ( 1 - omega ) + f_eq[2] * omega;
+        f[3] = f[3] - omega_p * ( f_p[3] - f_eq_p[3] ) - omega_m * ( f_m[3] - f_eq_m[3] ); //f[3] * ( 1 - omega ) + f_eq[3] * omega;
+        f[4] = f[4] - omega_p * ( f_p[4] - f_eq_p[4] ) - omega_m * ( f_m[4] - f_eq_m[4] ); //f[4] * ( 1 - omega ) + f_eq[4] * omega;
+        f[5] = f[5] - omega_p * ( f_p[5] - f_eq_p[5] ) - omega_m * ( f_m[5] - f_eq_m[5] ); //f[5] * ( 1 - omega ) + f_eq[5] * omega;
+        f[6] = f[6] - omega_p * ( f_p[6] - f_eq_p[6] ) - omega_m * ( f_m[6] - f_eq_m[6] ); //f[6] * ( 1 - omega ) + f_eq[6] * omega;
+        f[7] = f[7] - omega_p * ( f_p[7] - f_eq_p[7] ) - omega_m * ( f_m[7] - f_eq_m[7] ); //f[7] * ( 1 - omega ) + f_eq[7] * omega;
+        f[8] = f[8] - omega_p * ( f_p[8] - f_eq_p[8] ) - omega_m * ( f_m[8] - f_eq_m[8] ); //f[8] * ( 1 - omega ) + f_eq[8] * omega;
+
+    }
+
+
+    // Handle inlet on the left wall and outlet on the right wall
+    if( X == 0 /*|| X == D.x - 1*/ ) {
+        f[ 1] += 2 * pw[ 1] * rho * wall_velocity;
+        f[ 2] -= 2 * pw[ 2] * rho * wall_velocity;
+        f[ 7] += 2 * pw[ 7] * rho * wall_velocity; 
+        f[ 8] -= 2 * pw[ 8] * rho * wall_velocity; 
+        f[ 9] += 2 * pw[ 9] * rho * wall_velocity; 
+        f[10] -= 2 * pw[10] * rho * wall_velocity; 
+        f[11] += 2 * pw[11] * rho * wall_velocity; 
+        f[12] -= 2 * pw[12] * rho * wall_velocity; 
+        f[13] -= 2 * pw[13] * rho * wall_velocity; 
+        f[14] += 2 * pw[14] * rho * wall_velocity; 
+    }
+
+
+        // population indices, +Z, 0Z, -Z
+        // Z = 1 //     // Z = 0 //     // Z= -1 //
+        // ===================================== // 
+        // 13  7 //     //   3   //     // 12  9 //
+        //  \ /  //     //   |   //     //  \ /  //
+        //   5   //     // 2-0-1 //     //   6   //
+        //  / \  //     //   |   //     //  / \  //
+        // 10 11 //     //   4   //     // 8  14 //
+
+        //                      0       1       2       3       4       5       6       7       8       9       10      11      12      13      14
+        // Directions:          R       +X      -X      +Y      -Y      +Z     -Z       +X+Y+Z  -X-Y-Z  +X+Y-Z  -X-Y+Z  +X-Y+Z  -X+Y-Z  -X+Y+Z  +X-Y-Z
+
+    // Store new populations
+    imageStore( popul_buffer,                              I, vec4( f[0] ));
+    imageStore( popul_buffer, ( pong +  1 ) * cell_count + I, vec4( f[ 1] ));
+    imageStore( popul_buffer, ( pong +  2 ) * cell_count + I, vec4( f[ 2] ));
+    imageStore( popul_buffer, ( pong +  3 ) * cell_count + I, vec4( f[ 3] ));
+    imageStore( popul_buffer, ( pong +  4 ) * cell_count + I, vec4( f[ 4] ));
+    imageStore( popul_buffer, ( pong +  5 ) * cell_count + I, vec4( f[ 5] ));
+    imageStore( popul_buffer, ( pong +  6 ) * cell_count + I, vec4( f[ 6] ));
+    imageStore( popul_buffer, ( pong +  7 ) * cell_count + I, vec4( f[ 7] ));
+    imageStore( popul_buffer, ( pong +  8 ) * cell_count + I, vec4( f[ 8] ));
+    imageStore( popul_buffer, ( pong +  9 ) * cell_count + I, vec4( f[ 9] ));
+    imageStore( popul_buffer, ( pong + 10 ) * cell_count + I, vec4( f[10] ));
+    imageStore( popul_buffer, ( pong + 11 ) * cell_count + I, vec4( f[11] ));
+    imageStore( popul_buffer, ( pong + 12 ) * cell_count + I, vec4( f[12] ));
+    imageStore( popul_buffer, ( pong + 13 ) * cell_count + I, vec4( f[13] ));
+    imageStore( popul_buffer, ( pong + 14 ) * cell_count + I, vec4( f[14] ));
+
+}   // main
+
+
+
+// Directions   :   R   N   S   E   W   NE  SW  SE  NW
+// Cascaded     :   R   NW  W   SW  S   SE  E   NE  N
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// alternative access method using multi dim local work group size, currently not working properly //
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/*
+// shortcut to imageSize, the Domain of the computation, same as Global Size
+#define Domain ivec3( gl_WorkGroupSize * gl_NumWorkGroups )
+#define D ( Domain )
+//#define D imageSize( vel_rho_img )
+
+#define GID ivec3( gl_GlobalInvocationID )
+// define gl_WorkGroupIndex equivalent to gl_LocalInvocationIndex
+// this is confirmed on CPU, where is the crux ???
+uint work_group_index = 
+    gl_WorkGroupID.z * gl_NumWorkGroups.z * gl_NumWorkGroups.y +
+    gl_WorkGroupID.y * gl_NumWorkGroups.x +
+    gl_WorkGroupID.x;
+
+// define linearization of the whole domain
+int I = int(
+    gl_WorkGroupSize.z *
+    gl_WorkGroupSize.y *
+    gl_WorkGroupSize.x * work_group_index + gl_LocalInvocationIndex );
+
+
+#define X int( GID.x )
+#define Y int( GID.y )
+#define Z ( I / ( D.x * D.y ))
+*/
