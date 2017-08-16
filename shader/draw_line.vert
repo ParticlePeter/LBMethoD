@@ -14,8 +14,17 @@ layout( std140, binding = 0 ) uniform uboViewer {
 };
 
 
+// uniform buffer
+layout( std140, binding = 6 ) uniform Display_UBO {
+    uint    display_property;
+    float   amplify_property;
+    uint    color_layers;
+    uint    z_layer;
+};
+
+
 // sampler and image
-layout( binding = 4 ) uniform sampler2D vel_rho_tex;      // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+layout( binding = 4 ) uniform sampler2DArray vel_rho_tex;      // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
 
 
 // out per vertex redefinition
@@ -49,10 +58,10 @@ void main() {
     offset[ 1 - LA ] = 2 * VI * LN[ 1 - LA ] - 1; //DS[ 1 - LA ] - DS[ 1 - LA ];
 
     vec2 tex_coord = 0.5 * offset + 0.5;
-    vec4 vel_rho = texture( vel_rho_tex, tex_coord ); // access velocity density texture, result
+    vec4 vel_rho = texture( vel_rho_tex, vec3( tex_coord, z_layer )); // access velocity density texture, result
 
     offset *= DS.xy;
-    offset[ LA ] += dir[ LA ] * vel_rho[ LA ];
+    offset[ LA ] += dir[ LA ] * vel_rho[ LA ] * DS[ LA ];
 
 
 /*  

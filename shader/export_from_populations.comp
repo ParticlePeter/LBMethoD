@@ -23,15 +23,6 @@ layout( local_size_x = 256 ) in;
 layout( local_size_y =   1 ) in;
 layout( local_size_z =   1 ) in;
 
-// specialization constants for init or loop phase
-layout( constant_id = 3 ) const uint ALGORITHM = 0;
-#define INIT_DENSITY_ONE    1 + 255
-#define LOOP_SRT_LBGK       0
-#define LOOP_TRT            1
-#define LOOP_MRT            2
-#define LOOP_CASCADED       3
-#define LOOP_CASCADED_DRAG  4
-
 
 // populations 1 single buffered rest velocity, 8 double buffered link velocities
 layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
@@ -98,7 +89,7 @@ const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
 
 #define X ( I % D.x )
 #define Y ( I / D.x )
-//#define Z ( I / ( imageSize( vel_rho_img ).x * imageSize( vel_rho_img ).y )
+#define Z ( I / ( D.x * D.y ))
 
 // derived total count of nodes
 int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );

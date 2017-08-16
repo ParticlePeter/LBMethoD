@@ -15,7 +15,7 @@ layout( local_size_z =   1 ) in;
 layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 
 // velocity and density write target, will be rendered as texture in next pass
-layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict writeonly image2D vel_rho_img;
+layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict writeonly image2DArray vel_rho_img;
 
 
 // population indices
@@ -46,7 +46,7 @@ const float[9] pw = {   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 
 
 #define X ( I % D.x )
 #define Y ( I / D.x )
-//#define Z ( I / ( imageSize( vel_rho_img ).x * imageSize( vel_rho_img ).y )
+#define Z ( I / ( D.x * D.y ))
 
 // derived total count of nodes
 int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
@@ -56,12 +56,12 @@ int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
 void main( void ) {
 
     // Init velocities and densities
-    imageStore( vel_rho_img, ivec2( X, Y ), vec4( 0, 0, 0, 1 ));
+    imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( 0, 0, 0, 1 ));
 
     // init all distribution f(unctions) with equilibrium, p = population
     for( int p = 0; p < 9; ++p )  {
         imageStore( popul_buffer, p * cell_count + I, vec4( pw[ p ] ));
-        //if( p > 0 ) imageStore( popul_buffer, ( p + 8 ) * cell_count + I, vec4( pw[ p ] ));
+        if( p > 0 ) imageStore( popul_buffer, ( p + 8 ) * cell_count + I, vec4( pw[ p ] ));
     }
 }   // main
 
@@ -99,5 +99,5 @@ int I = int(
 
 #define X int( GID.x )
 #define Y int( GID.y )
-//#define Z ( I / ( imageSize( vel_rho_img ).x * imageSize( vel_rho_img ).y )
+#define Z ( I / ( D.x * D.y ))
 */

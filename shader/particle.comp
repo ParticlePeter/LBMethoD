@@ -24,7 +24,7 @@ layout( push_constant ) uniform Push_Constant {
 } pc;
 
 // velocity texture
-layout( binding = 4 ) uniform sampler2D vel_tex;      // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+layout( binding = 4 ) uniform sampler2DArray vel_tex;      // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
 
 
 // particle positions
@@ -116,8 +116,8 @@ const float frame = 1;
 // compute two 2D points at once with a 4D vector
 vec4 texVel( vec4 p ) {
     return vec4(
-        texture( vel_tex, p.xy ).rg,
-        texture( vel_tex, p.zw ).rg
+        texture( vel_tex, vec3( p.xy, 0 )).rg,
+        texture( vel_tex, vec3( p.zw, 0 )).rg
     );
 }
 

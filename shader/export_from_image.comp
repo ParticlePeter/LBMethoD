@@ -23,21 +23,12 @@ layout( local_size_x = 256 ) in;
 layout( local_size_y =   1 ) in;
 layout( local_size_z =   1 ) in;
 
-// specialization constants for init or loop phase
-layout( constant_id = 3 ) const uint ALGORITHM = 0;
-#define INIT_DENSITY_ONE    1 + 255
-#define LOOP_SRT_LBGK       0
-#define LOOP_TRT            1
-#define LOOP_MRT            2
-#define LOOP_CASCADED       3
-#define LOOP_CASCADED_DRAG  4
-
 
 // populations 1 single buffered rest velocity, 8 double buffered link velocities
 layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 
 // velocity and density write target, will be rendered as texture in next pass
-layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict readonly image2D vel_rho_img;
+layout( binding = 3, rgba32f ) uniform restrict readonly image2DArray vel_rho_img;
 
 // velocity and density write target, will be rendered as texture in next pass
 layout( binding = 8, r32f /*rgba16f*/ ) uniform restrict writeonly imageBuffer export_buffer[2];
@@ -98,7 +89,7 @@ const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
 
 #define X ( I % D.x )
 #define Y ( I / D.x )
-//#define Z ( I / ( imageSize( vel_rho_img ).x * imageSize( vel_rho_img ).y )
+#define Z ( I / ( D.x * D.y ))
 
 // derived total count of nodes
 int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
@@ -134,7 +125,7 @@ void main( void ) {
     vec2  vel = ( vec2(f[1],f[2]) - vec2(f[3],f[4]) + vec2(f[5]) - vec2(f[7]) + vec2(f[8],f[6]) - vec2(f[6],f[8])) / rho;
 */
 
-    vec3 vel = imageLoad( vel_rho_img, ivec2( X, Y )).rgb;
+    vec3 vel = imageLoad( vel_rho_img, ivec3( X, Y, Z )).rgb;
     imageStore( export_buffer[ PCPING ],                  I, vec4( vel.x ));
     imageStore( export_buffer[ PCPING ],     cell_count + I, vec4( vel.y ));
     imageStore( export_buffer[ PCPING ], 2 * cell_count + I, vec4(     0 ));  // vel.z

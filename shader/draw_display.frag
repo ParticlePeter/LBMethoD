@@ -3,13 +3,14 @@
 layout( location = 0 ) in   vec2 vs_tex_coord;   // input from vertex shader
 layout( location = 0 ) out  vec4 fs_color;      // output from fragment shader
 
-layout( binding = 4 ) uniform sampler2D vel_rho_tex;      // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+layout( binding = 4 ) uniform sampler2DArray vel_rho_tex;      // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
 
 // uniform buffer
 layout( std140, binding = 6 ) uniform Display_UBO {
     uint    display_property;
     float   amplify_property;
     uint    color_layers;
+    uint    z_layer;
 };
 
 #define DISPLAY_DENSITY 0
@@ -99,7 +100,7 @@ vec3 colorRamp( float t ) {
 void main() {
 
     // get velocity and densoty data
-    vec4 vel_rho = texture( vel_rho_tex, vs_tex_coord );                          // access velocity density texture
+    vec4 vel_rho = texture( vel_rho_tex, vec3( vs_tex_coord, z_layer ));  // access velocity density layer texture 
 
     switch( display_property ) {
         case DISPLAY_DENSITY :
