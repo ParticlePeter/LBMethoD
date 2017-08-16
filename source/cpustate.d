@@ -227,10 +227,11 @@ void cpuSim( T, bool EXPORT, bool PROFILE = false )( ref VDrive_Gui_State vg ) n
         T v_x = ( f[1] - f[3] + f[5] - f[7] + f[8] - f[6] ) / rho;
         T v_y = ( f[2] - f[4] + f[5] - f[7] + f[6] - f[8] ) / rho;
 
-        // store velocities and densities in image
-        vg.sim_image_ptr[ 2 * I + 0 ] = cast( float )v_x;
-        vg.sim_image_ptr[ 2 * I + 1 ] = cast( float )v_y;
-
+        // store velocities and densities in stage buffer to copy to image with format VK_FORMAT_R32G32B32A32_SFLOAT
+        vg.sim_image_ptr[ 4 * I + 0 ] = cast( float )v_x;
+        vg.sim_image_ptr[ 4 * I + 1 ] = cast( float )v_y;
+        vg.sim_image_ptr[ 4 * I + 2 ] = 0;
+        vg.sim_image_ptr[ 4 * I + 3 ] = 1;
 //        if( vg.vc.start_index <= vg.sim_index && vg.sim_index < vg.vc.start_index + vg.vc.step_count ) {
 //            vg.vc.grid[ I + ( vg.sim_index - vg.vc.start_index ) * vg.vc.cell_count ] = vec3( v_x, v_y, 0 );
 //        }

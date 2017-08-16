@@ -2053,8 +2053,8 @@ void drawGuiData( ImDrawData* draw_data ) {
         VkBufferImageCopy buffer_image_copy = {
             imageSubresource: {
                 aspectMask      : subresource_range.aspectMask,
-                baseArrayLayer  : subresource_range.baseArrayLayer,
-                layerCount      : subresource_range.layerCount },
+                baseArrayLayer  : 0,
+                layerCount      : 1 },
             imageExtent     : vg.sim_image.extent,
         };
         cmd_buffer.vkCmdCopyBufferToImage( vg.sim_stage_buffer.buffer, vg.sim_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &buffer_image_copy );

@@ -130,6 +130,7 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
     vd.display_ubo.display_property = 3;
     vd.display_ubo.amplify_property = 1;
     vd.display_ubo.color_layers = 0;
+    vd.display_ubo.z_layer = 0;
     vd.updateDisplayUBO;
 
 
@@ -187,7 +188,14 @@ auto ref createSimImage( ref VDrive_State vd ) {
 
     // Todo(pp): the format should be choose-able
     // Todo(pp): here checks are required if this image format is available for VK_IMAGE_USAGE_STORAGE_BIT
-    auto image_format = VK_FORMAT_R32G32_SFLOAT; //VK_FORMAT_R16G16B16A16_SFLOAT
+    auto image_format = VK_FORMAT_R32G32B32A32_SFLOAT; //VK_FORMAT_R16G16B16A16_SFLOAT
+    VkImageSubresourceRange subresource_range = {
+        aspectMask      : VK_IMAGE_ASPECT_COLOR_BIT,
+        baseMipLevel    : cast( uint32_t )0,
+        levelCount      : 1,
+        baseArrayLayer  : cast( uint32_t )0,
+        layerCount      : vd.sim_domain[  2  ],
+    };
     vd.sim_image( vd )
         .create(
             image_format,
@@ -198,7 +206,7 @@ auto ref createSimImage( ref VDrive_State vd ) {
             GREG ? VK_IMAGE_TILING_OPTIMAL : VK_IMAGE_TILING_LINEAR
             )
         .createMemory( GREG ? VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT : VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )   // Todo(pp): check which memory property is required for the image format
-        .createView;
+        .createView( subresource_range, VK_IMAGE_VIEW_TYPE_2D_ARRAY, image_format );
 
 
     // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
@@ -227,7 +235,7 @@ auto ref createSimImage( ref VDrive_State vd ) {
         vd.sim_stage_buffer.destroyResources;  // destroy old image and its view, keeping the sampler
     }
 
-    uint32_t buffer_size = 2 * vd.sim_domain[0] * vd.sim_domain[1];     // only in 2D and with VK_FORMAT_R32G32_SFLOAT
+    uint32_t buffer_size = 4 * vd.sim_domain[0] * vd.sim_domain[1];     // only in 2D and with VK_FORMAT_R32G32B32A32_SFLOAT
     uint32_t buffer_mem_size = buffer_size * float.sizeof.toUint;
 
     vd.sim_image_ptr = cast( float* )( vd.sim_stage_buffer( vd )
@@ -307,7 +315,7 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         .addBufferInfo( vd.compute_ubo_buffer.buffer )
 
         // Display UBO for display parameter
-        .addLayoutBinding( 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT )
+        .addLayoutBinding( 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT )
         .addBufferInfo( vd.display_ubo_buffer.buffer )
 
         // Particles Buffer, not used yet

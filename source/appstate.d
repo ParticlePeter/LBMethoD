@@ -149,6 +149,7 @@ struct VDrive_State {
         uint32_t    display_property        = 0;    // display param display
         float       amplify_property        = 1;    // display param amplify param
         uint32_t    color_layers            = 0;
+        uint32_t    z_layer                 = 0;
     }
 
     Compute_UBO*    compute_ubo;
