@@ -101,39 +101,13 @@ int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
 // main simulation function
 void main( void ) {
 
-    // population indices
-    // 6 2 5 //
-    //  \|/  //
-    // 3-0-1 //
-    //  /|\  //
-    // 7 4 8 //
-/*
-    // load populations including streaming in a gather fashion
-    float f[9] = {
-        imageLoad( popul_buffer,                                                                                                           I ).r,
-        imageLoad( popul_buffer, ( X ==       0 )                  ? ( ping + 3 ) * cell_count + I : ( ping + 1 ) * cell_count -       1 + I ).r,
-        imageLoad( popul_buffer, ( Y == D.y - 1 )                  ? ( ping + 4 ) * cell_count + I : ( ping + 2 ) * cell_count + D.x     + I ).r,
-        imageLoad( popul_buffer, ( X == D.x - 1 )                  ? ( ping + 1 ) * cell_count + I : ( ping + 3 ) * cell_count +       1 + I ).r,
-        imageLoad( popul_buffer, ( Y ==       0 )                  ? ( ping + 2 ) * cell_count + I : ( ping + 4 ) * cell_count - D.x     + I ).r,
-        imageLoad( popul_buffer, ( X ==       0 || Y == D.y - 1 )  ? ( ping + 7 ) * cell_count + I : ( ping + 5 ) * cell_count + D.x - 1 + I ).r,
-        imageLoad( popul_buffer, ( Y == D.y - 1 || X == D.x - 1 )  ? ( ping + 8 ) * cell_count + I : ( ping + 6 ) * cell_count + D.x + 1 + I ).r,
-        imageLoad( popul_buffer, ( X == D.x - 1 || Y ==       0 )  ? ( ping + 5 ) * cell_count + I : ( ping + 7 ) * cell_count - D.x + 1 + I ).r,
-        imageLoad( popul_buffer, ( Y ==       0 || X ==       0 )  ? ( ping + 6 ) * cell_count + I : ( ping + 8 ) * cell_count - D.x - 1 + I ).r,
-    };
-
-    float rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
-    vec2  vel = ( vec2(f[1],f[2]) - vec2(f[3],f[4]) + vec2(f[5]) - vec2(f[7]) + vec2(f[8],f[6]) - vec2(f[6],f[8])) / rho;
-*/
-
+	// load macroscopic properties from image
     vec3 vel = imageLoad( vel_rho_img, ivec3( X, Y, Z )).rgb;
+
+    // store properties in export buffer with ensight vector format
     imageStore( export_buffer[ PCPING ],                  I, vec4( vel.x ));
     imageStore( export_buffer[ PCPING ],     cell_count + I, vec4( vel.y ));
     imageStore( export_buffer[ PCPING ], 2 * cell_count + I, vec4(     0 ));  // vel.z
-
-    //eb[ pc.ping ].export_buffer[                  I ] = vel.x;
-    //eb[ pc.ping ].export_buffer[     cell_count + I ] = vel.y;
-    //eb[ pc.ping ].export_buffer[ 2 * cell_count + I ] =     0;
-
 
 }   // main
 
