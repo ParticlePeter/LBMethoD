@@ -112,36 +112,45 @@ void main( void ) {
     //                      0       1       2       3       4       5       6       7       8       9       10      11      12      13      14
     // Directions:          R       +X      -X      +Y      -Y      +Z     -Z       +X+Y+Z  -X-Y-Z  +X+Y-Z  -X-Y+Z  +X-Y+Z  -X+Y-Z  -X+Y+Z  +X-Y-Z
 
-    #define OX 1
-    #define OY D.x
-    #define OZ ( D.x * D.y )
+    //
     // load populations including streaming in a gather fashion
-    float f[9] = {                              // bounce back                                                      // inlet / outlet                                   // streaming
-        imageLoad( popul_buffer,                                                                                                                                                                  I ).r,
-        imageLoad( popul_buffer,                                                                     ( X ==       0 ) ? ( ping +  1 ) * cell_count + OY - OX + I : ( ping + 1 ) * cell_count -            1 + I ).r,
-        imageLoad( popul_buffer,                                                                     ( X == D.x - 1 ) ? ( ping +  2 ) * cell_count - OY + OX + I : ( ping + 2 ) * cell_count +            1 + I ).r,
-        imageLoad( popul_buffer, ( Y ==       0 ) ? ( ping + 4 ) * cell_count + I                                                                                     : ( ping + 3 ) * cell_count - D.x          + I ).r,
-        imageLoad( popul_buffer, ( Y == D.y - 1 ) ? ( ping + 3 ) * cell_count + I                                                                                     : ( ping + 4 ) * cell_count + D.x          + I ).r,
-        imageLoad( popul_buffer, ( Z ==       0 ) ? ( ping + 5 ) * cell_count + I                                                                                     : ( ping + 5 ) * cell_count - D.x * D.y    + I ).r,
-        imageLoad( popul_buffer, ( Z == D.z - 1 ) ? ( ping + 6 ) * cell_count + I                                                                                     : ( ping + 6 ) * cell_count + D.x * D.y    + I ).r,
+    //
 
-        imageLoad( popul_buffer, ( Y == D.y - 1 || Z == D.z - 1 ) ? ( ping +  8 ) * cell_count + I : ( X ==       0 ) ? ( ping +  7 ) * cell_count - OX - OY - OZ + I : ( ping + 5 ) * cell_count + D.x - 1 + I ).r,
-        imageLoad( popul_buffer, ( Y ==       0 || Z ==       0 ) ? ( ping +  7 ) * cell_count + I : ( X == D.x - 1 ) ? ( ping +  8 ) * cell_count + OX + OY + OZ + I : ( ping + 6 ) * cell_count + D.x + 1 + I ).r,
-        imageLoad( popul_buffer, ( Y == D.y - 1 || Z ==       0 ) ? ( ping + 10 ) * cell_count + I : ( X == D.x - 1 ) ? ( ping +  9 ) * cell_count - OX - OY + OZ + I : ( ping + 7 ) * cell_count - D.x + 1 + I ).r,
-        imageLoad( popul_buffer, ( Y ==       0 || Z == D.z - 1 ) ? ( ping +  9 ) * cell_count + I : ( X ==       0 ) ? ( ping + 10 ) * cell_count + OX + OY - OZ + I : ( ping + 8 ) * cell_count - D.x - 1 + I ).r,
+    // Deltas in 3D
+    #define DX 1
+    #define DY D.x
+    #define DZ ( D.x * D.y )
 
-        imageLoad( popul_buffer, ( Y ==       0 || Z == D.z - 1 ) ? ( ping + 12 ) * cell_count + I : ( X ==       0 ) ? ( ping + 11 ) * cell_count - OX + OY - OZ + I : ( ping + 5 ) * cell_count + D.x - 1 + I ).r,
-        imageLoad( popul_buffer, ( Y == D.y - 1 || Z ==       0 ) ? ( ping + 11 ) * cell_count + I : ( X == D.x - 1 ) ? ( ping + 12 ) * cell_count + OX - OY + OZ + I : ( ping + 6 ) * cell_count + D.x + 1 + I ).r,
-        imageLoad( popul_buffer, ( Y == D.y - 1 || Z == D.z - 1 ) ? ( ping + 14 ) * cell_count + I : ( X == D.x - 1 ) ? ( ping + 13 ) * cell_count + OX - OY - OZ + I : ( ping + 7 ) * cell_count - D.x + 1 + I ).r,
-        imageLoad( popul_buffer, ( Y ==       0 || Z ==       0 ) ? ( ping + 13 ) * cell_count + I : ( X ==       0 ) ? ( ping + 14 ) * cell_count - OX + OY + OZ + I : ( ping + 8 ) * cell_count - D.x - 1 + I ).r,
+    // access the ping population p of the current cell index, while the cell index can still be offset
+    #define POP(p) (( ping + p ) * cell_count + I )
+
+    float f[9] = {// boundaries:                                    bback    :                      periodic   :   no boundary streaming
+        imageLoad( popul_buffer,                                                                                              I                 ).r,    // Rest
+                                                                                                                                // Axis Aligned
+        imageLoad( popul_buffer,                                                  ( X ==       0   ?   + D.x   :   0 ) + POP( 1) - DX           ).r,
+        imageLoad( popul_buffer,                                                  ( X == D.x - 1   ?   - D.x   :   0 ) + POP( 2) + DX           ).r,
+        imageLoad( popul_buffer, Y ==       0                   ?   POP( 4)                                    :         POP( 3)      - DY      ).r,
+        imageLoad( popul_buffer, Y == D.y - 1                   ?   POP( 3)                                    :         POP( 4)      + DY      ).r,
+        imageLoad( popul_buffer, Z ==       0                   ?   POP( 5)                                    :         POP( 5)           - DY ).r,
+        imageLoad( popul_buffer, Z == D.z - 1                   ?   POP( 6)                                    :         POP( 6)           + DY ).r,
+                                                                                                                                // Diagonal
+        imageLoad( popul_buffer, Y == D.y - 1 || Z == D.z - 1   ?   POP( 8)   :   ( X ==       0   ?   + D.x   :   0 ) + POP( 7) - DX - DY - DZ ).r,
+        imageLoad( popul_buffer, Y ==       0 || Z ==       0   ?   POP( 7)   :   ( X == D.x - 1   ?   - D.x   :   0 ) + POP( 8) + DX + DY + DZ ).r,
+        imageLoad( popul_buffer, Y == D.y - 1 || Z ==       0   ?   POP(10)   :   ( X == D.x - 1   ?   - D.x   :   0 ) + POP( 9) - DX - DY + DZ ).r,
+        imageLoad( popul_buffer, Y ==       0 || Z == D.z - 1   ?   POP( 9)   :   ( X ==       0   ?   + D.x   :   0 ) + POP(10) + DX + DY - DZ ).r,
+        imageLoad( popul_buffer, Y ==       0 || Z == D.z - 1   ?   POP(12)   :   ( X ==       0   ?   + D.x   :   0 ) + POP(11) - DX + DY - DZ ).r,
+        imageLoad( popul_buffer, Y == D.y - 1 || Z ==       0   ?   POP(11)   :   ( X == D.x - 1   ?   - D.x   :   0 ) + POP(12) + DX - DY + DZ ).r,
+        imageLoad( popul_buffer, Y == D.y - 1 || Z == D.z - 1   ?   POP(14)   :   ( X == D.x - 1   ?   - D.x   :   0 ) + POP(13) + DX - DY - DZ ).r,
+        imageLoad( popul_buffer, Y ==       0 || Z ==       0   ?   POP(13)   :   ( X ==       0   ?   + D.x   :   0 ) + POP(14) - DX + DY + DZ ).r,
     };
 
+    // compute macroscopic properties
     vec3 vel = ( vec3(f[1],f[3],f[5]) - vec3(f[2],f[4],f[6]) + vec3(f[7]) - vec3(f[8]) + vec3(f[9],f[9],f[10]) - vec3(f[10],f[10],f[9]) + vec3(f[14],f[13],f[13] - vec3(f[13],f[14],f[14])) / rho;
     //vec3 vel = vec3(    f[1] - f[2] + f[7] - f[8] + f[ 9] - f[10] + f[14] - f[13],
     //                    f[3] - f[4] + f[7] - f[8] + f[ 9] - f[10] + f[13] - f[14],
     //                    f[5] - f[6] + f[7] - f[8] + f[10] - f[ 9] + f[13] - f[14] ) / rho;
 
-    // store velocities and densities in image
+    // store properties in image
     imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vel, 0, rho ));
 
 

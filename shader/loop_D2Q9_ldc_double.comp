@@ -154,25 +154,44 @@ void bounce( int p, double f ) {
 // main simulation function
 void main( void ) {
 
-    // load populations
-    double f[9] = {
-         packDouble2x32( imageLoad( popul_buffer,                             I ).rg ),
-         packDouble2x32( imageLoad( popul_buffer, ( ping + 1 ) * cell_count + I ).rg ),
-         packDouble2x32( imageLoad( popul_buffer, ( ping + 2 ) * cell_count + I ).rg ),
-         packDouble2x32( imageLoad( popul_buffer, ( ping + 3 ) * cell_count + I ).rg ),
-         packDouble2x32( imageLoad( popul_buffer, ( ping + 4 ) * cell_count + I ).rg ),
-         packDouble2x32( imageLoad( popul_buffer, ( ping + 5 ) * cell_count + I ).rg ),
-         packDouble2x32( imageLoad( popul_buffer, ( ping + 6 ) * cell_count + I ).rg ),
-         packDouble2x32( imageLoad( popul_buffer, ( ping + 7 ) * cell_count + I ).rg ),
-         packDouble2x32( imageLoad( popul_buffer, ( ping + 8 ) * cell_count + I ).rg ) 
+    // population indices
+    // 6 2 5 //
+    //  \|/  //
+    // 3-0-1 //
+    //  /|\  //
+    // 7 4 8 //
+
+    //
+    // load populations including streaming in a gather fashion
+    //
+
+    // Deltas in 3D
+    #define DX 1
+    #define DY D.x
+    #define DZ ( D.x * D.y )
+
+    // access the ping population p of the current cell index, while the cell index can still be offset
+    #define POP(p) (( ping + p ) * cell_count + I )
+
+    double f[9] = {     // boundaries:                                    bback    :   no boundary streaming
+         packDouble2x32( popul_buffer,                                                     I            ).rg,
+         packDouble2x32( popul_buffer, X ==       0                   ?   POP(3)   :   POP(1) - DX      ).rg,
+         packDouble2x32( popul_buffer, Y == D.y - 1                   ?   POP(4)   :   POP(2)      + DY ).rg,
+         packDouble2x32( popul_buffer, X == D.x - 1                   ?   POP(1)   :   POP(3) + DX      ).rg,
+         packDouble2x32( popul_buffer, Y ==       0                   ?   POP(2)   :   POP(4)      - DY ).rg,
+         packDouble2x32( popul_buffer, X ==       0 || Y == D.y - 1   ?   POP(7)   :   POP(5) - DX + DY ).rg,
+         packDouble2x32( popul_buffer, Y == D.y - 1 || X == D.x - 1   ?   POP(8)   :   POP(6) + DX + DY ).rg,
+         packDouble2x32( popul_buffer, X == D.x - 1 || Y ==       0   ?   POP(5)   :   POP(7) + DX - DY ).rg,
+         packDouble2x32( popul_buffer, Y ==       0 || X ==       0   ?   POP(6)   :   POP(8) - DX - DY ).rg 
     };
 
+    // compute macroscopic properties
     double rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
     dvec2  vel = ( dvec2(f[1],f[2]) - dvec2(f[3],f[4]) + dvec2(f[5]) - dvec2(f[7]) + dvec2(f[8],f[6]) - dvec2(f[6],f[8])) / rho;
     //dvec2  vel = dvec2(   f[1] - f[3] + f[5] - f[7] + f[8] - f[6],
-    //                    f[2] - f[4] + f[5] - f[7] + f[6] - f[8] ) / rho;
+    //                      f[2] - f[4] + f[5] - f[7] + f[6] - f[8] ) / rho;
 
-    // store velocities and densities in image
+    // store properties in image
     imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vel, 0, rho ));
 
 
@@ -395,18 +414,15 @@ void main( void ) {
     // 7 4 8 //
 
     // Store new populations
-    imageStore( popul_buffer, I, uvec4( unpackDouble2x32( f[0] ), 0, 0 ));
-
-    if( X == D.x - 1 ) bounce( 1, f[1] ); else stream( 1, f[1] );
-    if( Y ==       0 ) bounce( 2, f[2] ); else stream( 2, f[2] );
-    if( X ==       0 ) bounce( 3, f[3] ); else stream( 3, f[3] );
-    if( Y == D.y - 1 ) bounce( 4, f[4] ); else stream( 4, f[4] );
-
-    if( X == D.x - 1 || Y ==       0 ) bounce( 5, f[5] ); else stream( 5, f[5] );
-    if( Y ==       0 || X ==       0 ) bounce( 6, f[6] ); else stream( 6, f[6] );
-    if( X ==       0 || Y == D.y - 1 ) bounce( 7, f[7] ); else stream( 7, f[7] );
-    if( Y == D.y - 1 || X == D.x - 1 ) bounce( 8, f[8] ); else stream( 8, f[8] );
-
+    imageStore( popul_buffer,                             I, uvec4( unpackDouble2x32( f[0], 0, 0 ));
+    imageStore( popul_buffer, ( pong + 1 ) * cell_count + I, uvec4( unpackDouble2x32( f[1], 0, 0 ));
+    imageStore( popul_buffer, ( pong + 2 ) * cell_count + I, uvec4( unpackDouble2x32( f[2], 0, 0 ));
+    imageStore( popul_buffer, ( pong + 3 ) * cell_count + I, uvec4( unpackDouble2x32( f[3], 0, 0 ));
+    imageStore( popul_buffer, ( pong + 4 ) * cell_count + I, uvec4( unpackDouble2x32( f[4], 0, 0 ));
+    imageStore( popul_buffer, ( pong + 5 ) * cell_count + I, uvec4( unpackDouble2x32( f[5], 0, 0 ));
+    imageStore( popul_buffer, ( pong + 6 ) * cell_count + I, uvec4( unpackDouble2x32( f[6], 0, 0 ));
+    imageStore( popul_buffer, ( pong + 7 ) * cell_count + I, uvec4( unpackDouble2x32( f[7], 0, 0 ));
+    imageStore( popul_buffer, ( pong + 8 ) * cell_count + I, uvec4( unpackDouble2x32( f[8], 0, 0 ));
 }   // main
 
 

@@ -152,19 +152,30 @@ void main( void ) {
     //  /|\  //
     // 7 4 8 //
 
+    //
     // load populations including streaming in a gather fashion
-    float f[9] = {
-        imageLoad( popul_buffer,                                                                                                                                                             I ).r,
+    //
 
-        imageLoad( popul_buffer,                                                    ( X ==       0 ) ? ( ping + 1 ) * cell_count + D.x - 1 + I       : ( ping + 1 ) * cell_count -       1 + I ).r,
-        imageLoad( popul_buffer,                                                    ( Y == D.y - 1 ) ? ( ping + 4 ) * cell_count + I                 : ( ping + 2 ) * cell_count + D.x     + I ).r,
-        imageLoad( popul_buffer,                                                    ( X == D.x - 1 ) ? ( ping + 3 ) * cell_count - D.x + 1 + I       : ( ping + 3 ) * cell_count +       1 + I ).r,
-        imageLoad( popul_buffer,                                                    ( Y ==       0 ) ? ( ping + 2 ) * cell_count + I                 : ( ping + 4 ) * cell_count - D.x     + I ).r,
+    // Deltas in 3D
+    #define DX 1
+    #define DY D.x
+    #define DZ ( D.x * D.y )
 
-        imageLoad( popul_buffer, ( Y == D.y - 1 ) ? ( ping + 7 ) * cell_count + I : ( X ==       0 ) ? ( ping + 5 ) * cell_count + D.x + D.x - 1 + I : ( ping + 5 ) * cell_count + D.x - 1 + I ).r,
-        imageLoad( popul_buffer, ( Y == D.y - 1 ) ? ( ping + 8 ) * cell_count + I : ( X == D.x - 1 ) ? ( ping + 6 ) * cell_count - D.x + D.x + 1 + I : ( ping + 6 ) * cell_count + D.x + 1 + I ).r,
-        imageLoad( popul_buffer, ( Y ==       0 ) ? ( ping + 5 ) * cell_count + I : ( X == D.x - 1 ) ? ( ping + 7 ) * cell_count - D.x - D.x + 1 + I : ( ping + 7 ) * cell_count - D.x + 1 + I ).r,
-        imageLoad( popul_buffer, ( Y ==       0 ) ? ( ping + 6 ) * cell_count + I : ( X ==       0 ) ? ( ping + 8 ) * cell_count + D.x - D.x - 1 + I : ( ping + 8 ) * cell_count - D.x - 1 + I ).r,
+    // access the ping population p of the current cell index, while the cell index can still be offset
+    #define POP(p) (( ping + p ) * cell_count + I )
+
+    float f[9] = {// boundaries:                   bback     :                     periodic   :  no boundary streaming
+        imageLoad( popul_buffer,                                                                           I            ).r,
+
+        imageLoad( popul_buffer,                                 ( X ==       0   ?   + D.x   :  0 ) + POP(1) - DX      ).r,
+        imageLoad( popul_buffer, Y == D.y - 1   ?   POP(4)                                    :        POP(2)      + DY ).r,
+        imageLoad( popul_buffer,                                 ( X == D.x - 1   ?   - D.x   :  0 ) + POP(3) + DX      ).r,
+        imageLoad( popul_buffer, Y ==       0   ?   POP(2)                                    :        POP(4)      - DY ).r,
+
+        imageLoad( popul_buffer, Y == D.y - 1   ?   POP(7)   :   ( X ==       0   ?   + D.x   :  0 ) + POP(5) - DX + DY ).r,
+        imageLoad( popul_buffer, Y == D.y - 1   ?   POP(8)   :   ( X == D.x - 1   ?   - D.x   :  0 ) + POP(6) + DX + DY ).r,
+        imageLoad( popul_buffer, Y ==       0   ?   POP(5)   :   ( X == D.x - 1   ?   - D.x   :  0 ) + POP(7) + DX - DY ).r,
+        imageLoad( popul_buffer, Y ==       0   ?   POP(6)   :   ( X ==       0   ?   + D.x   :  0 ) + POP(8) - DX - DY ).r,
     };
 
     float rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
