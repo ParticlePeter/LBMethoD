@@ -327,15 +327,12 @@ auto ref createExportCommands( ref VDrive_Gui_State vd ) {
         // - vd.ping_pong = ve.sim_index % 2;
         // - vd.sim_index = ve.start_index + ve.export_index * ve.step_size;
 
-        //uint32_t[2] push_constant = [ (( vd.ve.start_index + i ) % 2 ).toUint, vd.sim_layers ];
-        uint32_t[2] push_constant = [ i.toUint % vd.MAX_FRAMES, vd.sim_layers ];
-
-        cmd_buffer.vkBeginCommandBuffer( &sim_cmd_buffers_bi );  // begin command buffer recording
-
-
         //
         // First export the current frame!
         //
+
+        cmd_buffer.vkBeginCommandBuffer( &sim_cmd_buffers_bi );  // begin command buffer recording
+
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.comp_export_pso.pipeline );    // bind compute vd.comp_export_pso.pipeline
 
         cmd_buffer.vkCmdBindDescriptorSets(             // VkCommandBuffer              commandBuffer
@@ -348,6 +345,12 @@ auto ref createExportCommands( ref VDrive_Gui_State vd ) {
             null                                        // const( uint32_t )*           pDynamicOffsets
         );
 
+        // with this approach we are able to export sim step zero, initial settings, where no simulation took place
+        // we export from the pong buffer, for any other case, after simulation took place
+        // hence we use ( i + 1 ) % 2 instead of i % 2
+        // to get proper results, the pong range of the population buffer and the macroscopic property image
+        // must be properly initialized
+        uint32_t[2] push_constant = [ ( i + 1 ).toUint % 2, vd.sim_layers ];
         cmd_buffer.vkCmdPushConstants( vd.comp_export_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
 
         cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );   // dispatch compute command
@@ -369,7 +372,7 @@ auto ref createExportCommands( ref VDrive_Gui_State vd ) {
         foreach( s; 0 .. vd.ve.step_size ) {
 
             //push_constant[0] = (( ve.sim_index + i + s ) % 2 ).toUint;
-            push_constant[0] = (( i + s ) % vd.MAX_FRAMES ).toUint;
+            push_constant[0] = (( i + s ) % 2 ).toUint;
 
             cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.comp_loop_pso.pipeline );    // bind compute vd.comp_loop_pso.pipeline
 
