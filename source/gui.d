@@ -28,8 +28,8 @@ private {
 struct VDrive_Gui_State {
     alias               vd this;
     VDrive_State        vd;
-    VDrive_Export_State ve;
-    VDrive_Cpu_State    vc;
+    //VDrive_Export_State ve;
+    //VDrive_Cpu_State    vc;
 
 
     // gui resources
@@ -66,10 +66,6 @@ struct VDrive_Gui_State {
 
     // count of command buffers to be drawn when in play mode
     uint32_t    sim_play_cmd_buffer_count;
-
-    uint32_t    sim_profile_step_size = 1;
-    uint32_t    sim_profile_step_count = 1000;
-    uint32_t    sim_profile_step_index;
 
     bool        sim_use_double;
     bool        sim_use_3_dim;

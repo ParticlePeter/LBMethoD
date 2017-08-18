@@ -85,7 +85,6 @@ struct VDrive_State {
     VkCommandPool               sim_cmd_pool;           // we do not reset this on window resize events
     VkCommandBuffer[2]          sim_cmd_buffers;        // using ping pong approach for now
     Meta_Image                  sim_image;              // output macroscopic moments density and velocity
-    float*                      sim_image_ptr;          // pointer to the mapped image
     Meta_Buffer                 sim_buffer;             // mesoscopic velocity populations
     Meta_Memory                 sim_memory;             // memory backing image and buffer
     VkBufferView                sim_buffer_view;        // arbitrary count of buffer views, dynamic resizing is not that easy as we would have to recreate the descriptor set each time
@@ -115,7 +114,15 @@ struct VDrive_State {
     Meta_Descriptor_Update      export_descriptor_update;  // update only the export descriptor
     VkDeviceSize                export_size;
     void*[2]                    export_data;
-    VkMappedMemoryRange[2]      export_mapped_range;       
+    VkMappedMemoryRange[2]      export_mapped_range;
+
+    import exportstate;
+    VDrive_Export_State         ve;
+
+    // cpu resources
+    import cpustate;
+    VDrive_Cpu_State            vc;
+    float*                      sim_image_ptr;             // pointer to the mapped image       
 
 
     /////////////////////////////////////////////////
@@ -156,7 +163,11 @@ struct VDrive_State {
     Display_UBO*    display_ubo;
 
 
-    // profile stop watch
+    // profile data
+    uint32_t        sim_profile_step_size = 1;
+    uint32_t        sim_profile_step_count = 1000;
+    uint32_t        sim_profile_step_index;
+
     import std.datetime.stopwatch;
     StopWatch stop_watch;
     nothrow {
