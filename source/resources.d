@@ -288,7 +288,7 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
     }
 
 
-    vd.sim_image.sampler = vd.createSampler; //( VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT, VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT );
+    vd.sim_image.sampler = vd.createSampler( VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER );
 
     // Note(pp): immutable does not filter properly, either driver bug or module descriptor bug
     // Todo(pp): debug the issue
