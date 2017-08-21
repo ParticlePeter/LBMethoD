@@ -25,6 +25,10 @@ private {
 }
 
 
+////////////////////////////////
+// struct of gui related data //
+////////////////////////////////
+
 struct VDrive_Gui_State {
     alias               vd this;
     VDrive_State        vd;
@@ -74,7 +78,7 @@ struct VDrive_Gui_State {
     bool        sim_loop_shader_dirty;
     bool        sim_work_group_dirty;
     bool        draw_gui = true;
-    bool        sim_profile_mode = false;
+    bool        sim_profile_mode = false;   // Todo(pp): this is redundant as we can use play_mode bellow as well, remove this one
 
 }
 
@@ -208,11 +212,20 @@ auto ref initImgui( ref VDrive_Gui_State vg ) {
 
 
 
+//////////////////////////////////////////////////////////////////////////////////////////////
+// create vulkan related command and synchronization objects and data updated for gui usage //
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 auto ref createCommandObjects( ref VDrive_Gui_State vg ) {
     resources.createCommandObjects( vg, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT );
     return vg;
 }
 
+
+
+//////////////////////////////////////////////////////
+// create simulation and gui related memory objects //
+//////////////////////////////////////////////////////
 
 auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
     resources.createMemoryObjects( vg );
@@ -344,17 +357,23 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
 }
 
 
-// start configuring descriptor set, pass the temporary meta_descriptor
-// as a pointer to references.createDescriptorSet, where additional
-// descriptors will be added, the set constructed and stored in
-// vd.descriptor of type Core_Descriptor
+
+//////////////////////////////////////////////////////
+// create simulation and gui related descriptor set //
+//////////////////////////////////////////////////////
+
 auto ref createDescriptorSet( ref VDrive_Gui_State vg ) {
+
+    // start configuring descriptor set, pass the temporary meta_descriptor
+    // as a pointer to references.createDescriptorSet, where additional
+    // descriptors will be added, the set constructed and stored in
+    // vd.descriptor of type Core_Descriptor
 
     import vdrive.descriptor;
     Meta_Descriptor meta_descriptor;    // temporary
     meta_descriptor( vg )
-        .addLayoutBindingImmutable( 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT )
-            .addImageInfo( vg.gui_font_tex.image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, vg.gui_font_tex.sampler );
+        .addLayoutBinding/*Immutable*/( 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT )
+        .addImageInfo( vg.gui_font_tex.image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, vg.gui_font_tex.sampler );
 
     // forward to appstate createDescriptorSet with the currently being configured meta_descriptor
     resources.createDescriptorSet( vg, & meta_descriptor );
@@ -364,11 +383,14 @@ auto ref createDescriptorSet( ref VDrive_Gui_State vg ) {
 
 
 
+
+//////////////////////////////////////////////////////
+// create appstate and gui related render resources //
+//////////////////////////////////////////////////////
+
 auto ref createRenderResources( ref VDrive_Gui_State vg ) {
 
-    //////////////////////////////////////////////
-    // create appstate related render resources //
-    //////////////////////////////////////////////
+
 
     // forward to appstate createRenderResources
     resources.createRenderResources( vg );
@@ -376,7 +398,7 @@ auto ref createRenderResources( ref VDrive_Gui_State vg ) {
 
 
     ///////////////////////////////////////////
-    // create imgui related render recources //
+    // create imgui related render resources //
     ///////////////////////////////////////////
 
     // create pipeline for gui rendering
@@ -2169,6 +2191,7 @@ void drawGuiData( ImDrawData* draw_data ) {
 private const( char )* getClipboardString( void* user_data ) {
     return glfwGetClipboardString( cast( GLFWwindow* )user_data );
 }
+
 
 private void setClipboardString( void* user_data, const( char )* text ) {
     glfwSetClipboardString( cast( GLFWwindow* )user_data, text );
