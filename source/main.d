@@ -24,6 +24,7 @@ int main() {
         import gui;
         VDrive_Gui_State vd;    // VDrive state struct
         vd.initImgui;           // initialize imgui first, we raster additional fonts but currently don't install its glfw callbacks, they should be treated
+        import resources : drawInit;
     } else {
         import resources;
         VDrive_State vd;

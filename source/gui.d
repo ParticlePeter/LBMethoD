@@ -560,19 +560,6 @@ auto ref destroyResources( ref VDrive_Gui_State vg ) {
 
 
 
-
-//////////////////////////
-// Initial on time draw //
-//////////////////////////
-
-auto ref drawInit( ref VDrive_Gui_State vg ) {
-    // forward to appstate drawInit
-    appstate.drawInit( vg );
-    return vg;
-}
-
-
-
 ///////////////////////////////////////////////////////
 // Draw function pointer for play, pause and profile //
 ///////////////////////////////////////////////////////
