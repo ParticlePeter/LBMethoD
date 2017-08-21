@@ -10,6 +10,9 @@ import dlsl.matrix;
 
 
 
+////////////////////////////////////////////////////////////////////////
+// create vulkan related command and synchronization objects and data //
+////////////////////////////////////////////////////////////////////////
 
 /// create resources and vulkan objects for rendering
 auto ref createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags command_pool_create_flags = 0 ) {
@@ -71,10 +74,14 @@ auto ref createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags com
 }
 
 
+//////////////////////////////////////////////
+// create simulation related memory objects //
+//////////////////////////////////////////////
 
-/// create static memory resources which will be referenced in descriptor set
-/// the corresponding createDescriptorSet function might be overwritten somewhere else
 auto ref createMemoryObjects( ref VDrive_State vd ) {
+
+    // create static memory resources which will be referenced in descriptor set
+    // the corresponding createDescriptorSet function might be overwritten somewhere else
 
     //////////////////////////////////////////
     // create uniform buffers - called once //
@@ -144,7 +151,10 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
 
 
 
-/// create or recreate simulation buffer
+//////////////////////////////////////////
+// create or recreate simulation buffer //
+//////////////////////////////////////////
+
 auto ref createSimBuffer( ref VDrive_State vd ) {
 
     // (re)create buffer and buffer view
@@ -177,7 +187,10 @@ auto ref createSimBuffer( ref VDrive_State vd ) {
 
 
 
-/// create or recreate simulation images
+///////////////////////////////////////////
+/// create or recreate simulation images //
+///////////////////////////////////////////
+
 auto ref createSimImage( ref VDrive_State vd ) {
 
     // 1) (re)create Image
@@ -250,7 +263,10 @@ auto ref createSimImage( ref VDrive_State vd ) {
 
 enum GREG = true;
 
-/// create or recreate simulation memory, buffers and images
+//////////////////////////////////////////////////////////////
+// create or recreate simulation memory, buffers and images //
+//////////////////////////////////////////////////////////////
+
 auto ref createSimMemoryObjects( ref VDrive_State vd ) {
 
     // 1.) (re)create Image, Buffer (and the buffer view) without memory backing
@@ -269,17 +285,17 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
 
 
 
-// configure descriptor set with required descriptors
-// the descriptor set will be constructed in createRenderRecources
-// immediately before creating the first pipeline so that additional
-// descriptors can be added through other means before finalizing
-// maybe we even might overwrite it completely in a parent struct
+///////////////////////////
+// create descriptor set //
+///////////////////////////
+
 auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_ptr = null ) {
 
-    ///////////////////////////
-    // create descriptor set //
-    ///////////////////////////
-
+    // configure descriptor set with required descriptors
+    // the descriptor set will be constructed in createRenderRecources
+    // immediately before creating the first pipeline so that additional
+    // descriptors can be added through other means before finalizing
+    // maybe we even might overwrite it completely in a parent struct
 
     // this is required if no Meta Descriptor has been passed in from the outside
     Meta_Descriptor meta_descriptor = vd;
@@ -360,9 +376,13 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
         .addTexelBufferView( vd.export_buffer_view[0] )
         .addTexelBufferView( vd.export_buffer_view[1] )
         .attachSet( vd.descriptor.descriptor_set );
-
 }
 
+
+
+//////////////////////////////////
+// create descriptor set update //
+//////////////////////////////////
 
 auto ref updateDescriptorSet( ref VDrive_State vd ) {
 
@@ -385,6 +405,9 @@ auto ref updateDescriptorSet( ref VDrive_State vd ) {
 
 
 
+/////////////////////////////////
+// create default graphics PSO //
+/////////////////////////////////
 
 auto ref createGraphicsPipeline( ref VDrive_State vd ) {
 
@@ -394,12 +417,7 @@ auto ref createGraphicsPipeline( ref VDrive_State vd ) {
         vd.destroy( vd.graphics_pso );
     }
 
-
-
-    //////////////////////////////
-    // create graphics pipeline //
-    //////////////////////////////
-
+    // create the pso
     Meta_Graphics meta_graphics;
     vd.graphics_pso = meta_graphics( vd )
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_display.vert" ))
@@ -423,6 +441,10 @@ auto ref createGraphicsPipeline( ref VDrive_State vd ) {
 
 
 
+///////////////////////////////
+// create velocity linea PSO //
+///////////////////////////////
+
 auto ref createVelocityLinePipeline( ref VDrive_State vd, bool draw_as_points = false ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
@@ -431,12 +453,7 @@ auto ref createVelocityLinePipeline( ref VDrive_State vd, bool draw_as_points = 
         vd.destroy( vd.draw_line_pso );
     }
 
-
-
-    //////////////////////////
-    // create line pipeline //
-    //////////////////////////
-
+    // create the pso
     Meta_Graphics meta_graphics;
     vd.draw_line_pso = meta_graphics( vd )
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.vert" ))
@@ -459,6 +476,10 @@ auto ref createVelocityLinePipeline( ref VDrive_State vd, bool draw_as_points = 
 }
 
 
+
+/////////////////////////////
+// create render resources //
+/////////////////////////////
 
 auto ref createRenderResources( ref VDrive_State vd ) {
 
@@ -547,6 +568,10 @@ auto ref createComputeResources( ref VDrive_State vd ) {
 }
 
 
+
+//////////////////////////////////////////////////////////////////
+// create LBM init and loop PSOs as well as sim command buffers //
+//////////////////////////////////////////////////////////////////
 
 auto ref createCompBoltzmannPipeline( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim = false ) {
 
@@ -798,6 +823,7 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
 ///////////////////////////////////
 // (re)create draw loop commands //
 ///////////////////////////////////
+
 auto ref createResizedCommands( ref VDrive_State vd ) nothrow {
 
     // reset the command pool to start recording drawing commands
