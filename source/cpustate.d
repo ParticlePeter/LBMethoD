@@ -6,7 +6,7 @@ import std.parallelism;
 import data_grid;
 import exportstate;
 
-import gui : setSimFuncPlay, setSimFuncPause, setDefaultSimFuncs;
+import gui : setSimFuncPlay, setDefaultSimFuncs;
 import dlsl.vector;
 
 
@@ -155,9 +155,6 @@ void setCpuSimFuncs( ref VDrive_Gui_State vg ) nothrow @system {
         vg.setSimFuncPlay( & cpuSimF_Play );
         vg.setSimFuncProfile( & cpuSimF_Profile );
     }
-
-    vg.setSimFuncPause;                 // set default pause function
-    vg.sim_play_cmd_buffer_count = 1;   // submit only the graphics display buffer
 }
 
 

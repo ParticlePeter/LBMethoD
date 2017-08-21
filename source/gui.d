@@ -564,61 +564,40 @@ auto ref destroyResources( ref VDrive_Gui_State vg ) {
 // Draw function pointer for play, pause and profile //
 ///////////////////////////////////////////////////////
 
+enum Transport { pause, play, step, profile };
+
+Transport transport = Transport.pause;
+Transport play_mode = Transport.play;
+
 //
 // Actually a function pointer so that we can set it with the purpose of cpu sim or export
 //
 alias Draw_Func = void function( ref VDrive_Gui_State vg ) nothrow @system;
-private Draw_Func draw_func;
 private Draw_Func draw_func_play;
-private Draw_Func draw_func_pause;
 private Draw_Func draw_func_profile;
-private Draw_Func draw_func_play_backup;
 
 
 void setDefaultSimFuncs( ref VDrive_Gui_State vg ) nothrow @system {
     draw_func_play      = & drawFuncPlay;
-    draw_func_pause     = & drawFuncPause;
     draw_func_profile   = & drawFuncProfile;
 
     vg.sim_play_cmd_buffer_count = 2;
 
-    if( vg.sim_profile_mode ) {
-        vg.swapPlayProfile;
-    }
-    vg.simPause;
+    //vg.simPause;
 }
 
-/*
-void setSimFunc( Draw_Func func = null ) nothrow @system {
-    if( func )  draw_func = func;
-    else        draw_func = & drawFunc;
-}
-*/
 
-void setSimFuncPlay( ref VDrive_Gui_State vg, Draw_Func func = null ) nothrow @system {
+
+void setSimFuncPlay( ref VDrive_Gui_State vg, Draw_Func func ) nothrow @system {
     if( func is null )  draw_func_play = & drawFuncPlay;
     else                draw_func_play = func;
 
-    if( vg.sim_profile_mode ) {
-        vg.swapPlayProfile;
-    }
-
-    vg.simPlay;
+    //vg.simPlay;     // Todo(pp): is this really necessary? Transport Controls should be public for fine grained control
 }
 
-void setSimFuncPause( ref VDrive_Gui_State vg, Draw_Func func = null ) nothrow @system {
-    if( func is null )  draw_func_pause = & drawFuncPause;
-    else                draw_func_pause = func;
-    vg.simPause;
-}
-
-void setSimFuncProfile( ref VDrive_Gui_State vg, Draw_Func func = null ) nothrow @system {
+void setSimFuncProfile( ref VDrive_Gui_State vg, Draw_Func func ) nothrow @system {
     if( func is null )  draw_func_profile = & drawFuncProfile;
     else                draw_func_profile = func;
-
-    if( vg.sim_profile_mode ) {
-        vg.swapPlayProfile;
-    }
 }
 
 
@@ -627,17 +606,10 @@ private {
     // now we can perfectly control single stepping through the gui
     // we must wrap the VDrive_State functions as they require a VDrive_State reference
     // but other functions require the whole VDrive_Gui_State
-    void drawFunc( ref VDrive_Gui_State vg ) nothrow @system {
-        appstate.draw( vg.vd );
-    }
-
     void drawFuncPlay( ref VDrive_Gui_State vg ) nothrow @system {
         appstate.drawSim( vg.vd );
     }
 
-    void drawFuncPause( ref VDrive_Gui_State vg ) nothrow @system {
-        appstate.draw( vg.vd );
-    }
 
     void drawFuncProfile( ref VDrive_Gui_State vg ) nothrow @system {
         appstate.profileCompute( vg.vd );
@@ -649,7 +621,7 @@ private {
         vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count;
         vg.draw_func_play;
         vg.drawCmdBufferCount = 1;
-        draw_func = draw_func_pause;
+        transport = Transport.pause;
     }
 
     void drawProfile( ref VDrive_Gui_State vg ) nothrow @system {
@@ -657,28 +629,15 @@ private {
         vg.draw_func_profile;
 
         if( 0 < vg.sim_profile_step_count && vg.sim_profile_step_index >= vg.sim_profile_step_count ) {
-            //swap
             vg.simPause;
         }
     }
-
-    void swapPlayProfile( ref VDrive_Gui_State vg ) nothrow @system {
-        draw_func_play_backup = draw_func_play;
-        draw_func_play = & drawProfile;
-        vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count = 1;
-    }
-
-    void swapProfilePlay( ref VDrive_Gui_State vg ) nothrow @system {
-        draw_func_play = draw_func_play_backup;
-        vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count = 2;
-    }
-
 
     //
     // transport control funcs
     //
     void simPause( ref VDrive_Gui_State vg ) nothrow @system {
-        draw_func = draw_func_pause;
+        transport = Transport.pause;
         vg.drawCmdBufferCount = 1;
     }
 
@@ -687,13 +646,13 @@ private {
             vg.sim_profile_step_index = 0;
             vg.resetStopWatch;
         }
-        draw_func = draw_func_play;
+        transport = play_mode; // Transport.play or Transport.profile;
         vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count;
     }
 
     void simStep( ref VDrive_Gui_State vg ) nothrow @system {
         if( !vg.isPlaying ) {
-            draw_func = & drawStep;
+            transport = Transport.step;
         }
     }
 
@@ -713,7 +672,7 @@ private {
     }
 
     bool isPlaying( ref VDrive_Gui_State vg ) nothrow @system {
-        return draw_func !is draw_func_pause;
+        return transport != Transport.pause;
     }
 }
 
@@ -729,8 +688,14 @@ void draw( ref VDrive_Gui_State vg ) {
     if( vg.draw_gui )   // this can't be a function pointer as well
         vg.drawGui;     // as we wouldn't know what else has to be drawn (drawFunc or drawFuncPlay etc. )
 
+    final switch( transport ) {
+        case Transport.pause    : appstate.draw( vg.vd );   break;
+        case Transport.play     : vg.draw_func_play;        break;
+        case Transport.step     : vg.drawStep;              break;
+        case Transport.profile  : vg.drawProfile;           break;
+    }
     // call function pointer
-    vg.draw_func;
+    //vg.draw_func;
 }
 
 
@@ -1147,10 +1112,17 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 vg.cpuReset;
                 vg.setCpuSimFuncs;
                 vg.sim_use_cpu = true;
+                vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count = 1;
             } else {
                 vg.setDefaultSimFuncs;
                 vg.sim_use_cpu = false;
                 vg.sim_use_double &= vg.sim_shader_double;
+                if( play_mode == Transport.play ) {     // in profile mode this must stay 1 (switches with play/pause )
+                    vg.sim_play_cmd_buffer_count = 2;   // as we submitted compute and draw command buffers separately
+                    if( transport == Transport.play ) { // if we are in play mode
+                        vg.drawCmdBufferCount = 2;      // we must set this value immediately
+                    }
+                }
             }
         }
         ImGui.PopItemWidth;
@@ -1789,8 +1761,15 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
             vg.simPause;    // currently sim is crashing we don't enter pause mode
 
-            if( vg.sim_profile_mode )   vg.swapPlayProfile;
-            else                        vg.swapProfilePlay;
+            if( vg.sim_profile_mode ) {
+                transport = play_mode = Transport.profile;
+                vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count = 1;
+            } else {
+                transport = play_mode = Transport.play;
+                if( !vg.sim_use_cpu ) {
+                    vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count = 2;
+                }
+            }
         }
 
 
@@ -1898,9 +1877,9 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 // should be assigned and Gui module should know of only the four function pointer
                 // implement it!
                 if( vg.sim_use_double ) {
-                    draw_func = & cpuSimD_Export;
+                    draw_func_play = & cpuSimD_Export;
                 } else {
-                    draw_func = & cpuSimF_Export;
+                    draw_func_play = & cpuSimF_Export;
                 }
             } else {
                 // double or float does not matter, export is allways float
