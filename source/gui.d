@@ -1827,29 +1827,31 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
     if( ImGui.CollapsingHeader( "Export Ensight" )) {
         ImGui.Separator;
-        import cpustate;
 
-        int sim_index = cast( int )vg.sim_index;
-        ImGui.PushStyleColor( ImGuiCol_Text, disabled_text );
-        ImGui.DragInt( "Simulation Index", & sim_index );
-        ImGui.PopStyleColor( 1 );
-        ImGui.Separator;
+        if( vg.sim_use_cpu ) {
+            ImGui.Text( "Export from CPU is not available" );
+        } else {
 
-        ImGui.DragInt( "Start Index", & vg.ve.start_index,  0.1, 0 );
-        ImGui.DragInt( "Step Count",  & vg.ve.step_count,   0.1, 1 );
-        ImGui.DragInt( "Every Nth Step", & vg.ve.step_size, 0.1, 1 );
-        ImGui.Separator;
+            int sim_index = cast( int )vg.sim_index;
+            ImGui.PushStyleColor( ImGuiCol_Text, disabled_text );
+            ImGui.DragInt( "Simulation Index", & sim_index );
+            ImGui.PopStyleColor( 1 );
+            ImGui.Separator;
 
-        ImGui.InputText( "Case File Name", vg.ve.case_file_name.ptr, vg.ve.case_file_name.length );
-        ImGui.InputText( "Var Name",  vg.ve.variable_name.ptr, 9 );
-        ImGui.SameLine;
-        ImGui.SetCursorPosX( 10 + ImGui.GetCursorPosX );
-        ImGui.Checkbox( "is Vector", & vg.vd.export_as_vector );
-        ImGui.Combo( "File Format", & cast( int )vg.ve.file_format, "Ascii\0Binary\0\0" );
-        ImGui.Separator;
+            ImGui.DragInt( "Start Index", & vg.ve.start_index,  0.1, 0 );
+            ImGui.DragInt( "Step Count",  & vg.ve.step_count,   0.1, 1 );
+            ImGui.DragInt( "Every Nth Step", & vg.ve.step_size, 0.1, 1 );
+            ImGui.Separator;
+
+            ImGui.InputText( "Case File Name", vg.ve.case_file_name.ptr, vg.ve.case_file_name.length );
+            ImGui.InputText( "Var Name",  vg.ve.variable_name.ptr, 9 );
+            ImGui.SameLine;
+            ImGui.SetCursorPosX( 10 + ImGui.GetCursorPosX );
+            ImGui.Checkbox( "is Vector", & vg.vd.export_as_vector );
+            ImGui.Combo( "File Format", & cast( int )vg.ve.file_format, "Ascii\0Binary\0\0" );
+            ImGui.Separator;
 
 
-        if( !vg.sim_use_cpu ) {
             ImGui.Spacing;
             ImGui.Text( "Export Shader" );
 
@@ -1882,30 +1884,24 @@ void drawGui( ref VDrive_Gui_State vg ) {
                     }
                 }
             } collapsingTerminator;
-        }
 
-        // Execute the data export
-        if( ImGui.Button( "Export Data", button_size_1 )) {
 
-            // reset simulation if we past the export step index
-            if( vg.ve.start_index < vg.sim_index ) {
-                vg.simReset;
-            }
+            // Execute the data export
+            if( ImGui.Button( "Export Data", button_size_1 )) {
 
-            // assign export appropriate function
-            if( vg.sim_use_cpu ) {
-                // Todo(pp): each category (e.g. export, cpu ) should have its own set of
-                // play, pause, step, reset functions. If selecting a category all of them
-                // should be assigned and Gui module should know of only the four function pointer
-                // implement it!
-                if( vg.sim_use_double ) {
-                    draw_func_play = & cpuSimD_Export;
-                } else {
-                    draw_func_play = & cpuSimF_Export;
+                // reset simulation if we past the export step index
+                if( vg.ve.start_index < vg.sim_index ) {
+                    vg.simReset;
                 }
-            } else {
-                // double or float does not matter, export is allways float
-                vg.exportSim;
+
+                // create export related gpu data and setup export function
+                // gpu export is always float
+                vg.createExportResources;
+
+                // set the play mode to play, might have been set to profile before, and start the sim
+                play_mode = Transport.play;
+                transport = Transport.play;
+
             }
         } collapsingTerminator;
     }

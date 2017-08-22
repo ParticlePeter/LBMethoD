@@ -1,9 +1,7 @@
 import gui;
 import erupted;
 
-
 import std.parallelism;
-import data_grid;
 import exportstate;
 
 import gui : setSimFuncPlay, setDefaultSimFuncs;
@@ -21,6 +19,7 @@ struct VDrive_Cpu_State {
     ubyte   ping;
     size_t  current_buffer_mem_size;
     float*  sim_image_ptr;              // cpu simulation resources
+    float*  sim_export_ptr;
 
 }
 
@@ -127,10 +126,6 @@ ref VDrive_Gui_State cpuReset( ref VDrive_Gui_State vg ) {
     if( must_init )
         vg.cpuInit;
 
-    vg.ve.grid.minDomain = vec4( 0 );
-    vg.ve.grid.maxDomain = vec4( 1 );
-    vg.ve.grid.cellCount = uvec4( vg.sim_domain, 0 );
-
     return vg;
 }
 
@@ -158,15 +153,13 @@ void setCpuSimFuncs( ref VDrive_Gui_State vg ) nothrow @system {
 }
 
 
-alias cpuSimF_Play      = cpuSim!( float,  false );
-alias cpuSimD_Play      = cpuSim!( double, false );
-alias cpuSimF_Export    = cpuSim!( float,  true );
-alias cpuSimD_Export    = cpuSim!( double, true );
-alias cpuSimF_Profile   = cpuSim!( float,  false, true );
-alias cpuSimD_Profile   = cpuSim!( double, false, true );
+alias cpuSimF_Play      = cpuSim!( float  );
+alias cpuSimD_Play      = cpuSim!( double );
+alias cpuSimF_Profile   = cpuSim!( float,  true );
+alias cpuSimD_Profile   = cpuSim!( double, true );
 
 
-void cpuSim( T, bool EXPORT, bool PROFILE = false )( ref VDrive_Gui_State vg ) nothrow @system {
+void cpuSim( T, bool PROFILE = false )( ref VDrive_Gui_State vg ) nothrow @system {
 
     float    omega = vg.compute_ubo.collision_frequency;
     float    wall_velocity = vg.compute_ubo.wall_velocity;
@@ -181,20 +174,6 @@ void cpuSim( T, bool EXPORT, bool PROFILE = false )( ref VDrive_Gui_State vg ) n
         T* popul_buffer = vg.vc.popul_buffer_f;
     }
 
-    static if( EXPORT ) {
-        if( vg.ve.grid.cellCount.w < vg.ve.step_count ) {
-            vg.ve.grid.cellCount.w = vg.ve.step_count;
-            vg.ve.grid.create_domain_from_min_max;
-        }
-
-        bool store_data = false;
-        if( vg.ve.start_index <= vg.sim_index && vg.ve.store_index < ( vg.ve.step_count - 1 ) && ( vg.sim_index - vg.ve.start_index - 1 ) % vg.ve.step_size == 0 ) {
-            store_data = true;
-            ++vg.ve.store_index;
-            //import core.stdc.stdio : printf;
-            //printf( "Sim Index: %d, Store Index: %d\n", vg.sim_index, vg.vc.store_index );
-        }
-    }
 
     ubyte pong = vg.vc.ping;
     vg.vc.ping = cast( ubyte )( 8 - vg.vc.ping );
@@ -229,15 +208,7 @@ void cpuSim( T, bool EXPORT, bool PROFILE = false )( ref VDrive_Gui_State vg ) n
         vg.sim_image_ptr[ 4 * I + 1 ] = cast( float )v_y;
         vg.sim_image_ptr[ 4 * I + 2 ] = 0;
         vg.sim_image_ptr[ 4 * I + 3 ] = 1;
-//        if( vg.vc.start_index <= vg.sim_index && vg.sim_index < vg.vc.start_index + vg.vc.step_count ) {
-//            vg.vc.grid[ I + ( vg.sim_index - vg.vc.start_index ) * vg.vc.cell_count ] = vec3( v_x, v_y, 0 );
-//        }
 
-        static if( EXPORT ) {
-            if( store_data ) {
-                vg.ve.grid[ I + vg.ve.store_index * vg.vc.cell_count ] = vec3( v_x, v_y, 0 );
-            }
-        }
 
         T X_P_Y = v_x + v_y;
         T X_M_Y = v_x - v_y;
@@ -305,12 +276,6 @@ void cpuSim( T, bool EXPORT, bool PROFILE = false )( ref VDrive_Gui_State vg ) n
     static if( PROFILE )
         vg.stopStopWatch;
 
-    static if( EXPORT ) {
-        if( vg.ve.grid.cellCount.w - 1 <= vg.ve.store_index ) {
-            vg.cpuExport;
-        }
-    }
-
     import vdrive.memory;
     //vg.sim_image.flushMappedMemoryRange;
     vg.sim_stage_buffer.flushMappedMemoryRange;
@@ -322,35 +287,3 @@ void cpuSim( T, bool EXPORT, bool PROFILE = false )( ref VDrive_Gui_State vg ) n
     vg.vd.draw;                                // let vulkan dance
 
 }
-
-
-auto ref cpuExport( ref VDrive_Gui_State vg ) @system nothrow {
-
-    import std.string : fromStringz;
-    import std.conv : to;
-    import ensight;
-
-    Export_Options options;
-    options.output      = vg.ve.case_file_name.ptr.fromStringz.to!string;
-    options.variable    = vg.ve.variable_name;
-    options.format      = vg.ve.file_format;
-    options.overwrite   = true;
-    options.set_default_options;
-
-//    import std.stdio;
-//    auto cc = vg.vc.grid.cellCount;
-//    auto num_cells = cc.x * cc.y * cc.z * cc.w;
-//    foreach( i; 0 .. num_cells )
-//        writeln( vg.vc.grid[ i ] );
-
-    // assign non export function
-    //if( vg.sim_use_double ) setSimFuncPlay( & cpuSimD_Play );
-    //else                    setSimFuncPlay( & cpuSimF_Play );
-
-    // stop simulation
-    vg.setDefaultSimFuncs;
-
-    vg.ve.grid.ensStore( options );
-}
-
-
