@@ -1,7 +1,7 @@
 
 import std.stdio;
 import std.string : fromStringz;
-import data_grid;
+//import data_grid;
 
 // enum for the storage format of ensight geo and ensight variable format
 enum Export_Format{ ascii, binary }
@@ -28,7 +28,7 @@ auto ref set_default_options( ref Export_Options options ) {
     if( options.output.extension == "" )                                // use the default .case extension
         options.output = basename.setExtension( "case" );
 
-    if( options.outGeo == "" )                                          // derive geo filepath from caseFilepath                    
+    if( options.outGeo == "" )                                          // derive geo filepath from caseFilepath
         options.outGeo = basename.setExtension( "geo" );
 
     else if( options.outGeo.extension == "" )                           // use the default .case extension
@@ -74,7 +74,7 @@ private struct Export_Binary_Variable_Header {
     ubyte[80]   part = 0;       //  80 chars "part"
     uint  partNumber = 0;       //   1 uint ( int per definition, but its unlikely that negative parts will be used )
     ubyte[80]   block = 0;      //  80 chars "block"
-}                               // 244 chars / bytes in total 
+}                               // 244 chars / bytes in total
 
 
 // struct for parsing TIME section and capturing timeset data
@@ -84,22 +84,16 @@ private struct Export_Time_Set_Data {
     uint    number_of_steps;
     uint    filename_start_number;
     uint    filename_increment;
-    float[] time_values;        
+    float[] time_values;
 }
 
 nothrow:
-void ensStore( ref Data_Grid grid, in Export_Options options, Export_Time_Set_Data * time_set_data = null ) {
-    ensStoreCase( options, 0, grid.cellCount.w, 1, time_set_data );
-    ensStoreGeo(  options, grid.minDomain[0..3], grid.maxDomain[0..3], grid.incDomain[0..3], grid.cellCount[0..3] );
-    auto var_header = ensGetBinaryVarHeader( options.variable.ptr );
-
-}
 
 void ensStoreCase(
     Export_Options          options,
     uint                    start_index,
     uint                    step_count,
-    uint                    step_size, 
+    uint                    step_size,
     Export_Time_Set_Data*   time_set_data = null
     ) {
 
@@ -115,15 +109,15 @@ void ensStoreCase(
         ++minPadding;
     }
 
-    // if the specified padding is not enough increase it 
+    // if the specified padding is not enough increase it
     if( minPadding > options.padding ) {
-        options.padding = minPadding; 
+        options.padding = minPadding;
         //options.outVar = options.outVar.leftJustify( options.outVar.length + options.padding, '*' );
     }
 
     // append options.padding * to the end of the variable path specification in the case file
     import std.string : leftJustify, fromStringz;
-    auto caseVarPath = options.outVar.leftJustify( options.outVar.length + options.padding, '*' ); 
+    auto caseVarPath = options.outVar.leftJustify( options.outVar.length + options.padding, '*' );
 
     try {
 
@@ -133,7 +127,7 @@ void ensStoreCase(
         import std.stdio;
         import std.path : dirName, baseName;
         import std.file : exists, mkdirRecurse;
-    
+
         // check if target directory exists and possibly create it
         if(!options.output.dirName.exists )
             //options.output..dirName.mkdir;
@@ -191,7 +185,7 @@ void ensStoreGeo(
     float[3]            minDomain,
     float[3]            maxDomain,
     float[3]            incDomain,
-    uint [3]            cellCount 
+    uint [3]            cellCount
     ) {
     // geometry and variable files specified in the case file are specified relative to the case file
     // if the case was specified with a directory prefix, the same prefix must be prependet to the physical file location
@@ -213,7 +207,7 @@ void ensStoreGeo(
         // write binary data file
         if( options.format == Export_Format.binary ) {
 
-            // chunk of memory to be written, the size is variable dependent on the entry of 
+            // chunk of memory to be written, the size is variable dependent on the entry of
             // Export_Binary_Geometry.block in conjunction with Export_Binary_Geometry.ijkDim at the end of the struct
             // while writing it will be always the same size (block uniform)
             // but may differ while reading, hence the last 6 floats are attached without being part of the struct
@@ -226,7 +220,7 @@ void ensStoreGeo(
             binaryGeometry.nodeId[0..11]    = cast( ubyte[] )"node id off";
             binaryGeometry.elemId[0..14]    = cast( ubyte[] )"element id off";
             binaryGeometry.extent[0.. 7]    = cast( ubyte[] )"extents";
-            binaryGeometry.extentValues     = [ minDomain[0], maxDomain[0], minDomain[1], maxDomain[1], minDomain[2], maxDomain[2] ]; 
+            binaryGeometry.extentValues     = [ minDomain[0], maxDomain[0], minDomain[1], maxDomain[1], minDomain[2], maxDomain[2] ];
             binaryGeometry.part[0.. 4]      = cast( ubyte[] )"part";
             binaryGeometry.partNumber       = 1;
             binaryGeometry.desc[0..15]      = cast( ubyte[] )"full voxel grid";
@@ -242,7 +236,7 @@ void ensStoreGeo(
 
         } else {
 
-            // use OutBuffer as sink for the ascii file structure 
+            // use OutBuffer as sink for the ascii file structure
             auto geoData = scoped!OutBuffer;
             geoData.writefln( "Full model structured" );
             geoData.writefln( "=====================" );
@@ -307,7 +301,7 @@ void ensRawWriteBinaryVarFile( void[] data_with_header, char[] file_name, uint i
     ////////////////////
 
     // append suffix at the end of the file
-    uint suffix = 1; 
+    uint suffix = 1;
     uint constraint = 1;
     while( constraint <= index ) {
         file_name[ $ - suffix ] = cast( char )(( index / constraint ) % 10 + 48 );
@@ -338,17 +332,17 @@ void ensRawWriteBinaryVarFile( void[] data_with_header, char[] file_name, uint i
         // in the binary case each data file has a 244 byte header
         // hence a Array!float is created with length of 244/4 + 3*i*j*k  =  61 + 3*i*j*k
         // to set the header data it is cast inot an ubyte pointer
-        // the following data segment is written with an offset of 61 floats = 244 bytes      
+        // the following data segment is written with an offset of 61 floats = 244 bytes
         auto numVelocities = I * J * K;
         import std.container.array;
         Array!float varData;
         varData.length = 61 + 3 * numVelocities;
 
-        // in the case of ascii data files the binary header offset is ignored 
-        // the following ascii string representation header is prepended to each variable file 
+        // in the case of ascii data files the binary header offset is ignored
+        // the following ascii string representation header is prepended to each variable file
         auto asciiHeader = options.variable.ptr.fromStringz ~ "\npart\n         1\nblock\n";      // "%10d", 1
 
-        
+
         char[16] formatBuffer;                                              // format buffer to format each filename
         foreach( t; 0..T ) {
             // sort the data into the required order
@@ -364,7 +358,7 @@ void ensRawWriteBinaryVarFile( void[] data_with_header, char[] file_name, uint i
             import std.conv : to;
             import std.format : sformat;
             auto formatString = sformat( formatBuffer, "%%0%sd", options.padding );     // format (prepare) formatString
-            auto frameNumber = sformat( formatBuffer, formatString, t );                // use formatString to 
+            auto frameNumber = sformat( formatBuffer, formatString, t );                // use formatString to
             file = File( buildPath( baseDir, options.outVar ~ frameNumber ), "w" );
 
             // write binary data file
