@@ -7,10 +7,9 @@ import gui;
 import appstate;
 import resources;
 import ensight;
-import data_grid;
+
 
 struct VDrive_Export_State {
-    Data_Grid       grid;
     int             start_index     = 0;
     int             step_count      = 200;
     int             step_size       = 5;
@@ -20,7 +19,7 @@ struct VDrive_Export_State {
     Export_Format   file_format     = Export_Format.binary;
     private int     export_index    = 0;
     char[256]       var_file_buffer;
-    char[]          var_file_name;       
+    char[]          var_file_name;
 }
 
 
@@ -55,7 +54,7 @@ void drawExport( ref VDrive_Gui_State vg ) nothrow @system {
     // and simply call vd.draw
 
     if( vg.ve.export_index < vg.ve.step_count ) {
-        
+
         // here we must draw explicitely appstate draw func! othervise we would loop, as gui.draw calls drawExport
         //vg.vd.draw;
         vg.sim_profile_step_index += vg.ve.step_size;
@@ -87,20 +86,21 @@ void drawExport( ref VDrive_Gui_State vg ) nothrow @system {
         vg.setDefaultSimFuncs;
 
         // draw the graphics display once
-        // otherwisethis draw would be omitted, and the gui rebuild immediatelly      
+        // otherwisethis draw would be omitted, and the gui rebuild immediatelly
         vg.vd.draw;
 
     }
 }
 
 
-auto ref exportSim( ref VDrive_Gui_State vg ) {
-    
+
+auto ref createExportResources( ref VDrive_Gui_State vg ) {
+
     // create vulkan resources
     vg.createExportBuffer;
     vg.createExportPipeline;
     vg.createExportCommands;
-    
+
     // setup export draw function
     vg.setSimFuncPlay( & drawExportWait );
 
@@ -138,7 +138,7 @@ auto ref exportSim( ref VDrive_Gui_State vg ) {
     vg.ve.var_file_buffer[ 0 .. length ] = options.outVar[];
     vg.ve.var_file_buffer[ length .. length + 3 ] = cast( char )( 48 );
 
-    // assign the prepared buffer to the name slice 
+    // assign the prepared buffer to the name slice
     vg.ve.var_file_name = vg.ve.var_file_buffer[ 0 .. length + 3 ];
     vg.ve.export_index = 0;
 
@@ -157,7 +157,7 @@ auto ref exportSim( ref VDrive_Gui_State vg ) {
 auto ref createExportBuffer( ref VDrive_State vd ) {
 
     uint32_t buffer_size = vd.sim_domain[0] * vd.sim_domain[1] * ( vd.sim_use_3_dim ? vd.sim_domain[2] : 1 );
-    uint32_t buffer_mem_size = buffer_size * (( vd.export_as_vector ? 3 : 1 ) * float.sizeof ).toUint; 
+    uint32_t buffer_mem_size = buffer_size * (( vd.export_as_vector ? 3 : 1 ) * float.sizeof ).toUint;
     auto header_size = ensGetBinaryVarHeaderSize;
     //
     // exit early if memory is sufficiently large
@@ -165,7 +165,7 @@ auto ref createExportBuffer( ref VDrive_State vd ) {
     if( header_size + buffer_mem_size <= vd.export_memory.memSize )
         return vd;
 
-    
+
     vd.graphics_queue.vkQueueWaitIdle;
     //
     // (re)create memory, buffer and buffer view
@@ -225,14 +225,14 @@ auto ref createExportBuffer( ref VDrive_State vd ) {
     vd.export_buffer_view[0] = vd.createBufferView( vd.export_buffer[0].buffer, VK_FORMAT_R32_SFLOAT );
     vd.export_buffer_view[1] = vd.createBufferView( vd.export_buffer[1].buffer, VK_FORMAT_R32_SFLOAT );
 
-    // update the descriptor with buffer 
+    // update the descriptor with buffer
     vd.export_descriptor_update.texel_buffer_views[0] = vd.export_buffer_view[0];  // export target buffer
     vd.export_descriptor_update.texel_buffer_views[1] = vd.export_buffer_view[1];  // export target buffer
     vd.export_descriptor_update.update;
 
     // map first and second memory ranges, including the aligned headers
     vd.export_size = header_size + buffer_mem_size;
-    auto mapped_memory = vd.export_memory.mapMemory; 
+    auto mapped_memory = vd.export_memory.mapMemory;
     vd.export_data[0]  = mapped_memory + aligned_offset_0 - header_size;    //vd.export_memory.mapMemory( vd.export_size, aligned_offset_0 - header_size );    // size, offset
     vd.export_data[1]  = mapped_memory + aligned_offset_1 - header_size;    //vd.export_memory.mapMemory( vd.export_size, aligned_offset_1 - header_size );    // size, offset
 
@@ -250,7 +250,7 @@ auto ref createExportPipeline( ref VDrive_State vd ) {
         vd.graphics_queue.vkQueueWaitIdle;          // wait for queue idle as we need to destroy the pipeline
         vd.destroy( vd.comp_export_pso );
     }
-    
+
     Meta_Compute meta_compute;                      // use temporary Meta_Compute struct to specify and create the pso
     vd.comp_export_pso = meta_compute( vd )         // extracting the core items after construction with reset call
         .shaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_COMPUTE_BIT, vd.export_shader ))
@@ -357,12 +357,12 @@ auto ref createExportCommands( ref VDrive_Gui_State vd ) {
 
         export_buffer_memory_barrier.buffer = vd.export_buffer[i].buffer;
         cmd_buffer.vkCmdPipelineBarrier(
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,       // VkPipelineStageFlags                 srcStageMask,                                    
-            VK_PIPELINE_STAGE_HOST_BIT,                 // VkPipelineStageFlags                 dstStageMask,                        
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,       // VkPipelineStageFlags                 srcStageMask,
+            VK_PIPELINE_STAGE_HOST_BIT,                 // VkPipelineStageFlags                 dstStageMask,
             0,                                          // VkDependencyFlags                    dependencyFlags,
-            0, null,                                    // uint32_t memoryBarrierCount,         const VkMemoryBarrier*  pMemoryBarriers,        
-            1, & export_buffer_memory_barrier,          // uint32_t bufferMemoryBarrierCount,   const VkBufferMemoryBarrier* pBufferMemoryBarriers,                                
-            0, null,                                    // uint32_t imageMemoryBarrierCount,    const VkImageMemoryBarrier*  pImageMemoryBarriers,        
+            0, null,                                    // uint32_t memoryBarrierCount,         const VkMemoryBarrier*  pMemoryBarriers,
+            1, & export_buffer_memory_barrier,          // uint32_t bufferMemoryBarrierCount,   const VkBufferMemoryBarrier* pBufferMemoryBarriers,
+            0, null,                                    // uint32_t imageMemoryBarrierCount,    const VkImageMemoryBarrier*  pImageMemoryBarriers,
         );
 
         //
@@ -416,7 +416,7 @@ auto ref createExportCommands( ref VDrive_Gui_State vd ) {
     // init_pso ping pong variable to 1
     // it will be switched to 0 ( pp = 1 - pp ) befor submitting compute commands
     //vd.sim_ping_pong = 1;
-} 
+}
 
 
 
