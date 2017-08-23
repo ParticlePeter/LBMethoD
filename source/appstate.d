@@ -104,6 +104,7 @@ struct VDrive_State {
     Core_Pipeline               comp_part_pso;
     Core_Pipeline               draw_part_pso;
     Core_Pipeline               draw_line_pso;
+    Core_Pipeline               draw_axis_pso;
 
 
     // export resources

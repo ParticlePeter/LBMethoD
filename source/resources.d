@@ -442,10 +442,10 @@ auto ref createGraphicsPipeline( ref VDrive_State vd ) {
 
 
 ///////////////////////////////
-// create velocity linea PSO //
+// create velocity lines PSO //
 ///////////////////////////////
 
-auto ref createVelocityLinePipeline( ref VDrive_State vd, bool draw_as_points = false ) {
+auto ref createVelocityLinePipeline( ref VDrive_State vd, bool draw_as_points = false, bool axis = false ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
     if( vd.draw_line_pso.pipeline != VK_NULL_HANDLE ) {
@@ -453,10 +453,16 @@ auto ref createVelocityLinePipeline( ref VDrive_State vd, bool draw_as_points = 
         vd.destroy( vd.draw_line_pso );
     }
 
+    // create Meta_Specialization struct with static data array
+    Meta_SC!( 1 ) meta_sc;
+    meta_sc
+        .addMapEntry( MapEntry32( axis ? 1 : 0 ))  // default constantID is 0, next would be 1
+        .construct;
+
     // create the pso
     Meta_Graphics meta_graphics;
-    vd.draw_line_pso = meta_graphics( vd )
-        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.vert" ))
+    meta_graphics( vd )
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.vert", & meta_sc.specialization_info  ))
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.frag" ))
         .inputAssembly( draw_as_points ? VK_PRIMITIVE_TOPOLOGY_POINT_LIST : VK_PRIMITIVE_TOPOLOGY_LINE_STRIP )  // set the inputAssembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )    // add viewport and scissor state, necessary even if we use dynamic state
@@ -469,8 +475,12 @@ auto ref createVelocityLinePipeline( ref VDrive_State vd, bool draw_as_points = 
         .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 28 )                 // specify push constant range
         .renderPass( vd.render_pass.render_pass )                                  // describe compatible render pass
         .construct( vd.graphics_cache )                                            // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
-        .destroyShaderModules                                                      // shader modules compiled into pipeline, not shared, can be deleted now
-        .reset;                                                                     // extract core data into Core_Pipeline struct
+        .destroyShaderModules;                                                     // shader modules compiled into pipeline, not shared, can be deleted now
+
+    if( axis )
+        vd.draw_axis_pso = meta_graphics.reset;                                                                    // extract core data into Core_Pipeline struct
+    else
+        vd.draw_line_pso = meta_graphics.reset;
 
     return vd;
 }
@@ -539,13 +549,14 @@ auto ref createRenderResources( ref VDrive_State vd ) {
     // create pipeline cache for the graphics and compute pipelines //
     //////////////////////////////////////////////////////////////////
 
-    vd.graphics_cache   = vd.createPipelineCache;   // create once, but will be used several times in createGRaphicsPipeline
+    vd.graphics_cache   = vd.createPipelineCache;   // create once, but will be used several times in createGraphicsPipeline
 
 
 
     // create the graphics pipeline, can be called multiple time to parse shader at runtime
     vd.createGraphicsPipeline;
     vd.createVelocityLinePipeline;
+    vd.createVelocityLinePipeline( false, true );   // this creates a coordinate axis
     vd.createParticleDrawPipeline;
 
     // create all resources for the compute pipeline
@@ -931,6 +942,7 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.destroy( vd.comp_init_pso );
     vd.destroy( vd.comp_loop_pso );
     vd.destroy( vd.draw_line_pso );
+    if( vd.draw_axis_pso.is_constructed ) vd.destroy( vd.draw_axis_pso );
     vd.destroy( vd.graphics_cache );
     vd.destroy( vd.compute_cache );
 
