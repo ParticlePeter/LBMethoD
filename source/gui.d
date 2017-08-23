@@ -521,8 +521,8 @@ auto ref resetGlfwCallbacks( ref VDrive_Gui_State vg ) {
     // set glfw callbacks, these here wrap the callbacks in module input
     glfwSetWindowSizeCallback(      vg.window, & guiWindowSizeCallback );
     glfwSetMouseButtonCallback(     vg.window, & guiMouseButtonCallback );
-    glfwSetScrollCallback(          vg.window, &guiScrollCallback );
-    glfwSetCharCallback(            vg.window, &guiCharCallback );
+    glfwSetScrollCallback(          vg.window, & guiScrollCallback );
+    glfwSetCharCallback(            vg.window, & guiCharCallback );
     glfwSetKeyCallback(             vg.window, & guiKeyCallback );
 
     return vg;
@@ -1281,8 +1281,11 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
                 // recreate resources and update descriptor
                 vg.createSimBuffer;
-                if( rebuild_sim_image )
+                if( rebuild_sim_image ) {
                     vg.createSimImage;
+                    import input : initTrackball;
+                    vg.initTrackball;
+                }
                 vg.updateDescriptorSet;
 
                 // recreate lattice boltzmann pipeline with possibly new shaders
