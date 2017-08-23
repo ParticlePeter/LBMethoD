@@ -6,15 +6,15 @@ import derelict.glfw3.glfw3;
 
 import appstate;
 
-private VDrive_State* vd;
+//private VDrive_State* vd;
 
-void registerCallbacks( GLFWwindow* window, void* user_pointer = null ) {
-    vd = cast( VDrive_State* )user_pointer;
-    glfwSetWindowUserPointer( window, user_pointer );
-    glfwSetWindowSizeCallback( window, &windowSizeCallback );
-    glfwSetMouseButtonCallback( window, &mouseButtonCallback );
-    glfwSetCursorPosCallback( window, &cursorPosCallback );
-    glfwSetKeyCallback( window, &keyCallback );
+void registerCallbacks( ref VDrive_State vd ) {
+    //.vd = &vd;
+    glfwSetWindowUserPointer(   vd.window, & vd );
+    glfwSetWindowSizeCallback(  vd.window, & windowSizeCallback );
+    glfwSetMouseButtonCallback( vd.window, & mouseButtonCallback );
+    glfwSetCursorPosCallback(   vd.window, & cursorPosCallback );
+    glfwSetKeyCallback(         vd.window, & keyCallback );
 }
 
 // wrap dlsl.Trackball and extracted glfw mouse buttons
@@ -53,6 +53,7 @@ auto ref initTrackball(
 /// Callback Function for capturing window resize events
 extern( C ) void windowSizeCallback( GLFWwindow * window, int w, int h ) nothrow {
     // the extent might change at swapchain creation when the specified extent is not usable
+    auto vd = cast( VDrive_State* )window.glfwGetWindowUserPointer;
     vd.swapchainExtent( w, h );
     vd.window_resized = true;
 }
@@ -60,9 +61,10 @@ extern( C ) void windowSizeCallback( GLFWwindow * window, int w, int h ) nothrow
 
 /// Callback Function for capturing mouse motion events
 extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) nothrow {
+    auto vd = cast( VDrive_State* )window.glfwGetWindowUserPointer;
     if( vd.tb.button == 0 || glfwGetKey( window, GLFW_KEY_LEFT_ALT ) != GLFW_PRESS ) return;
     switch( vd.tb.button ) {
-        //case 1  : vd.tb.orbit( x, y ); break;
+        case 1  : /*if( vd.sim_use_3_dim )*/ vd.tb.orbit( x, y ); break;
         case 2  : vd.tb.xform( x, y ); break;
         case 4  : vd.tb.dolly( x, y ); break;
         default : break;
@@ -72,6 +74,7 @@ extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) no
 
 /// Callback Function for capturing mouse motion events
 extern( C ) void mouseButtonCallback( GLFWwindow * window, int button, int val, int mod ) nothrow {
+    auto vd = cast( VDrive_State* )window.glfwGetWindowUserPointer;
     // compute mouse button bittfield flags
     switch( button ) {
         case 0  : vd.tb.button += 2 * val - 1; break;
@@ -97,7 +100,7 @@ extern( C ) void scrollCallback( GLFWwindow * window, double x, double y ) nothr
 
 /// Callback Function for capturing keyboard events
 extern( C ) void keyCallback( GLFWwindow * window, int key, int scancode, int val, int mod ) nothrow {
-
+    auto vd = cast( VDrive_State* )window.glfwGetWindowUserPointer;
     // use key press results only
     if( val != GLFW_PRESS ) return;
     switch( key ) {
