@@ -25,7 +25,7 @@ struct TrackballButton {
 }
 
 
-auto ref initTrackball(
+void initTrackball(
     ref     VDrive_State vd,
     float   perspective_fovy    = 60,
     float   window_height       = 1080,
@@ -46,12 +46,11 @@ auto ref initTrackball(
     vd.tb.camHome;
     vd.tb.perspectiveFovyWindowHeight( perspective_fovy, window_height );
     //vd.registerCallbacks;
-    return vd;
 }
 
 
 
-auto ref initTrackball( ref VDrive_State vd ) {
+void initTrackball( ref VDrive_State vd ) {
 
     import std.math : tan;
     enum deg2rad = 0.0174532925199432957692369076849f;
@@ -73,7 +72,6 @@ auto ref initTrackball( ref VDrive_State vd ) {
     vd.tb.camHome;
     vd.tb.perspectiveFovyWindowHeight( vd.projection_fovy, vd.windowHeight );
     //vd.registerCallbacks;
-    return vd;
 }
 
 

@@ -15,7 +15,7 @@ import dlsl.matrix;
 ////////////////////////////////////////////////////////////////////////
 
 /// create resources and vulkan objects for rendering
-auto ref createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags command_pool_create_flags = 0 ) {
+void createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags command_pool_create_flags = 0 ) {
 
     //////////////////////////
     // create command pools //
@@ -70,7 +70,6 @@ auto ref createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags com
     //  pResults                = null;                         // per swapchain prsentation results, redundant when using only one swapchain
     }
 
-    return vd;
 }
 
 
@@ -78,7 +77,7 @@ auto ref createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags com
 // create simulation related memory objects //
 //////////////////////////////////////////////
 
-auto ref createMemoryObjects( ref VDrive_State vd ) {
+void createMemoryObjects( ref VDrive_State vd ) {
 
     // create static memory resources which will be referenced in descriptor set
     // the corresponding createDescriptorSet function might be overwritten somewhere else
@@ -155,7 +154,7 @@ auto ref createMemoryObjects( ref VDrive_State vd ) {
 // create or recreate simulation buffer //
 //////////////////////////////////////////
 
-auto ref createSimBuffer( ref VDrive_State vd ) {
+void createSimBuffer( ref VDrive_State vd ) {
 
     // (re)create buffer and buffer view
     if( vd.sim_buffer.buffer   != VK_NULL_HANDLE ) {
@@ -182,7 +181,6 @@ auto ref createSimBuffer( ref VDrive_State vd ) {
         vd.createBufferView( vd.sim_buffer.buffer,
             vd.sim_use_double ? VK_FORMAT_R32G32_UINT : VK_FORMAT_R32_SFLOAT, 0, buffer_mem_size );
 
-    return vd;
 }
 
 
@@ -191,7 +189,7 @@ auto ref createSimBuffer( ref VDrive_State vd ) {
 /// create or recreate simulation images //
 ///////////////////////////////////////////
 
-auto ref createSimImage( ref VDrive_State vd ) {
+void createSimImage( ref VDrive_State vd ) {
 
     // 1) (re)create Image
     if( vd.sim_image.image != VK_NULL_HANDLE ) {
@@ -256,7 +254,6 @@ auto ref createSimImage( ref VDrive_State vd ) {
         .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
         .mapMemory );
 
-    return vd;
 }
 
 
@@ -267,7 +264,7 @@ enum GREG = true;
 // create or recreate simulation memory, buffers and images //
 //////////////////////////////////////////////////////////////
 
-auto ref createSimMemoryObjects( ref VDrive_State vd ) {
+void createSimMemoryObjects( ref VDrive_State vd ) {
 
     // 1.) (re)create Image, Buffer (and the buffer view) without memory backing
     // 2.) check if the memory requirement for the objects above has increased, if not goto 4.) - this does not work currently ...
@@ -276,10 +273,9 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
     // 5.) (re)create VkImageView and VkBufferView(s)
     // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
 
-    return vd
-        .createParticleBuffer
-        .createSimBuffer
-        .createSimImage;
+    vd.createParticleBuffer;
+    vd.createSimBuffer;
+    vd.createSimImage;
 
 }
 
@@ -289,7 +285,7 @@ auto ref createSimMemoryObjects( ref VDrive_State vd ) {
 // create descriptor set //
 ///////////////////////////
 
-auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_ptr = null ) {
+void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_ptr = null ) {
 
     // configure descriptor set with required descriptors
     // the descriptor set will be constructed in createRenderRecources
@@ -384,7 +380,7 @@ auto ref createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descrip
 // create descriptor set update //
 //////////////////////////////////
 
-auto ref updateDescriptorSet( ref VDrive_State vd ) {
+void updateDescriptorSet( ref VDrive_State vd ) {
 
     //vd.graphics_queue.vkQueueWaitIdle;
 
@@ -400,7 +396,6 @@ auto ref updateDescriptorSet( ref VDrive_State vd ) {
     // it will most likely not be updated with the other resources and vice versa
     // but ... what the heck ... for now ... we won't update both of them often enough
 
-    return vd;
 }
 
 
@@ -409,7 +404,7 @@ auto ref updateDescriptorSet( ref VDrive_State vd ) {
 // create default graphics PSO //
 /////////////////////////////////
 
-auto ref createGraphicsPSO( ref VDrive_State vd ) {
+void createGraphicsPSO( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
     if( vd.graphics_pso.pipeline != VK_NULL_HANDLE ) {
@@ -436,7 +431,6 @@ auto ref createGraphicsPSO( ref VDrive_State vd ) {
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct
 
-    return vd;
 }
 
 
@@ -445,7 +439,7 @@ auto ref createGraphicsPSO( ref VDrive_State vd ) {
 // create velocity lines PSO //
 ///////////////////////////////
 
-auto ref createVelocityLinePSO( ref VDrive_State vd, bool draw_as_points = false, bool axis = false ) {
+void createVelocityLinePSO( ref VDrive_State vd, bool draw_as_points = false, bool axis = false ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
     if( vd.draw_line_pso.pipeline != VK_NULL_HANDLE ) {
@@ -482,7 +476,6 @@ auto ref createVelocityLinePSO( ref VDrive_State vd, bool draw_as_points = false
     else
         vd.draw_line_pso = meta_graphics.reset;
 
-    return vd;
 }
 
 
@@ -491,7 +484,7 @@ auto ref createVelocityLinePSO( ref VDrive_State vd, bool draw_as_points = false
 // create render resources //
 /////////////////////////////
 
-auto ref createRenderResources( ref VDrive_State vd ) {
+void createRenderResources( ref VDrive_State vd ) {
 
     /////////////////////////////////////////////////////////
     // select swapchain image format and presentation mode //
@@ -560,7 +553,7 @@ auto ref createRenderResources( ref VDrive_State vd ) {
     vd.createParticleDrawPipeline;
 
     // create all resources for the compute pipeline
-    return vd.createComputeResources;
+    vd.createComputeResources;
 }
 
 
@@ -569,13 +562,12 @@ auto ref createRenderResources( ref VDrive_State vd ) {
 // create compute pipelines and compute command buffers to initialize and simulate LBM //
 /////////////////////////////////////////////////////////////////////////////////////////
 
-auto ref createComputeResources( ref VDrive_State vd ) {
+void createComputeResources( ref VDrive_State vd ) {
 
     vd.compute_cache = vd.createPipelineCache;
     vd.createBoltzmannPSO( true, true );
     vd.createParticleCompPipeline( true, true );
 
-    return vd;
 }
 
 
@@ -584,7 +576,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
 // create LBM init and loop PSOs as well as sim command buffers //
 //////////////////////////////////////////////////////////////////
 
-auto ref createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim = false ) {
+void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim = false ) {
 
     // create Meta_Specialization struct with static data array
     Meta_SC!( 4 ) meta_sc;
@@ -710,13 +702,12 @@ auto ref createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, 
     // it will be switched to 0 ( pp = 1 - pp ) befor submitting compute commands
     //vd.sim_ping_pong = 1;
 
-    return vd;
 }
 
 
 
 
-auto ref resizeRenderResources( ref VDrive_State vd ) {
+void resizeRenderResources( ref VDrive_State vd ) {
 
     //////////////////////////////////////////////////////
     // (re)construct the already parametrized swapchain //
@@ -826,7 +817,6 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
     vd.viewport = VkViewport( 0, 0, vd.swapchain.imageExtent.width, vd.swapchain.imageExtent.height, 0, 1 );
     vd.scissors = VkRect2D( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent );
 
-    return vd;
 }
 
 
@@ -835,7 +825,7 @@ auto ref resizeRenderResources( ref VDrive_State vd ) {
 // (re)create draw loop commands //
 ///////////////////////////////////
 
-auto ref createResizedCommands( ref VDrive_State vd ) nothrow {
+void createResizedCommands( ref VDrive_State vd ) nothrow {
 
     // reset the command pool to start recording drawing commands
     vd.graphics_queue.vkQueueWaitIdle;   // equivalent using a fence per Spec v1.0.48
@@ -894,7 +884,6 @@ auto ref createResizedCommands( ref VDrive_State vd ) nothrow {
         cmd_buffer.vkEndCommandBuffer;
     }
 
-    return vd;
 }
 
 
@@ -908,7 +897,7 @@ auto ref createResizedCommands( ref VDrive_State vd ) nothrow {
 
 
 
-auto ref destroyResources( ref VDrive_State vd ) {
+void destroyResources( ref VDrive_State vd ) {
 
     import erupted, vdrive;
 
@@ -965,6 +954,5 @@ auto ref destroyResources( ref VDrive_State vd ) {
 
 
 
-    return vd;
 }
 

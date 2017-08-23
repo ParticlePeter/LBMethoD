@@ -94,7 +94,7 @@ void drawExport( ref VDrive_Gui_State vg ) nothrow @system {
 
 
 
-auto ref createExportResources( ref VDrive_Gui_State vg ) {
+void createExportResources( ref VDrive_Gui_State vg ) {
 
     // create vulkan resources
     vg.createExportBuffer;
@@ -146,24 +146,22 @@ auto ref createExportResources( ref VDrive_Gui_State vg ) {
     vg.ve.variable_name.ptr.ensGetBinaryVarHeader( vg.export_data[0] );
     vg.ve.variable_name.ptr.ensGetBinaryVarHeader( vg.export_data[1] );
 
-    return vg;
-
 }
 
 
 
 
 
-auto ref createExportBuffer( ref VDrive_State vd ) {
+void createExportBuffer( ref VDrive_State vd ) {
 
     uint32_t buffer_size = vd.sim_domain[0] * vd.sim_domain[1] * ( vd.sim_use_3_dim ? vd.sim_domain[2] : 1 );
     uint32_t buffer_mem_size = buffer_size * (( vd.export_as_vector ? 3 : 1 ) * float.sizeof ).toUint;
     auto header_size = ensGetBinaryVarHeaderSize;
+
     //
     // exit early if memory is sufficiently large
     //
-    if( header_size + buffer_mem_size <= vd.export_memory.memSize )
-        return vd;
+    if( header_size + buffer_mem_size <= vd.export_memory.memSize ) return;
 
 
     vd.graphics_queue.vkQueueWaitIdle;
@@ -236,15 +234,10 @@ auto ref createExportBuffer( ref VDrive_State vd ) {
     vd.export_data[0]  = mapped_memory + aligned_offset_0 - header_size;    //vd.export_memory.mapMemory( vd.export_size, aligned_offset_0 - header_size );    // size, offset
     vd.export_data[1]  = mapped_memory + aligned_offset_1 - header_size;    //vd.export_memory.mapMemory( vd.export_size, aligned_offset_1 - header_size );    // size, offset
 
-
-    //vd.export_mapped_range[0]
-
-    return vd;
-
 }
 
 
-auto ref createExportPipeline( ref VDrive_State vd ) {
+void createExportPipeline( ref VDrive_State vd ) {
 
     if( vd.comp_export_pso.is_constructed ) {
         vd.graphics_queue.vkQueueWaitIdle;          // wait for queue idle as we need to destroy the pipeline
@@ -262,7 +255,7 @@ auto ref createExportPipeline( ref VDrive_State vd ) {
 }
 
 
-auto ref createExportCommands( ref VDrive_Gui_State vd ) {
+void createExportCommands( ref VDrive_Gui_State vd ) nothrow {
 
     ///////////////////////////////////////////////////////////////////////////
     // create two reusable compute command buffers with export functionality //
@@ -420,7 +413,7 @@ auto ref createExportCommands( ref VDrive_Gui_State vd ) {
 
 
 
-auto ref destroyExportResources( ref VDrive_State vd ) {
+void destroyExportResources( ref VDrive_State vd ) {
     // export resources
     if( vd.comp_export_pso.is_constructed ) vd.destroy( vd.comp_export_pso );
     if( vd.export_memory.is_constructed ) vd.export_memory.destroyResources;

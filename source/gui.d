@@ -88,7 +88,7 @@ struct VDrive_Gui_State {
 // initialize imgui //
 //////////////////////
 
-auto ref initImgui( ref VDrive_Gui_State vg ) {
+void initImgui( ref VDrive_Gui_State vg ) {
 
     // Get static ImGuiIO struct and set the address of our VDrive_Gui_State as user pointer
     auto io = & ImGui.GetIO();
@@ -204,10 +204,9 @@ auto ref initImgui( ref VDrive_Gui_State vg ) {
 
 
     // as this is the first func called, without requiring any VDrive state
-    // we use the oportunity to setup all the drawFunc function pointers
+    // we use the opportunity to setup all the drawFunc function pointers
     vg.setDefaultSimFuncs;
 
-    return vg;
 }
 
 
@@ -216,9 +215,8 @@ auto ref initImgui( ref VDrive_Gui_State vg ) {
 // create vulkan related command and synchronization objects and data updated for gui usage //
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-auto ref createCommandObjects( ref VDrive_Gui_State vg ) {
+void createCommandObjects( ref VDrive_Gui_State vg ) {
     resources.createCommandObjects( vg, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT );
-    return vg;
 }
 
 
@@ -227,7 +225,7 @@ auto ref createCommandObjects( ref VDrive_Gui_State vg ) {
 // create simulation and gui related memory objects //
 //////////////////////////////////////////////////////
 
-auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
+void createMemoryObjects( ref VDrive_Gui_State vg ) {
     resources.createMemoryObjects( vg );
 
     // get available devices, store their names concatenated in private devices pointer
@@ -353,7 +351,6 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
         .createView
         .createSampler; // create a sampler and store it in the internal Meta_Image sampler member
 
-    return vg;
 }
 
 
@@ -362,7 +359,7 @@ auto ref createMemoryObjects( ref VDrive_Gui_State vg ) {
 // create simulation and gui related descriptor set //
 //////////////////////////////////////////////////////
 
-auto ref createDescriptorSet( ref VDrive_Gui_State vg ) {
+void createDescriptorSet( ref VDrive_Gui_State vg ) {
 
     // start configuring descriptor set, pass the temporary meta_descriptor
     // as a pointer to references.createDescriptorSet, where additional
@@ -378,7 +375,6 @@ auto ref createDescriptorSet( ref VDrive_Gui_State vg ) {
     // forward to appstate createDescriptorSet with the currently being configured meta_descriptor
     resources.createDescriptorSet( vg, & meta_descriptor );
 
-    return vg;
 }
 
 
@@ -388,7 +384,7 @@ auto ref createDescriptorSet( ref VDrive_Gui_State vg ) {
 // create appstate and gui related render resources //
 //////////////////////////////////////////////////////
 
-auto ref createRenderResources( ref VDrive_Gui_State vg ) {
+void createRenderResources( ref VDrive_Gui_State vg ) {
 
 
 
@@ -512,12 +508,11 @@ auto ref createRenderResources( ref VDrive_Gui_State vg ) {
     // command pool will be reset in resources.resizeRenderResources
     //vg.device.vkResetCommandPool( vg.cmd_pool, 0 ); // second argument is VkCommandPoolResetFlags
 
-    return vg;
 }
 
 
 
-auto ref resetGlfwCallbacks( ref VDrive_Gui_State vg ) {
+void resetGlfwCallbacks( ref VDrive_Gui_State vg ) {
     // set glfw callbacks, these here wrap the callbacks in module input
     glfwSetWindowSizeCallback(      vg.window, & guiWindowSizeCallback );
     glfwSetMouseButtonCallback(     vg.window, & guiMouseButtonCallback );
@@ -525,12 +520,11 @@ auto ref resetGlfwCallbacks( ref VDrive_Gui_State vg ) {
     glfwSetCharCallback(            vg.window, & guiCharCallback );
     glfwSetKeyCallback(             vg.window, & guiKeyCallback );
 
-    return vg;
 }
 
 
 
-auto ref resizeRenderResources( ref VDrive_Gui_State vg ) {
+void resizeRenderResources( ref VDrive_Gui_State vg ) {
     // forward to appstate resizeRenderResources
     resources.resizeRenderResources( vg );
 
@@ -546,7 +540,6 @@ auto ref resizeRenderResources( ref VDrive_Gui_State vg ) {
     auto io = & ImGui.GetIO();
     io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
 
-    return vg;
 }
 
 
@@ -555,7 +548,7 @@ auto ref resizeRenderResources( ref VDrive_Gui_State vg ) {
 // Exit destroying alll resources //
 ////////////////////////////////////
 
-auto ref destroyResources( ref VDrive_Gui_State vg ) {
+void destroyResources( ref VDrive_Gui_State vg ) {
 
     // forward to appstate destroyResources, this also calls device.vkDeviceWaitIdle;
     resources.destroyResources( vg );
@@ -577,7 +570,6 @@ auto ref destroyResources( ref VDrive_Gui_State vg ) {
 
     ImGui.Shutdown;
 
-    return vg;
 }
 
 

@@ -26,7 +26,7 @@ struct VDrive_Cpu_State {
 
 
 
-ref VDrive_Gui_State cpuInit( ref VDrive_Gui_State vg ) {
+void cpuInit( ref VDrive_Gui_State vg ) {
     vg.vc.ping = 8;
 
     if( vg.sim_use_double ) {
@@ -65,12 +65,11 @@ ref VDrive_Gui_State cpuInit( ref VDrive_Gui_State vg ) {
     //vg.sim_index = 0;
     vg.ve.store_index = -1;
 
-    return vg;
 }
 
 
 
-ref VDrive_Gui_State cpuReset( ref VDrive_Gui_State vg ) {
+void cpuReset( ref VDrive_Gui_State vg ) {
 
     assert( !( vg.vc.popul_buffer_f !is null && vg.vc.popul_buffer_d !is null ));
 
@@ -126,19 +125,17 @@ ref VDrive_Gui_State cpuReset( ref VDrive_Gui_State vg ) {
     if( must_init )
         vg.cpuInit;
 
-    return vg;
 }
 
 
 
-auto ref cpuFree( ref VDrive_Gui_State vg ) {
+void cpuFree( ref VDrive_Gui_State vg ) {
     import core.stdc.stdlib : free;
     free( cast( void* )vg.vc.popul_buffer_f ); vg.vc.popul_buffer_f = null;
     free( cast( void* )vg.vc.popul_buffer_d ); vg.vc.popul_buffer_d = null;
 
     vg.vc.cell_count = 0;
 
-    return vg;
 }
 
 

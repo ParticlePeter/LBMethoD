@@ -18,7 +18,7 @@ void createTexelBuffer(
     VkFormat                buffer_format
     ) {
 
-    // (re)create buffer and buffer view 
+    // (re)create buffer and buffer view
     if( buffer.buffer   != VK_NULL_HANDLE )
         buffer.destroyResources;          // destroy old buffer
 
@@ -30,15 +30,14 @@ void createTexelBuffer(
         .createMemory( buffer_memory_flags );
         .createBufferView( buffer.buffer, buffer_format );
 
-    return vd;
 }
 */
 
 
 /// create particle buffer
-auto ref createParticleBuffer( ref VDrive_State vd ) {
+void createParticleBuffer( ref VDrive_State vd ) {
 
-    // (re)create buffer and buffer view 
+    // (re)create buffer and buffer view
     if( vd.sim_particle_buffer.buffer   != VK_NULL_HANDLE ) {
         vd.graphics_queue.vkQueueWaitIdle;
         vd.sim_particle_buffer.destroyResources;          // destroy old buffer
@@ -48,7 +47,7 @@ auto ref createParticleBuffer( ref VDrive_State vd ) {
         vd.destroy( vd.sim_particle_buffer_view );        // destroy old buffer view
     }
 
-    uint32_t buffer_mem_size = vd.sim_particle_count * ( 3 * float.sizeof ).toUint; 
+    uint32_t buffer_mem_size = vd.sim_particle_count * ( 3 * float.sizeof ).toUint;
 
     vd.sim_particle_buffer( vd )
         .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, buffer_mem_size )
@@ -57,7 +56,6 @@ auto ref createParticleBuffer( ref VDrive_State vd ) {
     vd.sim_particle_buffer_view =
         vd.createBufferView( vd.sim_particle_buffer.buffer, VK_FORMAT_R32G32B32A32_SFLOAT );
 
-    return vd;
 }
 
 
@@ -65,7 +63,7 @@ auto ref createParticleBuffer( ref VDrive_State vd ) {
 
 
 
-auto ref createParticleCompPipeline( ref VDrive_State vd, bool init_pso, bool loop_pso ) {
+void createParticleCompPipeline( ref VDrive_State vd, bool init_pso, bool loop_pso ) {
 
     // create Meta_Specialization struct with static data array
     Meta_SC!( 1 ) meta_sc;
@@ -146,7 +144,7 @@ auto ref createParticleCompPipeline( ref VDrive_State vd, bool init_pso, bool lo
 
 
 
-auto ref createParticleDrawPipeline( ref VDrive_State vd ) {
+void createParticleDrawPipeline( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
     if( vd.draw_part_pso.pipeline != VK_NULL_HANDLE ) {
@@ -178,17 +176,15 @@ auto ref createParticleDrawPipeline( ref VDrive_State vd ) {
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct
 
-    return vd;
 }
 
 
 
-auto ref destroyParticles( ref VDrive_State vd ) {
+void destroyParticles( ref VDrive_State vd ) {
 
     vd.destroy( vd.comp_part_pso );
     vd.destroy( vd.draw_part_pso );
     vd.destroy( vd.sim_particle_buffer_view );
     vd.sim_particle_buffer.destroyResources;
 
-    return vd;
 }
