@@ -78,6 +78,7 @@ struct VDrive_Gui_State {
     bool        sim_loop_shader_dirty;
     bool        sim_work_group_dirty;
     bool        draw_gui = true;
+    bool        draw_velocity_lines_as_points = false;
     bool        sim_profile_mode = false;   // Todo(pp): this is redundant as we can use play_mode bellow as well, remove this one
 
 }
@@ -1727,16 +1728,10 @@ void drawGui( ref VDrive_Gui_State vg ) {
                     vg.sim_display.lines_count[ i ] = cast( ubyte )( gl & 255 );
                 }
             }
-            static int line_type = 0;
-            if( ImGui.RadioButton( "Points", &line_type, 1 ))   vg.createVelocityLinePSO( true );
 
-            ImGui.SameLine;
-            ImGui.SetCursorPosX( main_win_size.x * 0.25 + 6 );
-            if( ImGui.RadioButton( "Lines", &line_type, 0 ))    vg.createVelocityLinePSO( false );
-
-            ImGui.SameLine;
-            ImGui.SetCursorPosX( main_win_size.x * 0.5 + 8 );
-            ImGui.Text( "Velocity Lines Type" );
+            ImGui.SetCursorPosX( 160 );
+            if( ImGui.Checkbox( "Draw as Points", & vg.draw_velocity_lines_as_points ))
+                vg.createLinePSO( vg.Line_Type.velocity, vg.draw_velocity_lines_as_points );
 
             ImGui.PopItemWidth;
             ImGui.TreePop;
