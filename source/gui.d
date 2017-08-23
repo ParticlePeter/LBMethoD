@@ -2058,8 +2058,7 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
-    // begin the render pass
-    cmd_buffer.vkCmdBeginRenderPass( &vg.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
+
 
     // take care of dynamic state
     cmd_buffer.vkCmdSetViewport( 0, 1, &vg.viewport );
@@ -2076,6 +2075,9 @@ void drawGuiData( ImDrawData* draw_data ) {
         null                                // const( uint32_t )*           pDynamicOffsets
     );
 
+    // begin the render pass
+    cmd_buffer.vkCmdBeginRenderPass( &vg.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
+
 
 
 
@@ -2084,12 +2086,17 @@ void drawGuiData( ImDrawData* draw_data ) {
     cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.graphics_pso.pipeline );
 
     // push constant the sim display scale
-    cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, vg.sim_display.scale.ptr );
+    cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, vg.vd.sim_domain.ptr ); //sim_display.scale.ptr );
 
     // buffer-less draw with build in gl_VertexIndex exclusively to generate position and texcoord data
     cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
 
+
+
+    // bind axis pipeline and issue draw command
+    cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_axis_pso.pipeline );
+    cmd_buffer.vkCmdDraw( 2, 3, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
 
 

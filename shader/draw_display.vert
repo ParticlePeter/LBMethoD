@@ -2,7 +2,7 @@
 
 // push constants
 layout( push_constant ) uniform Push_Constant {
-    vec2 scale;
+    uvec2 scale;
 } pc;
 
 
@@ -23,5 +23,5 @@ layout( location = 0 ) out vec2 vs_tex_coord;    // vertex shader output vertex 
 
 void main() {
     vs_tex_coord = vec2( VI >> 1, VI & 1 );
-    gl_Position = WVPM * vec4( pc.scale * ( 2 * vs_tex_coord - 1 ), 0, 1 );
+    gl_Position = WVPM * vec4( pc.scale * vs_tex_coord, 0, 1 );
 }
