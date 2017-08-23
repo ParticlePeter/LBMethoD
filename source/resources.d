@@ -943,6 +943,7 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.destroy( vd.comp_loop_pso );
     vd.destroy( vd.draw_line_pso );
     if( vd.draw_axis_pso.is_constructed ) vd.destroy( vd.draw_axis_pso );
+    if( vd.draw_grid_pso.is_constructed ) vd.destroy( vd.draw_grid_pso );
     vd.destroy( vd.graphics_cache );
     vd.destroy( vd.compute_cache );
 

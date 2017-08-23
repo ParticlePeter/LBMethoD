@@ -104,6 +104,7 @@ struct VDrive_State {
     Core_Pipeline               draw_part_pso;
     Core_Pipeline               draw_line_pso;
     Core_Pipeline               draw_axis_pso;
+    Core_Pipeline               draw_grid_pso;
 
 
     // export resources
@@ -122,7 +123,7 @@ struct VDrive_State {
     // cpu resources
     import cpustate;
     VDrive_Cpu_State            vc;
-    float*                      sim_image_ptr;             // pointer to the mapped image       
+    float*                      sim_image_ptr;             // pointer to the mapped image
 
 
     /////////////////////////////////////////////////
