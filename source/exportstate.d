@@ -78,7 +78,7 @@ void drawExport( ref VDrive_Gui_State vg ) nothrow @system {
         // don't reset or recreate the pipeline
         // attach set vd.draw as new draw_func
         try {
-            vg.createCompBoltzmannPipeline( false, false, false );
+            vg.createBoltzmannPSO( false, false, false );
         } catch( Exception ) {}
 
         // set default function pointer for play, step, pause

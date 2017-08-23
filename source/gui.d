@@ -688,7 +688,7 @@ private {
             if( vg.sim_use_cpu ) {
                 vg.cpuInit;
             } else {
-                vg.createCompBoltzmannPipeline( false, false, true );  // rebuild init pipeline, rebuild loop pipeline, reset domain
+                vg.createBoltzmannPSO( false, false, true );  // rebuild init pipeline, rebuild loop pipeline, reset domain
             }
         } catch( Exception ) {}
     }
@@ -1286,7 +1286,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 vg.updateDescriptorSet;
 
                 // recreate lattice boltzmann pipeline with possibly new shaders
-                vg.createCompBoltzmannPipeline( vg.sim_init_shader_dirty, vg.sim_loop_shader_dirty );
+                vg.createBoltzmannPSO( true, true );
                 vg.sim_init_shader_dirty = vg.sim_loop_shader_dirty = false;
 
                 if( vg.sim_use_cpu ) {
@@ -1301,7 +1301,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         } else if( vg.sim_init_shader_dirty || vg.sim_loop_shader_dirty ) {
             if( ImGui.Button( "Apply", button_size_2 )) {
-                vg.createCompBoltzmannPipeline( vg.sim_init_shader_dirty, vg.sim_loop_shader_dirty );
+                vg.createBoltzmannPSO( vg.sim_init_shader_dirty, vg.sim_loop_shader_dirty );
                 vg.sim_init_shader_dirty = vg.sim_loop_shader_dirty = false;
             }
             ImGui.SameLine;
@@ -1311,7 +1311,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             if( ImGui.Button( "Apply", button_size_2 )) {
                 vg.sim_work_group_dirty     = false;
                 vg.vd.sim_work_group_size   = vg.sim_work_group_size;
-                vg.createCompBoltzmannPipeline( false, false, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
+                vg.createBoltzmannPSO( false, false, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
             }
             ImGui.SameLine;
             ImGui.Text( "Changes" );
@@ -1478,7 +1478,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             }
 
             //if( ImGui.Selectable( "Parse Init Shader" )) {
-            //    vg.createCompBoltzmannPipeline( true, false, false );
+            //    vg.createBoltzmannPSO( true, false, false );
             //}
 
             ImGui.Spacing;
@@ -1510,7 +1510,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             }
 
             //if( ImGui.Selectable( "Parse Loop Shader" )) {
-            //    vg.createCompBoltzmannPipeline( false, true, false );
+            //    vg.createBoltzmannPSO( false, true, false );
             //}
 
             ImGui.PopItemWidth;
@@ -1553,7 +1553,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 vg.updateViscosity;
                 if( vg.sim_algorithm != 4 ) {
                     vg.sim_algorithm  = 4;
-                    vg.createCompBoltzmannPipeline( false, true );
+                    vg.createBoltzmannPSO( false, true );
                 }
             }
             if( ImGui.Selectable( "Crazy Cascades" )) {
@@ -1563,7 +1563,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 vg.updateViscosity;
                 if( vg.sim_algorithm != 4 ) {
                     vg.sim_algorithm  = 4;
-                    vg.createCompBoltzmannPipeline( false, true );
+                    vg.createBoltzmannPSO( false, true );
                 }
                 // set resolution to 1024 * 1024
 
@@ -1585,7 +1585,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         // collision algorithm
         if( ImGui.Combo( "Collision Algorithm", cast( int* )( & vg.sim_algorithm ), "SRT-LBGK\0TRT\0MRT\0Cascaded\0Cascaded Drag\0\0" )) {
-            vg.createCompBoltzmannPipeline( false, true );
+            vg.createBoltzmannPSO( false, true );
         }
 
         ImGui.Separator;
@@ -1684,8 +1684,8 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         if( ImGui.BeginPopupContextItem( "Display Property Context Menu" )) {
             if( ImGui.Selectable( "Parse Display Shader" )) {
-                vg.createGraphicsPipeline;
-                vg.createVelocityLinePipeline;
+                vg.createGraphicsPSO;
+                vg.createVelocityLinePSO;
             } ImGui.EndPopup();
         }
 
@@ -1733,11 +1733,11 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 }
             }
             static int line_type = 0;
-            if( ImGui.RadioButton( "Points", &line_type, 1 ))   vg.createVelocityLinePipeline( true );
+            if( ImGui.RadioButton( "Points", &line_type, 1 ))   vg.createVelocityLinePSO( true );
 
             ImGui.SameLine;
             ImGui.SetCursorPosX( main_win_size.x * 0.25 + 6 );
-            if( ImGui.RadioButton( "Lines", &line_type, 0 ))    vg.createVelocityLinePipeline( false );
+            if( ImGui.RadioButton( "Lines", &line_type, 0 ))    vg.createVelocityLinePSO( false );
 
             ImGui.SameLine;
             ImGui.SetCursorPosX( main_win_size.x * 0.5 + 8 );
@@ -1999,7 +1999,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     // begin command buffer recording //
     ////////////////////////////////////
 
-    // first attach the swapchain image related frambuffer to the render pass
+    // first attach the swapchain image related framebuffer to the render pass
     import vdrive.renderbuffer : attachFramebuffer;
     vg.render_pass.attachFramebuffer( vg.framebuffers( vg.next_image_index ));
 
@@ -2279,7 +2279,7 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
 
         case GLFW_KEY_P :
         try {
-            vg.vd.createVelocityLinePipeline;
+            vg.vd.createVelocityLinePSO;
         } catch( Exception ) {}
         break;
 

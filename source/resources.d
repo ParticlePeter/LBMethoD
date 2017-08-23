@@ -409,7 +409,7 @@ auto ref updateDescriptorSet( ref VDrive_State vd ) {
 // create default graphics PSO //
 /////////////////////////////////
 
-auto ref createGraphicsPipeline( ref VDrive_State vd ) {
+auto ref createGraphicsPSO( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
     if( vd.graphics_pso.pipeline != VK_NULL_HANDLE ) {
@@ -445,7 +445,7 @@ auto ref createGraphicsPipeline( ref VDrive_State vd ) {
 // create velocity lines PSO //
 ///////////////////////////////
 
-auto ref createVelocityLinePipeline( ref VDrive_State vd, bool draw_as_points = false, bool axis = false ) {
+auto ref createVelocityLinePSO( ref VDrive_State vd, bool draw_as_points = false, bool axis = false ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
     if( vd.draw_line_pso.pipeline != VK_NULL_HANDLE ) {
@@ -549,14 +549,14 @@ auto ref createRenderResources( ref VDrive_State vd ) {
     // create pipeline cache for the graphics and compute pipelines //
     //////////////////////////////////////////////////////////////////
 
-    vd.graphics_cache   = vd.createPipelineCache;   // create once, but will be used several times in createGraphicsPipeline
+    vd.graphics_cache   = vd.createPipelineCache;   // create once, but will be used several times in createGraphicsPSO
 
 
 
     // create the graphics pipeline, can be called multiple time to parse shader at runtime
-    vd.createGraphicsPipeline;
-    vd.createVelocityLinePipeline;
-    vd.createVelocityLinePipeline( false, true );   // this creates a coordinate axis
+    vd.createGraphicsPSO;
+    vd.createVelocityLinePSO;
+    vd.createVelocityLinePSO( false, true );   // this creates a coordinate axis
     vd.createParticleDrawPipeline;
 
     // create all resources for the compute pipeline
@@ -572,7 +572,7 @@ auto ref createRenderResources( ref VDrive_State vd ) {
 auto ref createComputeResources( ref VDrive_State vd ) {
 
     vd.compute_cache = vd.createPipelineCache;
-    vd.createCompBoltzmannPipeline( true, true );
+    vd.createBoltzmannPSO( true, true );
     vd.createParticleCompPipeline( true, true );
 
     return vd;
@@ -584,7 +584,7 @@ auto ref createComputeResources( ref VDrive_State vd ) {
 // create LBM init and loop PSOs as well as sim command buffers //
 //////////////////////////////////////////////////////////////////
 
-auto ref createCompBoltzmannPipeline( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim = false ) {
+auto ref createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim = false ) {
 
     // create Meta_Specialization struct with static data array
     Meta_SC!( 4 ) meta_sc;
