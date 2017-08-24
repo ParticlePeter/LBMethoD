@@ -34,7 +34,8 @@ struct VDrive_State {
     mat4                        projection;                 // Projection Matrix
     float                       projection_fovy =    60;    // Projection Field Of View in Y dimension
     float                       projection_near =   0.1;    // Projection near plane distance
-    float                       projection_far  = 10000;    // Projection  far plane distance
+    float                       projection_far  =  1000;    // Projection  far plane distance
+    // Todo(pp): calculate best possible near and far clip planes when manipulating the trackball
 
     // surface and swapchain
     Meta_Swapchain              swapchain;
