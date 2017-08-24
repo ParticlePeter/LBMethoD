@@ -39,7 +39,7 @@ struct VDrive_State {
     // surface and swapchain
     Meta_Swapchain              swapchain;
     VkSampleCountFlagBits       sample_count = VK_SAMPLE_COUNT_1_BIT;
-    VkFormat                    depth_image_format = VK_FORMAT_D16_UNORM;
+    VkFormat                    depth_image_format = VK_FORMAT_D32_SFLOAT;
 
     // memory Resources
     Meta_Image                  depth_image;
