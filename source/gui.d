@@ -1156,6 +1156,108 @@ void drawGui( ref VDrive_Gui_State vg ) {
     if( ImGui.CollapsingHeader( "Compute Parameter" )) {
         ImGui.Separator;
 
+
+        //
+        // Shader or Function choice
+        //
+        if( compute_device > 0 ) {  // 0 is CPU, > 0 are available GPUs
+            // Shader Choice
+
+            ImGui.Spacing;
+            ImGui.SetCursorPosX( 8 );
+            ImGui.Text( "Compute Shader" );
+            //ImGui.Spacing;
+
+            // select init shader
+            static int init_shader_index = 0;
+            ImGui.PushItemWidth( ImGui.GetWindowWidth * 0.75 );
+            if( ImGui.Combo( "Initialize", & init_shader_index, //"shader/init_D2Q9.comp\0\0" )
+                init_shader_start_index == size_t.max
+                    ? "None found!"
+                    : shader_names_ptr[ init_shader_index ] )
+                ) {
+                if( init_shader_start_index != size_t.max ) {
+                    vg.sim_init_shader_dirty = !compareShaderNamesAndReplace(
+                        shader_names_ptr[ init_shader_start_index + init_shader_index ], vg.sim_init_shader
+                    );
+                }
+            }
+
+            // update init shader list when hovering over Combo
+            if( ImGui.IsItemHovered ) {
+                if( hasShaderDirChanged ) {
+                    parseShaderDirectory;
+                    // a new shader might replace the shader at the current index
+                    // when we would actually use the ImGui.Combo and select this new shader
+                    // it would not be registered
+                    if( init_shader_start_index != size_t.max ) {     // might all have been deleted
+                        vg.sim_init_shader_dirty = !compareShaderNamesAndReplace(
+                            shader_names_ptr[ init_shader_start_index + init_shader_index ], vg.sim_init_shader
+                        );
+                    }
+                }
+            }
+
+            // parse init shader through context menu
+            if( ImGui.BeginPopupContextItem( "Init Shader Context Menu" )) {
+                if( ImGui.Selectable( "Parse Shader" )) {
+                    vg.createBoltzmannPSO( true, false, false );
+                } ImGui.EndPopup();
+            }
+
+            ImGui.Spacing;
+
+            // select loop shader
+            static int loop_shader_index = 0;
+            if( ImGui.Combo( "Simulate", & loop_shader_index, //"shader/loop_D2Q9_channel_flow.comp\0\0" )
+                loop_shader_start_index == size_t.max
+                    ? "None found!"
+                    : shader_names_ptr[ loop_shader_start_index ] )
+                ) {
+                if( loop_shader_start_index != size_t.max ) {
+                    vg.sim_loop_shader_dirty = !compareShaderNamesAndReplace(
+                        shader_names_ptr[ loop_shader_start_index + loop_shader_index ], vg.sim_loop_shader
+                    );
+                }
+            }
+
+            // update loop shader list when hovering over Combo
+            if( ImGui.IsItemHovered ) {
+                if( hasShaderDirChanged ) {
+                    parseShaderDirectory;   // see comment in IsItemHovered above
+                    if( loop_shader_start_index != size_t.max ) {
+                        vg.sim_loop_shader_dirty = !compareShaderNamesAndReplace(
+                            shader_names_ptr[ loop_shader_start_index + loop_shader_index ], vg.sim_loop_shader
+                        );
+                    }
+                }
+            }
+
+            // parse loop shader through context menu
+            if( ImGui.BeginPopupContextItem( "Loop Shader Context Menu" )) {
+                if( ImGui.Selectable( "Parse Shader" )) {
+                    vg.createBoltzmannPSO( false, true, false );
+                } ImGui.EndPopup();
+            }
+
+            ImGui.PopItemWidth;
+
+        } else {
+            int func = 0;
+
+            ImGui.SetCursorPosX( 8 );
+            ImGui.Text( "CPU Function" );
+            ImGui.Separator;
+
+            int init_and_loop;
+            ImGui.PushItemWidth( ImGui.GetWindowWidth() * 0.75 );
+            ImGui.Combo( "Initialize", & init_and_loop, "D2Q9 Density One\0\0" );
+            ImGui.Separator;
+            ImGui.Combo( "Simulate", & init_and_loop, "D2Q9 Lid Driven Cavity\0\0" );
+            ImGui.PopItemWidth;
+        }
+        ImGui.Separator;
+
         //
         // Radio 2D or 3D
         //
@@ -1430,102 +1532,6 @@ void drawGui( ref VDrive_Gui_State vg ) {
             } ImGui.EndPopup();
         }
         */
-        ImGui.Separator;
-
-
-        //
-        // Shader or Function choice
-        //
-        if( compute_device == 1 ) {
-            // Shader Choice
-
-            ImGui.Spacing;
-            ImGui.SetCursorPosX( 8 );
-            ImGui.Text( "Compute Shader" );
-            //ImGui.Spacing;
-
-            // select init shader
-            static int init_shader_index = 0;
-            ImGui.PushItemWidth( ImGui.GetWindowWidth * 0.75 );
-            if( ImGui.Combo( "Initialize", & init_shader_index, //"shader/init_D2Q9.comp\0\0" )
-                init_shader_start_index == size_t.max
-                    ? "None found!"
-                    : shader_names_ptr[ init_shader_index ] )
-                ) {
-                if( init_shader_start_index != size_t.max ) {
-                    vg.sim_init_shader_dirty = !compareShaderNamesAndReplace(
-                        shader_names_ptr[ init_shader_start_index + init_shader_index ], vg.sim_init_shader
-                    );
-                }
-            }
-
-            // update init shader list when hovering over Combo
-            if( ImGui.IsItemHovered ) {
-                if( hasShaderDirChanged ) {
-                    parseShaderDirectory;
-                    // a new shader might replace the shader at the current index
-                    // when we would actually use the ImGui.Combo and select this new shader
-                    // it would not be registered
-                    if( init_shader_start_index != size_t.max ) {     // might all have been deleted
-                        vg.sim_init_shader_dirty = !compareShaderNamesAndReplace(
-                            shader_names_ptr[ init_shader_start_index + init_shader_index ], vg.sim_init_shader
-                        );
-                    }
-                }
-            }
-
-            //if( ImGui.Selectable( "Parse Init Shader" )) {
-            //    vg.createBoltzmannPSO( true, false, false );
-            //}
-
-            ImGui.Spacing;
-
-            // select loop shader
-            static int loop_shader_index = 0;
-            if( ImGui.Combo( "Simulate", & loop_shader_index, //"shader/loop_D2Q9_channel_flow.comp\0\0" )
-                loop_shader_start_index == size_t.max
-                    ? "None found!"
-                    : shader_names_ptr[ loop_shader_start_index ] )
-                ) {
-                if( loop_shader_start_index != size_t.max ) {
-                    vg.sim_loop_shader_dirty = !compareShaderNamesAndReplace(
-                        shader_names_ptr[ loop_shader_start_index + loop_shader_index ], vg.sim_loop_shader
-                    );
-                }
-            }
-
-            // update loop shader list when hovering over Combo
-            if( ImGui.IsItemHovered ) {
-                if( hasShaderDirChanged ) {
-                    parseShaderDirectory;   // see comment in IsItemHovered above
-                    if( loop_shader_start_index != size_t.max ) {
-                        vg.sim_loop_shader_dirty = !compareShaderNamesAndReplace(
-                            shader_names_ptr[ loop_shader_start_index + loop_shader_index ], vg.sim_loop_shader
-                        );
-                    }
-                }
-            }
-
-            //if( ImGui.Selectable( "Parse Loop Shader" )) {
-            //    vg.createBoltzmannPSO( false, true, false );
-            //}
-
-            ImGui.PopItemWidth;
-
-        } else {
-            int func = 0;
-
-            ImGui.SetCursorPosX( 8 );
-            ImGui.Text( "CPU Function" );
-            ImGui.Separator;
-
-            int init_and_loop;
-            ImGui.PushItemWidth( ImGui.GetWindowWidth() * 0.75 );
-            ImGui.Combo( "Initialize", & init_and_loop, "D2Q9 Density One\0\0" );
-            ImGui.Separator;
-            ImGui.Combo( "Simulate", & init_and_loop, "D2Q9 Lid Driven Cavity\0\0" );
-            ImGui.PopItemWidth;
-        }
 
         collapsingTerminator;
     }
