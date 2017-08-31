@@ -53,6 +53,7 @@ struct VDrive_Gui_State {
     float       sim_viscosity;          // at a relaxation rate of 1 and lattice units x, t = 1
     float       sim_wall_velocity;
 
+
     struct Sim_Display {                // std140 conform
       align( 1 ):
         float[3]    scale       = [ 1, 1, 1 ];
@@ -545,9 +546,9 @@ void resizeRenderResources( ref VDrive_Gui_State vg ) {
 
 
 
-////////////////////////////////////
-// Exit destroying alll resources //
-////////////////////////////////////
+///////////////////////////////////
+// Exit destroying all resources //
+///////////////////////////////////
 
 void destroyResources( ref VDrive_Gui_State vg ) {
 
@@ -1170,6 +1171,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
         ImGui.Text( "Simulation Type" );
         ImGui.Separator;
 
+
         //
         // Grid Resolution
         //
@@ -1319,7 +1321,6 @@ void drawGui( ref VDrive_Gui_State vg ) {
             ImGui.Text( "Changes" );
             popButtonStyleDisable;
         }
-
 
 
         //
@@ -1750,9 +1751,6 @@ void drawGui( ref VDrive_Gui_State vg ) {
             ImGui.TreePop;
         }
 
-
-
-
         collapsingTerminator;
     }
 
@@ -1985,9 +1983,9 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
-    ////////////////////////////////////
-    // begin command buffer recording //
-    ////////////////////////////////////
+    //
+    // begin command buffer recording
+    //
 
     // first attach the swapchain image related framebuffer to the render pass
     import vdrive.renderbuffer : attachFramebuffer;
