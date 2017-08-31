@@ -85,6 +85,7 @@ void cpuReset( ref VDrive_Gui_State vg ) {
     bool must_init;
     import core.stdc.stdlib : malloc, free;
     if( vg.sim_use_double ) {
+        vg.setSimFuncPlay( & cpuSimD_Play );
         if( vg.vc.popul_buffer_f !is null ) {
             if( old_buffer_mem_size < vg.vc.current_buffer_mem_size ) { // 2 * float.sizeof = double.sizeof
                 free( cast( void* )vg.vc.popul_buffer_f );
@@ -250,20 +251,6 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_Gui_State vg ) nothrow @syste
         f[6] = f[6] * ( 1 - omega ) + f_eq[6] * omega; // mix( f[6], f_eq[6], omega );
         f[7] = f[7] * ( 1 - omega ) + f_eq[7] * omega; // mix( f[7], f_eq[7], omega );
         f[8] = f[8] * ( 1 - omega ) + f_eq[8] * omega; // mix( f[8], f_eq[8], omega );
-
-        // compute 2D coordinates X and Y;
-        size_t X = I % D_x;
-        size_t Y = I / D_x;
-
-        // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
-        if( Y == D_y - 1 /*|| Y == 0*/ ) {
-            f[1] += 2 * vg.vc.pw[1] * rho * wall_velocity;
-            f[3] -= 2 * vg.vc.pw[3] * rho * wall_velocity;
-            f[5] += 2 * vg.vc.pw[5] * rho * wall_velocity;
-            f[6] -= 2 * vg.vc.pw[6] * rho * wall_velocity;
-            f[7] -= 2 * vg.vc.pw[7] * rho * wall_velocity;
-            f[8] += 2 * vg.vc.pw[8] * rho * wall_velocity;
-        }
 
         // Store new populations
         popul_buffer[ I ] = f[0];
