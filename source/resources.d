@@ -315,15 +315,15 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
         .addBufferInfo( vd.xform_ubo_buffer.buffer )
 
-        // Main Compute Buffer for poupulations
+        // Main Compute Buffer for populations
         .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
         .addTexelBufferView( vd.sim_buffer_view )
 
-        // Image to store macroscopic variables ( velocity, density ) from simulation compute shaders
+        // Image to store macroscopic variables ( velocity, density ) from simulation compute shader
         .addLayoutBinding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT )
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
 
-        // Sampler to read from macroscopic image in lines, display and export shaders
+        // Sampler to read from macroscopic image in lines, display and export shader
         .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT )
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
 
@@ -345,9 +345,12 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         //.addTexelBufferView( vd.export_buffer_view[1] );
 
     // The app crashes here in construct sometimes, and it is not clear why
-    // In Debug mode we see that some undefined exception is thrown, which cannot be catched here
-    // The error seems to be unrelated to this section, check all the steps taken before this occures
+    // In Debug mode we see that some undefined exception is thrown, which cannot be caught here
+    // The error seems to be unrelated to this section, check all the steps taken before this occurs
     // Exit Code: -1073740940 (FFFFFFFFC0000374)
+    // ---
+    // New insight tells us that this is a memory corruption which only occurs when using immutable samplers
+
     vd.descriptor = ( *meta_descriptor_ptr ).construct.reset;
 
 
@@ -501,13 +504,13 @@ void createRenderResources( ref VDrive_State vd ) {
     //surface_capabilities.printTypeInfo;
 
     // we need to know the swapchain image format before we create a render pass
-    // to render into that swapcahin image. We don't have to create the swapchain itself
+    // to render into that swapchain image. We don't have to create the swapchain itself
     // renderpass needs to be created only once in contrary to the swapchain, which must be
     // recreated if the window swapchain size changes
     // We set all required parameters here to avoid configuration at multiple locations
     // additionally configuration needs to happen only once
 
-    // list of prefered formats and modes, the first found will be used, otherwise the first available not in lists
+    // list of preferred formats and modes, the first found will be used, otherwise the first available not in lists
     VkFormat[4] request_format = [ VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM ];
     VkPresentModeKHR[3] request_mode = [ VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
     //VkPresentModeKHR[2] request_mode = [ VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
@@ -711,12 +714,15 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
 
 
 
+////////////////////////////////////////////////
+// (re)create window size dependent resources // 
+////////////////////////////////////////////////
 
 void resizeRenderResources( ref VDrive_State vd ) {
 
-    //////////////////////////////////////////////////////
-    // (re)construct the already parametrized swapchain //
-    //////////////////////////////////////////////////////
+    //
+    // (re)construct the already parametrized swapchain
+    //
 
     vd.swapchain.construct;
 
@@ -725,10 +731,9 @@ void resizeRenderResources( ref VDrive_State vd ) {
 
 
 
-    ////////////////////////
-    // create depth image //
-    ////////////////////////
-
+    //
+    // create depth image
+    //
 
     // prefer getting the depth image into a device local heap
     // first we need to find out if such a heap exist on the current device
@@ -749,13 +754,13 @@ void resizeRenderResources( ref VDrive_State vd ) {
 
 
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // record ransition of depth image from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL //
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // record transition of depth image from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+    //
 
     // Note: allocate one command buffer
     // cmd_buffer is an Array!VkCommandBuffer
-    // the array itself will be destroyd after this scope
+    // the array itself will be destroyed after this scope
     auto cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
 
     VkCommandBufferBeginInfo cmd_buffer_begin_info = {
@@ -783,9 +788,9 @@ void resizeRenderResources( ref VDrive_State vd ) {
 
 
 
-    /////////////////////////
-    // create framebuffers //
-    /////////////////////////
+    //
+    // create framebuffers
+    //
 
     VkImageView[1] render_targets = [ vd.depth_image.image_view ];  // compose render targets into an array
     vd.framebuffers( vd )
@@ -815,9 +820,9 @@ void resizeRenderResources( ref VDrive_State vd ) {
 
 
 
-    ///////////////////////////////////////////////
-    // update dynamic viewport and scissor state //
-    ///////////////////////////////////////////////
+    //
+    // update dynamic viewport and scissor state
+    //
 
     vd.viewport = VkViewport( 0, 0, vd.swapchain.imageExtent.width, vd.swapchain.imageExtent.height, 0, 1 );
     vd.scissors = VkRect2D( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent );
@@ -910,7 +915,7 @@ void destroyResources( ref VDrive_State vd ) {
 
     vd.destroyParticles;
 
-    // swapchain, swapchain and present image views
+    // surface, swapchain and present image views
     vd.swapchain.destroyResources;
 
     // memory Resources
