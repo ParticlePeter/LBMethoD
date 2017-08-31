@@ -14,6 +14,7 @@ void registerCallbacks( ref VDrive_State vd ) {
     glfwSetWindowSizeCallback(  vd.window, & windowSizeCallback );
     glfwSetMouseButtonCallback( vd.window, & mouseButtonCallback );
     glfwSetCursorPosCallback(   vd.window, & cursorPosCallback );
+    glfwSetScrollCallback(      vd.window, & scrollCallback );
     glfwSetKeyCallback(         vd.window, & keyCallback );
 }
 
@@ -119,7 +120,9 @@ extern( C ) void mouseButtonCallback( GLFWwindow * window, int button, int val, 
 
 /// Callback Function for capturing mouse wheel events
 extern( C ) void scrollCallback( GLFWwindow * window, double x, double y ) nothrow {
-
+    auto vd = cast( VDrive_State* )window.glfwGetWindowUserPointer;
+    vd.tb.reference( 0, 0 );
+    vd.tb.dolly( 5 * x, - 10 * y );
 }
 
 
