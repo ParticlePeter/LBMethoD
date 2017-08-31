@@ -300,7 +300,12 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
     }
 
 
-    vd.sim_image.sampler = vd.createSampler( VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER );
+    Meta_Sampler meta_sampler;
+    vd.sim_image.sampler = meta_sampler( vd )
+    //  .addressMode( VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER )
+        .unnormalizedCoordinates( VK_TRUE )
+        .construct
+        .sampler;
 
     // Note(pp): immutable does not filter properly, either driver bug or module descriptor bug
     // Todo(pp): debug the issue
