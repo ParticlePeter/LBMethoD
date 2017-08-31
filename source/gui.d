@@ -1374,21 +1374,19 @@ void drawGui( ref VDrive_Gui_State vg ) {
         if( vg.sim_compute_dirty ) {
             if( ImGui.Button( "Apply", button_size_2 )) {
 
-                bool sim_domain_changed     = vg.vd.sim_domain != vg.sim_domain;
-                vg.sim_compute_dirty        = vg.sim_work_group_dirty = false;
-                vg.vd.sim_work_group_size   = vg.sim_work_group_size;
-                vg.vd.sim_use_double        = vg.sim_use_double;
-
-                // update layers and sim buffer, when we reached this spot buffer must be updated in any case
-                vg.vd.sim_layers            = vg.sim_layers;
-
-                // recreate resources, update trackball and sim_display push constant data
-                if( sim_domain_changed ) {
+                // only if the sim domain changed we must ...
+                if( vg.vd.sim_domain != vg.sim_domain ) {
+                    // recreate sim image, update trackball and sim_display push constant data
                     vg.vd.sim_domain = vg.sim_display.sim_domain = vg.sim_domain;
                     vg.createSimImage;
                     import input : initTrackball;
                     vg.initTrackball;
                 }
+
+                vg.sim_compute_dirty        = vg.sim_work_group_dirty = false;
+                vg.vd.sim_work_group_size   = vg.sim_work_group_size;
+                vg.vd.sim_use_double        = vg.sim_use_double;
+                vg.vd.sim_layers            = vg.sim_layers;
 
                 // this must be after sim_domain_changed edits
                 vg.createSimBuffer;
