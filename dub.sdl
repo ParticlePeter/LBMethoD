@@ -8,17 +8,19 @@ authors             "Peter Particle"
 license             "MIT"
 
 dependency          "derelict-glfw3"    version = "~>3.1.0"
-dependency          "dlsl"              version   = "~>0.1.2"
+dependency          "dlsl"              version = "~>0.1.2"
 //dependency          "erupted"           version = "~>1.6.0"
 dependency          "erupted"           path    = "../ErupteD"
 dependency          "vdrive"            path    = "../V-Drive"
 dependency          "imgui_lib"         path    = "../../Lib_CPP/imgui_lib"
 
-libs                "../../Lib_CPP/imgui_lib/project/Debug/imgui"     // this should not be required or should simply be "imgui"
+libs                "../../Lib_CPP/imgui_lib/project/Release/imgui"     // this should not be required or should simply be "imgui"
 
 //buildOptions      "profile"
 //buildOptions      "profileGC"
 //dub build --build=release --arch=x86_64
+
+lflags "/NODEFAULTLIB:LIBVCRUNTIME"
 
 buildRequirements   "allowWarnings"
 

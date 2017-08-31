@@ -170,7 +170,21 @@ struct VDrive_State {
     uint32_t        sim_profile_step_count = 1000;
     uint32_t        sim_profile_step_index;
 
-    import std.datetime.stopwatch;
+
+version( LDC ) {
+    import std.datetime; // ldc is behind and datetime is a module and not a package yet
+    StopWatch stop_watch;
+    nothrow {
+        void resetStopWatch()       { try { stop_watch.reset; } catch( Exception ) {} }
+        void startStopWatch()       { try { stop_watch.start; } catch( Exception ) {} }
+        void stopStopWatch()        { try { stop_watch.stop;  } catch( Exception ) {} }
+        long getStopWatch_nsecs()   { try { return stop_watch.peek.to!( "nsecs" , long ); } catch( Exception ) { return 0; } }
+        long getStopWatch_hnsecs()  { try { return stop_watch.peek.to!( "hnsecs", long ); } catch( Exception ) { return 0; } }
+        long getStopWatch_usecs()   { try { return stop_watch.peek.to!( "usecs" , long ); } catch( Exception ) { return 0; } }
+        long getStopWatch_msecs()   { try { return stop_watch.peek.to!( "msecs" , long ); } catch( Exception ) { return 0; } }
+    }
+} else {
+    import std.datetime.stopwatch; // ldc is behind and datetime is a module and not a package yet
     StopWatch stop_watch;
     nothrow {
         void resetStopWatch()       { stop_watch.reset; }
@@ -181,6 +195,7 @@ struct VDrive_State {
         long getStopWatch_usecs()   { return stop_watch.peek.total!"usecs"; }
         long getStopWatch_msecs()   { return stop_watch.peek.total!"msecs"; }
     }
+}
 
 
 
