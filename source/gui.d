@@ -186,9 +186,9 @@ void initImgui( ref VDrive_Gui_State vg ) {
     style.Colors[ ImGuiCol_Header ]                 = ImVec4( 0.16f, 0.26f, 0.38f, 1.00f ); //ImVec4( 0.40f, 0.40f, 0.90f, 1.00f );
     style.Colors[ ImGuiCol_HeaderHovered ]          = ImVec4( 0.22f, 0.35f, 0.50f, 1.00f ); //ImVec4( 0.45f, 0.45f, 0.90f, 1.00f );
     style.Colors[ ImGuiCol_HeaderActive ]           = ImVec4( 0.22f, 0.35f, 0.50f, 1.00f ); //ImVec4( 0.53f, 0.53f, 0.87f, 1.00f );
-    style.Colors[ ImGuiCol_Column ]                 = ImVec4( 0.50f, 0.50f, 0.50f, 1.00f ); //ImVec4( 0.50f, 0.50f, 0.50f, 1.00f );
-    style.Colors[ ImGuiCol_ColumnHovered ]          = ImVec4( 0.60f, 0.60f, 0.60f, 1.00f ); //ImVec4( 0.60f, 0.60f, 0.60f, 1.00f );
-    style.Colors[ ImGuiCol_ColumnActive ]           = ImVec4( 0.70f, 0.70f, 0.70f, 1.00f ); //ImVec4( 0.70f, 0.70f, 0.70f, 1.00f );
+    style.Colors[ ImGuiCol_Separator ]              = ImVec4( 0.22f, 0.22f, 0.22f, 1.00f ); //ImVec4( 0.50f, 0.50f, 0.50f, 1.00f );
+    style.Colors[ ImGuiCol_SeparatorHovered ]       = ImVec4( 0.60f, 0.60f, 0.60f, 1.00f ); //ImVec4( 0.60f, 0.60f, 0.60f, 1.00f );
+    style.Colors[ ImGuiCol_SeparatorActive ]        = ImVec4( 0.70f, 0.70f, 0.70f, 1.00f ); //ImVec4( 0.70f, 0.70f, 0.70f, 1.00f );
     style.Colors[ ImGuiCol_ResizeGrip ]             = ImVec4( 1.00f, 1.00f, 1.00f, 1.00f ); //ImVec4( 1.00f, 1.00f, 1.00f, 1.00f );
     style.Colors[ ImGuiCol_ResizeGripHovered ]      = ImVec4( 1.00f, 1.00f, 1.00f, 1.00f ); //ImVec4( 1.00f, 1.00f, 1.00f, 1.00f );
     style.Colors[ ImGuiCol_ResizeGripActive ]       = ImVec4( 1.00f, 1.00f, 1.00f, 1.00f ); //ImVec4( 1.00f, 1.00f, 1.00f, 1.00f );
@@ -1066,8 +1066,8 @@ void drawGui( ref VDrive_Gui_State vg ) {
     // Tip: if we don't call ImGui.Begin()/ImGui.End() the widgets appears in a window automatically called "Debug"
 
 
-    ImGui.SetNextWindowPos(  main_win_pos,  ImGuiSetCond_Always );
-    ImGui.SetNextWindowSize( main_win_size, ImGuiSetCond_Always );
+    ImGui.SetNextWindowPos(  main_win_pos,  ImGuiCond_Always );
+    ImGui.SetNextWindowSize( main_win_size, ImGuiCond_Always );
     ImGui.Begin( "Main Window", null, window_flags );
 
     // create transport controls at top of window
@@ -1902,7 +1902,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
     // 2. Show another simple window, this time using an explicit Begin/End pair
     if( show_another_window ) {
-        auto next_win_size = ImVec2( 200, 100 ); ImGui.SetNextWindowSize( next_win_size, ImGuiSetCond_FirstUseEver );
+        auto next_win_size = ImVec2( 200, 100 ); ImGui.SetNextWindowSize( next_win_size, ImGuiCond_FirstUseEver );
         ImGui.Begin( "Another Window", &show_another_window );
         ImGui.Text( "Hello" );
         ImGui.End();
@@ -1910,7 +1910,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
     // 3. Show the ImGui test window. Most of the sample code is in ImGui.ShowTestWindow()
     if( show_test_window ) {
-        auto next_win_pos = ImVec2( 650, 20 ); ImGui.SetNextWindowPos( next_win_pos, ImGuiSetCond_FirstUseEver );
+        auto next_win_pos = ImVec2( 650, 20 ); ImGui.SetNextWindowPos( next_win_pos, ImGuiCond_FirstUseEver );
         ImGui.ShowTestWindow( &show_test_window );
     }
 
