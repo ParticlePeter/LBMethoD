@@ -34,7 +34,7 @@ struct VDrive_State {
     mat4                        projection;                 // Projection Matrix
     float                       projection_fovy =    60;    // Projection Field Of View in Y dimension
     float                       projection_near =   0.1;    // Projection near plane distance
-    float                       projection_far  =  1000;    // Projection  far plane distance
+    float                       projection_far  = 10000;    // Projection  far plane distance
     // Todo(pp): calculate best possible near and far clip planes when manipulating the trackball
 
     // surface and swapchain
@@ -103,9 +103,7 @@ struct VDrive_State {
     VkBufferView                sim_particle_buffer_view;
     Core_Pipeline               comp_part_pso;
     Core_Pipeline               draw_part_pso;
-    Core_Pipeline               draw_line_pso;
-    Core_Pipeline               draw_axis_pso;
-    Core_Pipeline               draw_grid_pso;
+    Core_Pipeline[2]            draw_line_pso;
 
 
     // export resources

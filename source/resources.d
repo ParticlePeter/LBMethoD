@@ -443,47 +443,46 @@ void createGraphicsPSO( ref VDrive_State vd ) {
 
 
 
-///////////////////////////////
-// create velocity lines PSO //
-///////////////////////////////
 
-void createVelocityLinePSO( ref VDrive_State vd, bool draw_as_points = false, bool axis = false ) {
+/////////////////////////////////////////////
+// create velocity, axis or grid lines PSO //
+/////////////////////////////////////////////
+
+void createLinePSO( ref VDrive_State vd ) {
+
 
     // if we are recreating an old pipeline exists already, destroy it first
-    if( vd.draw_line_pso.pipeline != VK_NULL_HANDLE ) {
-        vd.graphics_queue.vkQueueWaitIdle;
-        vd.destroy( vd.draw_line_pso );
+    foreach( ref pso; vd.draw_line_pso ) {
+        if( pso.is_constructed ) {
+            vd.graphics_queue.vkQueueWaitIdle;
+            vd.destroy( pso );
+        }
     }
 
-    // create Meta_Specialization struct with static data array
-    Meta_SC!( 1 ) meta_sc;
-    meta_sc
-        .addMapEntry( MapEntry32( axis ? 1 : 0 ))  // default constantID is 0, next would be 1
-        .construct;
-
-    // create the pso
+    // first create PSO to draw lines
     Meta_Graphics meta_graphics;
-    meta_graphics( vd )
-        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.vert", & meta_sc.specialization_info  ))
+    vd.draw_line_pso[ 0 ] = meta_graphics( vd )     
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.vert" ))
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.frag" ))
-        .inputAssembly( draw_as_points ? VK_PRIMITIVE_TOPOLOGY_POINT_LIST : VK_PRIMITIVE_TOPOLOGY_LINE_STRIP )  // set the inputAssembly
-        .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )    // add viewport and scissor state, necessary even if we use dynamic state
-        .cullMode( VK_CULL_MODE_BACK_BIT )                                         // set rasterization state
-        .depthState                                                                // set depth state - enable depth test with default attributes
-        .addColorBlendState( VK_FALSE )                                            // color blend state - append common (default) color blend attachment state
-        .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                              // add dynamic states viewport
-        .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                               // add dynamic states scissor
-        .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )             // describe pipeline layout
-        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 28 )                 // specify push constant range
-        .renderPass( vd.render_pass.render_pass )                                  // describe compatible render pass
-        .construct( vd.graphics_cache )                                            // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
-        .destroyShaderModules;                                                     // shader modules compiled into pipeline, not shared, can be deleted now
+        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_LINE_STRIP )                          // set the inputAssembly
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
+        .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
+        .depthState                                                                 // set depth state - enable depth test with default attributes
+        .addColorBlendState( VK_FALSE )                                             // color blend state - append common (default) color blend attachment state
+        .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
+        .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
+        .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )              // describe pipeline layout
+        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 28 )                  // specify push constant range
+        .renderPass( vd.render_pass.render_pass )                                   // describe compatible render pass
+        .construct( vd.graphics_cache )                                             // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
+        .extractCore;                                                               // extract core data into Core_Pipeline struct
 
-    if( axis )
-        vd.draw_axis_pso = meta_graphics.reset;                                                                    // extract core data into Core_Pipeline struct
-    else
-        vd.draw_line_pso = meta_graphics.reset;
-
+    // now edit the Meta_Pipeline to create an alternate points PSO
+    vd.draw_line_pso[ 1 ] = meta_graphics           
+        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_POINT_LIST )
+        .construct( vd.graphics_cache )                                             // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
+        .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
+        .reset;                                                                     // extract core data into Core_Pipeline struct and delete temporary data
 }
 
 
@@ -556,8 +555,7 @@ void createRenderResources( ref VDrive_State vd ) {
 
     // create the graphics pipeline, can be called multiple time to parse shader at runtime
     vd.createGraphicsPSO;
-    vd.createVelocityLinePSO;
-    vd.createVelocityLinePSO( false, true );   // this creates a coordinate axis
+    vd.createLinePSO;           // line (and point) PSO to draw velocity lines coordinate axis, grid and 3D bounding box 
     vd.createParticleDrawPipeline;
 
     // create all resources for the compute pipeline
@@ -929,7 +927,7 @@ void destroyResources( ref VDrive_State vd ) {
     vd.destroy( vd.sim_buffer_view );
     vd.sim_image.destroyResources;
     vd.sim_buffer.destroyResources;
-    if( vd.sim_memory.memory != VK_NULL_HANDLE )
+    if( vd.sim_memory.is_constructed )
         vd.sim_memory.destroyResources;
     vd.sim_stage_buffer.destroyResources;
 
@@ -940,9 +938,11 @@ void destroyResources( ref VDrive_State vd ) {
     vd.destroy( vd.graphics_pso );
     vd.destroy( vd.comp_init_pso );
     vd.destroy( vd.comp_loop_pso );
-    vd.destroy( vd.draw_line_pso );
-    if( vd.draw_axis_pso.is_constructed ) vd.destroy( vd.draw_axis_pso );
-    if( vd.draw_grid_pso.is_constructed ) vd.destroy( vd.draw_grid_pso );
+
+    foreach( ref pso; vd.draw_line_pso )
+        if( pso.is_constructed )
+            vd.destroy( pso );
+
     vd.destroy( vd.graphics_cache );
     vd.destroy( vd.compute_cache );
 

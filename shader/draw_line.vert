@@ -2,9 +2,11 @@
 
 // push constants
 layout( push_constant ) uniform Push_Constant {
-    vec3 display_scale;
-    uint lines_axis;
-    vec3 lines_norm;
+    uvec3   sim_domain;
+    uint    line_type___line_axis___repl_axis___velocity_axis;
+    int     repl_count;
+    float   line_offset;
+    float   repl_spread;
 } pc;
 
 
@@ -22,12 +24,6 @@ layout( std140, binding = 6 ) uniform Display_UBO {
     uint    z_layer;
 };
 
-// specialization constants for init or loop phase
-#define DISPLAY_VELOCITY    0
-#define DISPLAY_AXIS        1
-layout( constant_id = 0 ) const uint DISPLAY_TYPE = DISPLAY_VELOCITY;
-
-
 
 // sampler and image
 layout( binding = 4 ) uniform sampler2DArray vel_rho_tex;      // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
@@ -42,22 +38,31 @@ out gl_PerVertex {                              // not redifining gl_PerVertex u
 layout( location = 0 ) out vec3 vs_color;
 
 
+// specialization constants for init or loop phase
+#define DISPLAY_VELOCITY    0
+#define DISPLAY_AXIS        1
+#define DISPLAY_GRID        2
+//layout( constant_id = 0 ) const uint DISPLAY_TYPE = DISPLAY_VELOCITY;
+uint DISPLAY_TYPE = pc.line_type___line_axis___repl_axis___velocity_axis & 0xff;
+uint LA = ( pc.line_type___line_axis___repl_axis___velocity_axis >>  8 ) & 0xff;
+uint RA = ( pc.line_type___line_axis___repl_axis___velocity_axis >> 16 ) & 0xff;
+uint VA = ( pc.line_type___line_axis___repl_axis___velocity_axis >> 24 ) & 0xff;
+
+
+
+
+
 // vertex index
 #define VI gl_VertexIndex
 #define II gl_InstanceIndex
 
 #define DI imageSize( vel_rho_img )
 
-#define DS pc.display_scale
+#define SD pc.sim_domain
 #define LN pc.lines_norm
 
-//#define LA pc.lines_axis
-uint  LA = ( pc.lines_axis ) & 3;
-uvec3 IC = uvec3(
-    ( pc.lines_axis >>  8 ) & 255,
-    ( pc.lines_axis >> 16 ) & 255,
-    ( pc.lines_axis >> 24 ) & 255
-);
+
+
 
 
 
@@ -66,35 +71,45 @@ uvec3 IC = uvec3(
 const vec2 dir = vec2( 1, -1 );
 void main() {
 
-    if( DISPLAY_TYPE == DISPLAY_VELOCITY ) {
+    vec4 pos = vec4( 0, 0, 0, 1 );
+
+    switch( DISPLAY_TYPE ) {
+    case DISPLAY_VELOCITY :
+        /*
         vec2 offset = ( vec2( 2 * II + 2 ) - vec2( IC + 1 )) / vec2( IC + 1 );
-        offset[ 1 - LA ] = 2 * VI * LN[ 1 - LA ] - 1; //DS[ 1 - LA ] - DS[ 1 - LA ];
+        offset[ 1 - LA ] = 2 * VI * LN[ 1 - LA ] - 1; //SD[ 1 - LA ] - SD[ 1 - LA ];
 
         vec2 tex_coord = 0.5 * offset + 0.5;
         vec4 vel_rho = texture( vel_rho_tex, vec3( tex_coord, z_layer )); // access velocity density texture, result
 
-        offset *= DS.xy;
-        offset[ LA ] += dir[ LA ] * vel_rho[ LA ] * DS[ LA ];
-
-        /*
-        vec4 pos  = vec4( 0, 0, 0, 1 );
-        pos[ LA ] = 2 * tex_coord[ LA ] * pc.display_scale[ LA ] - pc.display_scale[ LA ];  // add positional axis offset
-        pos[ 1 - LA ] = dir[ LA ] * vel_rho[ 1 - LA ] + tex_coord[ 1 - LA ];
-        */
+        offset *= SD.xy;
+        offset[ LA ] += dir[ LA ] * vel_rho[ LA ] * SD[ LA ];
 
         vs_color = vec3( 1, 1, 0 );
-        vec4 pos = vec4( offset, 0, 1 );
-        gl_Position = WVPM * pos;
-    }
+        pos = vec4( offset, 0, 1 );
+        */
+        vs_color = vec3( 1, 1, 0 );
+        pos[ LA ] += 0.5 + VI;
+        pos[ RA ] += 0.5 + II * pc.repl_spread + pc.line_offset;
+        pos[ VA ] += texture( vel_rho_tex, pos.xyz )[ VA ] * pc.sim_domain[ VA ] * vec3( 1, -1, 1 )[ VA ];  // latter param is fixing 
+        break;
 
-    else if( DISPLAY_TYPE == DISPLAY_AXIS ) {
+
+    case DISPLAY_AXIS :
         const vec3[3] colors = { vec3( 1, 0, 0 ), vec3( 0, 1, 0 ), vec3( 0, 0, 1 ) };
         vs_color = colors[ II ];
-        vec4 pos = vec4( VI * vs_color, 1 );
-        gl_Position = WVPM * pos;
+        pos = vec4( VI * vs_color, 1 );
+        //gl_Position = WVPM * pos;
+        break;
+
+
+    case DISPLAY_GRID :
+        //vs_color = vec3( 0.25 );
+        vs_color = vec3( 1, 0, 0 );
+        pos[ LA ] = float( II );
+        pos[ 1 - LA ] = float( VI * SD[ 1 - LA ] );
+        break;
     }
 
-    else { // if( DISPLAY_TYPE == DISPLAY_GRID ) {
-
-    }
+    gl_Position = WVPM * pos;
 }
