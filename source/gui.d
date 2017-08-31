@@ -2206,8 +2206,10 @@ void guiMouseButtonCallback( GLFWwindow* window, int button, int val, int mod ) 
 }
 
 
-void guiScrollCallback( GLFWwindow*, double /*xoffset*/, double yoffset ) {
+void guiScrollCallback( GLFWwindow* window, double xoffset, double yoffset ) {
     g_MouseWheel += cast( float )yoffset; // Use fractional mouse wheel, 1.0 unit 5 lines.
+    import input : scrollCallback;
+    scrollCallback( window, xoffset, yoffset );
 }
 
 
