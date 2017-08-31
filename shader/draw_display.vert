@@ -17,11 +17,11 @@ out gl_PerVertex {                              // not redifining gl_PerVertex u
 };                                              // error seems to have vanished by now, but it does no harm to keep this redefinition
 
 
-layout( location = 0 ) out vec2 vs_tex_coord;    // vertex shader output vertex color, will be interpolated and rasterized
+layout( location = 0 ) out vec2 vs_tex_coord;   // vertex shader output vertex color, will be interpolated and rasterized
 
 #define VI gl_VertexIndex
 
 void main() {
-    vs_tex_coord = vec2( VI >> 1, VI & 1 );
-    gl_Position = WVPM * vec4( pc.scale * vs_tex_coord, 0, 1 );
+    vs_tex_coord = pc.scale * vec2( VI >> 1, VI & 1 );
+    gl_Position = WVPM * vec4( vs_tex_coord, 0.1, 1 );
 }
