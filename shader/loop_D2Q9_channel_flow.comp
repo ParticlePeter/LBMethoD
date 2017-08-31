@@ -36,7 +36,7 @@ layout( constant_id = 3 ) const uint ALGORITHM = 0;
 layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 
 // velocity and density write target, will be rendered as texture in next pass
-layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict writeonly image2DArray vel_rho_img;
+layout( binding = 3, rgba32f ) uniform restrict writeonly image2DArray vel_rho_img;
 
 
 // population indices
@@ -46,14 +46,8 @@ layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict writeonly image2DArray
 //  /|\  //
 // 7 4 8 //
 
-
-// Directions:          R       E       N       W       S       NE      NW      SW      SE
+// population weights:  R       E       N       W       S       NE      NW      SW      SE
 const float[9] pw = {   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 };
-
-
-// Cell Type Attributes
-//#define NOSLIP 1
-//#define FORCE 2
 
 
 ////////////////////////////////////////////////////////
@@ -67,38 +61,6 @@ const float[9] pw = {   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 
 // define access indices for the population buffers
 #define ping ( 8 * pc.ping )
 #define pong ( 8 -    ping )
-
-
-
-/////////////////////////////////////////
-// Indices and Counts if using VkImage //
-/////////////////////////////////////////
-/*
-// indices velocity and density
-#define UX gl_GlobalInvocationID.x
-#define UY gl_GlobalInvocationID.y
-#define UZ gl_GlobalInvocationID.z
-
-#define X int( UX )
-#define Y int( UY )
-#define Z int( UZ )
-
-// buffer offsets coresponding streaming ( in 2D so far )
-int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
-
-// stream function if not near boundary
-void stream( int p, float f ) {
-    int i = ( I + buffer_offset[ p ] + cell_count ) % cell_count;
-    imageStore( popul_buf[ pong + p ], i, vec4( f ));
-}
-
-const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
-// bounce function if next to boundary and velocity is pointing towards it
-void bounce( int p, float f ) {
-    imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
-}
-*/
-
 
 
 //////////////////////////////////////////
@@ -129,13 +91,9 @@ void bounce( int p, float f ) {
 int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
 #define buffer_size ( pc.values_per_cell * cell_count )  // count of elements in the passed in buffer, required for periodic boundary conditions
 
-// buffer offsets coresponding streaming ( in 2D so far )
-int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
-
-
 //#define tau 0.50001 //0.6
 //#define w (1.f/tau)
-#define tau 0.50001
+//#define tau 0.50001
 #define w omega
 #define wb 1
 #define w3 1
@@ -166,19 +124,52 @@ void main( void ) {
 
     float f[9] = {// boundaries:                   bback     :                     periodic   :  no boundary streaming
         imageLoad( popul_buffer,                                                                           I            ).r,
-
         imageLoad( popul_buffer,                                 ( X ==       0   ?   + D.x   :  0 ) + POP(1) - DX      ).r,
         imageLoad( popul_buffer, Y == D.y - 1   ?   POP(4)                                    :        POP(2)      + DY ).r,
         imageLoad( popul_buffer,                                 ( X == D.x - 1   ?   - D.x   :  0 ) + POP(3) + DX      ).r,
         imageLoad( popul_buffer, Y ==       0   ?   POP(2)                                    :        POP(4)      - DY ).r,
-
         imageLoad( popul_buffer, Y == D.y - 1   ?   POP(7)   :   ( X ==       0   ?   + D.x   :  0 ) + POP(5) - DX + DY ).r,
         imageLoad( popul_buffer, Y == D.y - 1   ?   POP(8)   :   ( X == D.x - 1   ?   - D.x   :  0 ) + POP(6) + DX + DY ).r,
         imageLoad( popul_buffer, Y ==       0   ?   POP(5)   :   ( X == D.x - 1   ?   - D.x   :  0 ) + POP(7) + DX - DY ).r,
         imageLoad( popul_buffer, Y ==       0   ?   POP(6)   :   ( X ==       0   ?   + D.x   :  0 ) + POP(8) - DX - DY ).r,
     };
 
+    // compute macroscopic density before applying wall velocity where required
     float rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
+
+    // Ladd's momentum correction for moving walls, applied to reflected populations not perpendicular to wall velocity
+    if( X == 0 /*|| X == D.x - 1*/ ) {
+        f[1] += 2 * pw[1] * rho * wall_velocity; // f[1] +=
+        f[3] -= 2 * pw[3] * rho * wall_velocity; // f[3] -=
+        f[5] += 2 * pw[5] * rho * wall_velocity; // f[5] +=
+        f[6] -= 2 * pw[6] * rho * wall_velocity; // f[6] -=
+        f[7] -= 2 * pw[7] * rho * wall_velocity; // f[7] -=
+        f[8] += 2 * pw[8] * rho * wall_velocity; // f[8] +=
+    }
+
+    // 6 2 5 //
+    //  \|/  //
+    // 3-0-1 //
+    //  /|\  //
+    // 7 4 8 //
+    
+    /*
+    // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+    if( Y == 0 || ) {
+        f[5] -= 2 * pw[5] * rho * wall_velocity; // f[5] -=
+        f[6] += 2 * pw[6] * rho * wall_velocity; // f[6] +=
+
+    }
+
+    else
+
+    if( Y == D.y - 1 ) {
+        f[7] += 2 * pw[7] * rho * wall_velocity; // f[7] +=
+        f[8] -= 2 * pw[8] * rho * wall_velocity; // f[8] -=
+    }
+    */
+
+    // compute macroscopic velocity after wall velocity is applied
     vec2  vel = ( vec2(f[1],f[2]) - vec2(f[3],f[4]) + vec2(f[5]) - vec2(f[7]) + vec2(f[8],f[6]) - vec2(f[6],f[8])) / rho;
     //vec2  vel = vec2(   f[1] - f[3] + f[5] - f[7] + f[8] - f[6],
     //                    f[2] - f[4] + f[5] - f[7] + f[6] - f[8] ) / rho;
@@ -372,36 +363,7 @@ void main( void ) {
 
     }
 
-
-    // Handle inlet on the left wall and outlet on the right wall
-    if( X == 0 /*|| X == D.x - 1*/ ) {
-        f[1] += 2 * pw[1] * rho * wall_velocity; // f[1] +=
-        f[3] -= 2 * pw[3] * rho * wall_velocity; // f[3] -=
-        f[5] += 2 * pw[5] * rho * wall_velocity; // f[5] +=
-        f[6] -= 2 * pw[6] * rho * wall_velocity; // f[6] -=
-        f[7] -= 2 * pw[7] * rho * wall_velocity; // f[7] -=
-        f[8] += 2 * pw[8] * rho * wall_velocity; // f[8] +=
-    }
-
-    // 6 2 5 //
-    //  \|/  //
-    // 3-0-1 //
-    //  /|\  //
-    // 7 4 8 //
-    
-    /*
-    // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
-    if( Y == 0 || Y == D.y - 1 ) {
-        f[1] -= 2 * pw[2] * rho * wall_velocity; // f[2] -=
-        f[3] += 2 * pw[4] * rho * wall_velocity; // f[4] +=
-        f[5] -= 2 * pw[5] * rho * wall_velocity; // f[5] -=
-        f[6] += 2 * pw[6] * rho * wall_velocity; // f[6] +=
-        f[7] += 2 * pw[7] * rho * wall_velocity; // f[7] +=
-        f[8] -= 2 * pw[8] * rho * wall_velocity; // f[8] -=
-    }
-    */
-
-
+    // store populations
     imageStore( popul_buffer,                             I, vec4( f[0] ));
     imageStore( popul_buffer, ( pong + 1 ) * cell_count + I, vec4( f[1] ));
     imageStore( popul_buffer, ( pong + 2 ) * cell_count + I, vec4( f[2] ));
@@ -417,10 +379,35 @@ void main( void ) {
 
 
 
-// Directions   :   R   N   S   E   W   NE  SW  SE  NW
-// Cascaded     :   R   NW  W   SW  S   SE  E   NE  N
 
 
+/////////////////////////////////////////
+// Indices and Counts if using VkImage //
+/////////////////////////////////////////
+/*
+// indices velocity and density
+#define UX gl_GlobalInvocationID.x
+#define UY gl_GlobalInvocationID.y
+#define UZ gl_GlobalInvocationID.z
+
+#define X int( UX )
+#define Y int( UY )
+#define Z int( UZ )
+
+// buffer offsets coresponding streaming ( in 2D so far )
+int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
+
+// stream function if not near boundary
+void stream( int p, float f ) {
+    int i = ( I + buffer_offset[ p ] + cell_count ) % cell_count;
+    imageStore( popul_buf[ pong + p ], i, vec4( f ));
+}
+
+// bounce function if next to boundary and velocity is pointing towards it
+void bounce( int p, float f ) {
+    imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
+}
+*/
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // alternative access method using multi dim local work group size, currently not working properly //

@@ -18,12 +18,14 @@ layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict writeonly image2DArray vel_rho_img;
 
 
-// population indices
-// 6 2 5 //
-//  \|/  //
-// 3-0-1 //
-//  /|\  //
-// 7 4 8 //
+// population indices, +Z, 0Z, -Z
+// Z = 1 //     // Z = 0 //     // Z= -1 //
+// ===================================== // 
+// 13  7 //     //   3   //     // 12  9 //
+//  \ /  //     //   |   //     //  \ /  //
+//   5   //     // 2-0-1 //     //   6   //
+//  / \  //     //   |   //     //  / \  //
+// 10 11 //     //   4   //     // 8  14 //
 
 //                      0       1       2       3       4       5       6       7       8       9       10      11      12      13      14
 // Directions:          R       +X      -X      +Y      -Y      +Z     -Z       +X+Y+Z  -X-Y-Z  +X+Y-Z  -X-Y+Z  +X-Y+Z  -X+Y-Z  -X+Y+Z  +X-Y-Z
@@ -67,10 +69,35 @@ void main( void ) {
 
 
 
-// Directions   :   R   N   S   E   W   NE  SW  SE  NW
-// Cascaded     :   R   NW  W   SW  S   SE  E   NE  N
 
 
+/////////////////////////////////////////
+// Indices and Counts if using VkImage //
+/////////////////////////////////////////
+/*
+// indices velocity and density
+#define UX gl_GlobalInvocationID.x
+#define UY gl_GlobalInvocationID.y
+#define UZ gl_GlobalInvocationID.z
+
+#define X int( UX )
+#define Y int( UY )
+#define Z int( UZ )
+
+// buffer offsets coresponding streaming ( in 2D so far )
+int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
+
+// stream function if not near boundary
+void stream( int p, float f ) {
+    int i = ( I + buffer_offset[ p ] + cell_count ) % cell_count;
+    imageStore( popul_buf[ pong + p ], i, vec4( f ));
+}
+
+// bounce function if next to boundary and velocity is pointing towards it
+void bounce( int p, float f ) {
+    imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
+}
+*/
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // alternative access method using multi dim local work group size, currently not working properly //

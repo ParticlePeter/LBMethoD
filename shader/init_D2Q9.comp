@@ -67,10 +67,35 @@ void main( void ) {
 
 
 
-// Directions   :   R   N   S   E   W   NE  SW  SE  NW
-// Cascaded     :   R   NW  W   SW  S   SE  E   NE  N
 
 
+/////////////////////////////////////////
+// Indices and Counts if using VkImage //
+/////////////////////////////////////////
+/*
+// indices velocity and density
+#define UX gl_GlobalInvocationID.x
+#define UY gl_GlobalInvocationID.y
+#define UZ gl_GlobalInvocationID.z
+
+#define X int( UX )
+#define Y int( UY )
+#define Z int( UZ )
+
+// buffer offsets coresponding streaming ( in 2D so far )
+int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
+
+// stream function if not near boundary
+void stream( int p, float f ) {
+    int i = ( I + buffer_offset[ p ] + cell_count ) % cell_count;
+    imageStore( popul_buf[ pong + p ], i, vec4( f ));
+}
+
+// bounce function if next to boundary and velocity is pointing towards it
+void bounce( int p, float f ) {
+    imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
+}
+*/
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // alternative access method using multi dim local work group size, currently not working properly //

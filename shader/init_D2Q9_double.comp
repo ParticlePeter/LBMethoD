@@ -61,8 +61,8 @@ void main( void ) {
     // init all distribution f(unctions) with equilibrium, p = population
     for( int p = 0; p < 9; ++p )  {
         imageStore( popul_buffer, p * cell_count + I, uvec4( unpackDouble2x32( double( pw[ p ] )), 0, 0 ));
-        if( p > 0 ) imageStore( popul_buffer, ( p + 8 ) * cell_count + I, vec4( pw[ p ] ));
-    }   
+        if( p > 0 ) imageStore( popul_buffer, ( p + 8 ) * cell_count + I, uvec4( unpackDouble2x32( double( pw[ p ] )), 0, 0 ));
+    }
 }   // main
 
 
@@ -85,7 +85,7 @@ void main( void ) {
 #define GID ivec3( gl_GlobalInvocationID )
 // define gl_WorkGroupIndex equivalent to gl_LocalInvocationIndex
 // this is confirmed on CPU, where is the crux ???
-uint work_group_index = 
+uint work_group_index =
     gl_WorkGroupID.z * gl_NumWorkGroups.z * gl_NumWorkGroups.y +
     gl_WorkGroupID.y * gl_NumWorkGroups.x +
     gl_WorkGroupID.x;

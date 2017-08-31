@@ -39,19 +39,18 @@ layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 layout( binding = 3, rgba32f ) uniform restrict writeonly image2DArray vel_rho_img;
 
 
-// population indices
-// 6 2 5 //
-//  \|/  //
-// 3-0-1 //
-//  /|\  //
-// 7 4 8 //
+// population indices, +Z, 0Z, -Z
+// Z = 1 //     // Z = 0 //     // Z= -1 //
+// ===================================== // 
+// 13  7 //     //   3   //     // 12  9 //
+//  \ /  //     //   |   //     //  \ /  //
+//   5   //     // 2-0-1 //     //   6   //
+//  / \  //     //   |   //     //  / \  //
+// 10 11 //     //   4   //     // 8  14 //
 
-
-// Directions:          R       E       N       W       S       NE      NW      SW      SE
 //                      0       1       2       3       4       5       6       7       8       9       10      11      12      13      14
 // Directions:          R       +X      -X      +Y      -Y      +Z     -Z       +X+Y+Z  -X-Y-Z  +X+Y-Z  -X-Y+Z  +X-Y+Z  -X+Y-Z  -X+Y+Z  +X-Y-Z
 const float[15] pw = {  2.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72 };
-
 
 
 ////////////////////////////////////////////////////////
@@ -144,7 +143,24 @@ void main( void ) {
         imageLoad( popul_buffer, Y ==       0 || Z ==       0   ?   POP(13)   :   ( X ==       0   ?   + D.x   :   0 ) + POP(14) - DX + DY + DZ ).r,
     };
 
-    // compute macroscopic properties
+    // compute macroscopic density before applying wall velocity where required
+    float rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8] + f[7] + f[10] + f[11] + f[12] + f[13] + f[14];
+
+    // Ladd's momentum correction for moving walls, applied to reflected populations not perpendicular to wall velocity
+    if( X == 0 /*|| X == D.x - 1*/ ) {
+        f[ 1] += 2 * pw[ 1] * rho * wall_velocity;
+        f[ 2] -= 2 * pw[ 2] * rho * wall_velocity;
+        f[ 7] += 2 * pw[ 7] * rho * wall_velocity; 
+        f[ 8] -= 2 * pw[ 8] * rho * wall_velocity; 
+        f[ 9] += 2 * pw[ 9] * rho * wall_velocity; 
+        f[10] -= 2 * pw[10] * rho * wall_velocity; 
+        f[11] += 2 * pw[11] * rho * wall_velocity; 
+        f[12] -= 2 * pw[12] * rho * wall_velocity; 
+        f[13] -= 2 * pw[13] * rho * wall_velocity; 
+        f[14] += 2 * pw[14] * rho * wall_velocity; 
+    }
+
+    // compute macroscopic velocity after wall velocity is applied
     vec3 vel = ( vec3(f[1],f[3],f[5]) - vec3(f[2],f[4],f[6]) + vec3(f[7]) - vec3(f[8]) + vec3(f[9],f[9],f[10]) - vec3(f[10],f[10],f[9]) + vec3(f[14],f[13],f[13] - vec3(f[13],f[14],f[14])) / rho;
     //vec3 vel = vec3(    f[1] - f[2] + f[7] - f[8] + f[ 9] - f[10] + f[14] - f[13],
     //                    f[3] - f[4] + f[7] - f[8] + f[ 9] - f[10] + f[13] - f[14],
@@ -309,35 +325,8 @@ void main( void ) {
     }
 
 
-    // Handle inlet on the left wall and outlet on the right wall
-    if( X == 0 /*|| X == D.x - 1*/ ) {
-        f[ 1] += 2 * pw[ 1] * rho * wall_velocity;
-        f[ 2] -= 2 * pw[ 2] * rho * wall_velocity;
-        f[ 7] += 2 * pw[ 7] * rho * wall_velocity; 
-        f[ 8] -= 2 * pw[ 8] * rho * wall_velocity; 
-        f[ 9] += 2 * pw[ 9] * rho * wall_velocity; 
-        f[10] -= 2 * pw[10] * rho * wall_velocity; 
-        f[11] += 2 * pw[11] * rho * wall_velocity; 
-        f[12] -= 2 * pw[12] * rho * wall_velocity; 
-        f[13] -= 2 * pw[13] * rho * wall_velocity; 
-        f[14] += 2 * pw[14] * rho * wall_velocity; 
-    }
-
-
-        // population indices, +Z, 0Z, -Z
-        // Z = 1 //     // Z = 0 //     // Z= -1 //
-        // ===================================== // 
-        // 13  7 //     //   3   //     // 12  9 //
-        //  \ /  //     //   |   //     //  \ /  //
-        //   5   //     // 2-0-1 //     //   6   //
-        //  / \  //     //   |   //     //  / \  //
-        // 10 11 //     //   4   //     // 8  14 //
-
-        //                      0       1       2       3       4       5       6       7       8       9       10      11      12      13      14
-        // Directions:          R       +X      -X      +Y      -Y      +Z     -Z       +X+Y+Z  -X-Y-Z  +X+Y-Z  -X-Y+Z  +X-Y+Z  -X+Y-Z  -X+Y+Z  +X-Y-Z
-
     // Store new populations
-    imageStore( popul_buffer,                              I, vec4( f[0] ));
+    imageStore( popul_buffer,                              I, vec4( f[ 0] ));
     imageStore( popul_buffer, ( pong +  1 ) * cell_count + I, vec4( f[ 1] ));
     imageStore( popul_buffer, ( pong +  2 ) * cell_count + I, vec4( f[ 2] ));
     imageStore( popul_buffer, ( pong +  3 ) * cell_count + I, vec4( f[ 3] ));
@@ -357,10 +346,35 @@ void main( void ) {
 
 
 
-// Directions   :   R   N   S   E   W   NE  SW  SE  NW
-// Cascaded     :   R   NW  W   SW  S   SE  E   NE  N
 
 
+/////////////////////////////////////////
+// Indices and Counts if using VkImage //
+/////////////////////////////////////////
+/*
+// indices velocity and density
+#define UX gl_GlobalInvocationID.x
+#define UY gl_GlobalInvocationID.y
+#define UZ gl_GlobalInvocationID.z
+
+#define X int( UX )
+#define Y int( UY )
+#define Z int( UZ )
+
+// buffer offsets coresponding streaming ( in 2D so far )
+int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
+
+// stream function if not near boundary
+void stream( int p, float f ) {
+    int i = ( I + buffer_offset[ p ] + cell_count ) % cell_count;
+    imageStore( popul_buf[ pong + p ], i, vec4( f ));
+}
+
+// bounce function if next to boundary and velocity is pointing towards it
+void bounce( int p, float f ) {
+    imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
+}
+*/
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // alternative access method using multi dim local work group size, currently not working properly //

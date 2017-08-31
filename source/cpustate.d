@@ -196,7 +196,20 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_Gui_State vg ) nothrow @syste
             popul_buffer[ ( vg.vc.ping + 8 ) * vg.vc.cell_count + I ],
         ];
 
+        // compute macroscopic density before applying wall velocity where required
         T rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
+
+        // compute 2D coordinates X and Y;
+        size_t X = I % D_x;
+        size_t Y = I / D_x;
+
+        // Ladd's momentum correction for moving walls, applied to reflected populations not perpendicular to wall velocity
+        if( Y == D_y - 1 /*|| Y == 0*/ ) {  // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+            f[7] -= 2 * vg.vc.pw[7] * rho * wall_velocity;
+            f[8] += 2 * vg.vc.pw[8] * rho * wall_velocity;
+        }
+
+        // compute macroscopic velocity after wall velocity is applied
         T v_x = ( f[1] - f[3] + f[5] - f[7] + f[8] - f[6] ) / rho;
         T v_y = ( f[2] - f[4] + f[5] - f[7] + f[6] - f[8] ) / rho;
 
@@ -207,24 +220,24 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_Gui_State vg ) nothrow @syste
         vg.sim_image_ptr[ 4 * I + 3 ] = 1;
 
 
-        T X_P_Y = v_x + v_y;
-        T X_M_Y = v_x - v_y;
-        T V_X_2 = 4.5 * v_x * v_x;
-        T V_Y_2 = 4.5 * v_y * v_y;
-        T XPY_2 = 4.5 * X_P_Y * X_P_Y;
-        T XMY_2 = 4.5 * X_M_Y * X_M_Y;
-        T V_D_V = 1.5 * ( v_x * v_x + v_y * v_y );
+        //T X_P_Y = v_x + v_y;
+        //T X_M_Y = v_x - v_y;
+        //T V_X_2 = 4.5 * v_x * v_x;
+        //T V_Y_2 = 4.5 * v_y * v_y;
+        //T XPY_2 = 4.5 * X_P_Y * X_P_Y;
+        //T XMY_2 = 4.5 * X_M_Y * X_M_Y;
+        //T V_D_V = 1.5 * ( v_x * v_x + v_y * v_y );
 
-        T[9] f_eq = [                                    // #define SQ(x) ((x) * (x))
-            vg.vc.pw[0] * rho * ( 1                     - V_D_V ), // vg.vc.pw[0] * rho * (1                                           - 1.5 * (SQ(v_x) + SQ(v_y))),
-            vg.vc.pw[1] * rho * ( 1 + 3 *  v_x  + V_X_2 - V_D_V ), // vg.vc.pw[1] * rho * (1 + 3 * ( v_x)       + 4.5 * SQ( v_x)       - 1.5 * (SQ(v_x) + SQ(v_y))),
-            vg.vc.pw[2] * rho * ( 1 + 3 *  v_y  + V_Y_2 - V_D_V ), // vg.vc.pw[2] * rho * (1 + 3 * ( v_y)       + 4.5 * SQ( v_y)       - 1.5 * (SQ(v_x) + SQ(v_y))),
-            vg.vc.pw[3] * rho * ( 1 - 3 *  v_x  + V_X_2 - V_D_V ), // vg.vc.pw[3] * rho * (1 + 3 * (-v_x)       + 4.5 * SQ(-v_x)       - 1.5 * (SQ(v_x) + SQ(v_y))),
-            vg.vc.pw[4] * rho * ( 1 - 3 *  v_y  + V_Y_2 - V_D_V ), // vg.vc.pw[4] * rho * (1 + 3 * (-v_y)       + 4.5 * SQ(-v_y)       - 1.5 * (SQ(v_x) + SQ(v_y))),
-            vg.vc.pw[5] * rho * ( 1 + 3 * X_P_Y + XPY_2 - V_D_V ), // vg.vc.pw[5] * rho * (1 + 3 * ( v_x + v_y) + 4.5 * SQ( v_x + v_y) - 1.5 * (SQ(v_x) + SQ(v_y))),
-            vg.vc.pw[6] * rho * ( 1 - 3 * X_M_Y + XMY_2 - V_D_V ), // vg.vc.pw[6] * rho * (1 + 3 * (-v_x + v_y) + 4.5 * SQ(-v_x + v_y) - 1.5 * (SQ(v_x) + SQ(v_y))),
-            vg.vc.pw[7] * rho * ( 1 - 3 * X_P_Y + XPY_2 - V_D_V ), // vg.vc.pw[7] * rho * (1 + 3 * (-v_x - v_y) + 4.5 * SQ(-v_x - v_y) - 1.5 * (SQ(v_x) + SQ(v_y))),
-            vg.vc.pw[8] * rho * ( 1 + 3 * X_M_Y + XMY_2 - V_D_V )  // vg.vc.pw[8] * rho * (1 + 3 * ( v_x - v_y) + 4.5 * SQ( v_x - v_y) - 1.5 * (SQ(v_x) + SQ(v_y)))
+        T[9] f_eq = [                                              // #define SQ(x) ((x) * (x))
+            vg.vc.pw[0] * rho * (1                                                        - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[0] * rho * ( 1                     - V_D_V ), // 
+            vg.vc.pw[1] * rho * (1 + 3 * ( v_x)       + 4.5 * ( v_x)       * ( v_x)       - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[1] * rho * ( 1 + 3 *  v_x  + V_X_2 - V_D_V ), // 
+            vg.vc.pw[2] * rho * (1 + 3 * ( v_y)       + 4.5 * ( v_y)       * ( v_y)       - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[2] * rho * ( 1 + 3 *  v_y  + V_Y_2 - V_D_V ), // 
+            vg.vc.pw[3] * rho * (1 + 3 * (-v_x)       + 4.5 * (-v_x)       * (-v_x)       - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[3] * rho * ( 1 - 3 *  v_x  + V_X_2 - V_D_V ), // 
+            vg.vc.pw[4] * rho * (1 + 3 * (-v_y)       + 4.5 * (-v_y)       * (-v_y)       - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[4] * rho * ( 1 - 3 *  v_y  + V_Y_2 - V_D_V ), // 
+            vg.vc.pw[5] * rho * (1 + 3 * ( v_x + v_y) + 4.5 * ( v_x + v_y) * ( v_x + v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[5] * rho * ( 1 + 3 * X_P_Y + XPY_2 - V_D_V ), // 
+            vg.vc.pw[6] * rho * (1 + 3 * (-v_x + v_y) + 4.5 * (-v_x + v_y) * (-v_x + v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[6] * rho * ( 1 - 3 * X_M_Y + XMY_2 - V_D_V ), // 
+            vg.vc.pw[7] * rho * (1 + 3 * (-v_x - v_y) + 4.5 * (-v_x - v_y) * (-v_x - v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[7] * rho * ( 1 - 3 * X_P_Y + XPY_2 - V_D_V ), // 
+            vg.vc.pw[8] * rho * (1 + 3 * ( v_x - v_y) + 4.5 * ( v_x - v_y) * ( v_x - v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[8] * rho * ( 1 + 3 * X_M_Y + XMY_2 - V_D_V )  // 
         ];
 
         // Collide - inlining is not working properly, hence manually

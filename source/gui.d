@@ -1620,14 +1620,14 @@ void drawGui( ref VDrive_Gui_State vg ) {
             // set width of items and their label - aligned visually with 8 pixels
             ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
 
-            static float typical_vel = 0.05;
+            static float typical_vel = 0.1;
             ImGui.DragFloat( "Typical Velocity U", & typical_vel, 0.001f );
             if( ImGui.BeginPopupContextItem( "Typical Velocity Context Menu" )) {
                 if( ImGui.Selectable( "Wall Velocity" )) { typical_vel = vg.sim_wall_velocity; }
                 ImGui.EndPopup();
             }
 
-            static float typical_len = 1;
+            static float typical_len = 256;
             ImGui.DragFloat( "Typical Length L", & typical_len, 0.001f );
 
             auto next_win_size = ImVec2( 200, 60 ); ImGui.SetNextWindowSize( next_win_size );

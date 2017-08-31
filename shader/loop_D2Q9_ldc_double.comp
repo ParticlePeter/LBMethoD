@@ -111,7 +111,7 @@ void bounce( int p, double f ) {
 // first come N rest populations then N east, etc.,
 // With the index variable I = [0..N) we can reach individual velocities of population intervall at p
 // We load with ( ping + 1 ) * N + I and store with ( pong + 1 ) * N + I
-// to reach the population of any node 
+// to reach the population of any node
 
 // define global equivalent for gl_LocalInvocationIndex
 #define UI gl_GlobalInvocationID.x
@@ -174,15 +174,15 @@ void main( void ) {
     #define POP(p) (( ping + p ) * cell_count + I )
 
     double f[9] = {     // boundaries:                                    bback    :   no boundary streaming
-         packDouble2x32( popul_buffer,                                                     I            ).rg,
-         packDouble2x32( popul_buffer, X ==       0                   ?   POP(3)   :   POP(1) - DX      ).rg,
-         packDouble2x32( popul_buffer, Y == D.y - 1                   ?   POP(4)   :   POP(2)      + DY ).rg,
-         packDouble2x32( popul_buffer, X == D.x - 1                   ?   POP(1)   :   POP(3) + DX      ).rg,
-         packDouble2x32( popul_buffer, Y ==       0                   ?   POP(2)   :   POP(4)      - DY ).rg,
-         packDouble2x32( popul_buffer, X ==       0 || Y == D.y - 1   ?   POP(7)   :   POP(5) - DX + DY ).rg,
-         packDouble2x32( popul_buffer, Y == D.y - 1 || X == D.x - 1   ?   POP(8)   :   POP(6) + DX + DY ).rg,
-         packDouble2x32( popul_buffer, X == D.x - 1 || Y ==       0   ?   POP(5)   :   POP(7) + DX - DY ).rg,
-         packDouble2x32( popul_buffer, Y ==       0 || X ==       0   ?   POP(6)   :   POP(8) - DX - DY ).rg 
+         packDouble2x32( imageLoad( popul_buffer,                                                     I            ).rg ),
+         packDouble2x32( imageLoad( popul_buffer, X ==       0                   ?   POP(3)   :   POP(1) - DX      ).rg ),
+         packDouble2x32( imageLoad( popul_buffer, Y == D.y - 1                   ?   POP(4)   :   POP(2)      + DY ).rg ),
+         packDouble2x32( imageLoad( popul_buffer, X == D.x - 1                   ?   POP(1)   :   POP(3) + DX      ).rg ),
+         packDouble2x32( imageLoad( popul_buffer, Y ==       0                   ?   POP(2)   :   POP(4)      - DY ).rg ),
+         packDouble2x32( imageLoad( popul_buffer, X ==       0 || Y == D.y - 1   ?   POP(7)   :   POP(5) - DX + DY ).rg ),
+         packDouble2x32( imageLoad( popul_buffer, Y == D.y - 1 || X == D.x - 1   ?   POP(8)   :   POP(6) + DX + DY ).rg ),
+         packDouble2x32( imageLoad( popul_buffer, X == D.x - 1 || Y ==       0   ?   POP(5)   :   POP(7) + DX - DY ).rg ),
+         packDouble2x32( imageLoad( popul_buffer, Y ==       0 || X ==       0   ?   POP(6)   :   POP(8) - DX - DY ).rg )
     };
 
     // compute macroscopic properties
@@ -206,7 +206,7 @@ void main( void ) {
         #define XMY_2 ( 4.5 * X_M_Y * X_M_Y )
         #define V_D_V ( 1.5 * dot( vel, vel ))
 
-        double f_eq[9] = {                                    // #define SQ(x) ((x) * (x))
+        double f_eq[9] = {                                   // #define SQ(x) ((x) * (x))
             pw[0] * rho * ( 1                     - V_D_V ), // pw[0] * rho * (1                                                   - 1.5 * (SQ(vel.x) + SQ(vel.y))),
             pw[1] * rho * ( 1 + 3 * vel.x + V_X_2 - V_D_V ), // pw[1] * rho * (1 + 3 * ( vel.x)         + 4.5 * SQ( vel.x)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
             pw[2] * rho * ( 1 + 3 * vel.y + V_Y_2 - V_D_V ), // pw[2] * rho * (1 + 3 * ( vel.y)         + 4.5 * SQ( vel.y)         - 1.5 * (SQ(vel.x) + SQ(vel.y))),
@@ -349,19 +349,19 @@ void main( void ) {
 
         // trace of the pressure tensor
         double T = 1/rho*((((-vx)*(-vx)))*f0+(((1-vx)*(1-vx)))*f1+(((-vx)*(-vx)))*f2+(((-1-vx)*(-1-vx)))*f3+(((-vx)*(-vx)))*f4+(((1-vx)*(1-vx)))*f5+(((-1-vx)*(-1-vx)))*f6+(((-1-vx)*(-1-vx)))*f7+(((1-vx)*(1-vx)))*f8)+1/rho*((((-vy)*(-vy)))*f0+(((-vy)*(-vy)))*f1+(((1-vy)*(1-vy)))*f2+(((-vy)*(-vy)))*f3+(((-1-vy)*(-1-vy)))*f4+(((1-vy)*(1-vy)))*f5+(((1-vy)*(1-vy)))*f6+(((-1-vy)*(-1-vy)))*f7+(((-1-vy)*(-1-vy)))*f8);
-        
+
         // normal stress difference
         double N = 1/rho*((((-vx)*(-vx)))*f0+(((1-vx)*(1-vx)))*f1+(((-vx)*(-vx)))*f2+(((-1-vx)*(-1-vx)))*f3+(((-vx)*(-vx)))*f4+(((1-vx)*(1-vx)))*f5+(((-1-vx)*(-1-vx)))*f6+(((-1-vx)*(-1-vx)))*f7+(((1-vx)*(1-vx)))*f8)-(1/rho*((((-vy)*(-vy)))*f0+(((-vy)*(-vy)))*f1+(((1-vy)*(1-vy)))*f2+(((-vy)*(-vy)))*f3+(((-1-vy)*(-1-vy)))*f4+(((1-vy)*(1-vy)))*f5+(((1-vy)*(1-vy)))*f6+(((-1-vy)*(-1-vy)))*f7+(((-1-vy)*(-1-vy)))*f8));
-        
+
         // off diagonal element of the stress tensor
         double Pxy = 1/rho*(((-vx)*(-vy))*f0+((1-vx)*(-vy))*f1+((-vx)*(1-vy))*f2+((-1-vx)*(-vy))*f3+((-vx)*(-1-vy))*f4+((1-vx)*(1-vy))*f5+((-1-vx)*(1-vy))*f6+((-1-vx)*(-1-vy))*f7+((1-vx)*(-1-vy))*f8);
-        
+
         // fisrt third order moment
         double Qyxx = 1/rho*((((-vx)*(-vx))*(-vy))*f0+(((1-vx)*(1-vx))*(-vy))*f1+(((-vx)*(-vx))*(1-vy))*f2+(((-1-vx)*(-1-vx))*(-vy))*f3+(((-vx)*(-vx))*(-1-vy))*f4+(((1-vx)*(1-vx))*(1-vy))*f5+(((-1-vx)*(-1-vx))*(1-vy))*f6+(((-1-vx)*(-1-vx))*(-1-vy))*f7+(((1-vx)*(1-vx))*(-1-vy))*f8);
-        
+
         // second third order moment
         double Qxyy = 1/rho*(((-vx)*((-vy)*(-vy)))*f0+((1-vx)*((-vy)*(-vy)))*f1+((-vx)*((1-vy)*(1-vy)))*f2+((-1-vx)*((-vy)*(-vy)))*f3+((-vx)*((-1-vy)*(-1-vy)))*f4+((1-vx)*((1-vy)*(1-vy)))*f5+((-1-vx)*((1-vy)*(1-vy)))*f6+((-1-vx)*((-1-vy)*(-1-vy)))*f7+((1-vx)*((-1-vy)*(-1-vy)))*f8);
-        
+
         // fourth order moment
         double A = 1/rho*((((-vx)*(-vx))*((-vy)*(-vy)))*f0+(((1-vx)*(1-vx))*((-vy)*(-vy)))*f1+(((-vx)*(-vx))*((1-vy)*(1-vy)))*f2+(((-1-vx)*(-1-vx))*((-vy)*(-vy)))*f3+(((-vx)*(-vx))*((-1-vy)*(-1-vy)))*f4+(((1-vx)*(1-vx))*((1-vy)*(1-vy)))*f5+(((-1-vx)*(-1-vx))*((1-vy)*(1-vy)))*f6+(((-1-vx)*(-1-vx))*((-1-vy)*(-1-vy)))*f7+(((1-vx)*(1-vx))*((-1-vy)*(-1-vy)))*f8);
 
@@ -414,15 +414,15 @@ void main( void ) {
     // 7 4 8 //
 
     // Store new populations
-    imageStore( popul_buffer,                             I, uvec4( unpackDouble2x32( f[0], 0, 0 ));
-    imageStore( popul_buffer, ( pong + 1 ) * cell_count + I, uvec4( unpackDouble2x32( f[1], 0, 0 ));
-    imageStore( popul_buffer, ( pong + 2 ) * cell_count + I, uvec4( unpackDouble2x32( f[2], 0, 0 ));
-    imageStore( popul_buffer, ( pong + 3 ) * cell_count + I, uvec4( unpackDouble2x32( f[3], 0, 0 ));
-    imageStore( popul_buffer, ( pong + 4 ) * cell_count + I, uvec4( unpackDouble2x32( f[4], 0, 0 ));
-    imageStore( popul_buffer, ( pong + 5 ) * cell_count + I, uvec4( unpackDouble2x32( f[5], 0, 0 ));
-    imageStore( popul_buffer, ( pong + 6 ) * cell_count + I, uvec4( unpackDouble2x32( f[6], 0, 0 ));
-    imageStore( popul_buffer, ( pong + 7 ) * cell_count + I, uvec4( unpackDouble2x32( f[7], 0, 0 ));
-    imageStore( popul_buffer, ( pong + 8 ) * cell_count + I, uvec4( unpackDouble2x32( f[8], 0, 0 ));
+    imageStore( popul_buffer,                             I, uvec4( unpackDouble2x32( f[0] ), 0, 0 ));
+    imageStore( popul_buffer, ( pong + 1 ) * cell_count + I, uvec4( unpackDouble2x32( f[1] ), 0, 0 ));
+    imageStore( popul_buffer, ( pong + 2 ) * cell_count + I, uvec4( unpackDouble2x32( f[2] ), 0, 0 ));
+    imageStore( popul_buffer, ( pong + 3 ) * cell_count + I, uvec4( unpackDouble2x32( f[3] ), 0, 0 ));
+    imageStore( popul_buffer, ( pong + 4 ) * cell_count + I, uvec4( unpackDouble2x32( f[4] ), 0, 0 ));
+    imageStore( popul_buffer, ( pong + 5 ) * cell_count + I, uvec4( unpackDouble2x32( f[5] ), 0, 0 ));
+    imageStore( popul_buffer, ( pong + 6 ) * cell_count + I, uvec4( unpackDouble2x32( f[6] ), 0, 0 ));
+    imageStore( popul_buffer, ( pong + 7 ) * cell_count + I, uvec4( unpackDouble2x32( f[7] ), 0, 0 ));
+    imageStore( popul_buffer, ( pong + 8 ) * cell_count + I, uvec4( unpackDouble2x32( f[8] ), 0, 0 ));
 }   // main
 
 
