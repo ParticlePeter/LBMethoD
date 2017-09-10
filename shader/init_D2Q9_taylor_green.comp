@@ -1,0 +1,124 @@
+// --- COMP ---
+#version 450 core
+
+// uniform buffer
+layout( std140, binding = 5 ) uniform Compute_UBO {
+    float omega;            // collision frequency
+    float wall_velocity;
+};
+
+// specialization constants for local work group size
+layout( local_size_x_id = 0 ) in;
+//layout( local_size_y_id = 1 ) in;
+//layout( local_size_z_id = 2 ) in;
+
+// local work group defaults, when constants are not defined
+layout( local_size_x = 256 ) in;
+layout( local_size_y =   1 ) in;
+layout( local_size_z =   1 ) in;
+
+// populations 1 single buffered rest velocity, 8 double buffered link velocities
+layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
+
+// velocity and density write target, will be rendered as texture in next pass
+layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict writeonly image2DArray vel_rho_img;
+
+
+// population indices
+// 6 2 5 //
+//  \|/  //
+// 3-0-1 //
+//  /|\  //
+// 7 4 8 //
+
+
+// Directions:          R       E       N       W       S       NE      NW      SW      SE
+const float[9] pw = {   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 };
+
+
+////////////////////////////////////////////////////////
+// Common Indices and Counts for VkImage and VkBuffer //
+////////////////////////////////////////////////////////
+
+// shortcut to imageSize, the Domain of the computation, same as Global Size
+//#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
+#define D imageSize( vel_rho_img )
+
+// define global equivalent for gl_LocalInvocationIndex
+#define UI gl_GlobalInvocationID.x
+
+// U and I are also the index velocity population index
+#define I int( UI )
+
+#define X ( I % D.x )
+#define Y ( I / D.x )
+#define Z ( I / ( D.x * D.y ))
+
+// derived total count of nodes
+int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
+
+#define PI 3.1415926535897932384626433832795
+#define u_max wall_velocity
+#define t 0
+#define rho0 1
+// main simulation function
+void main( void ) {
+    // tau = relaxation_rate, omega = 1 / tau = collision_frequency
+    float nu  = 1.0 / ( 6.0 * omega );  // float nu = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
+    float kx  = 2.0 * PI / D.x;
+    float ky  = 2.0 * PI / D.y;
+    float td  = nu * ( kx * kx + ky * ky ); // 1.0 / ( nu * ( kx * kx + ky * ky ));    // this is twice divided, why ???
+    float xx  = X + 0.5;
+    float yy  = Y + 0.5;
+    float ux  = - u_max * sqrt( ky / kx ) * cos( kx * xx ) * sin( ky * yy ) * exp( -1.0 * t * td ); // / td );
+    float uy  =   u_max * sqrt( kx / ky ) * sin( kx * xx ) * cos( ky * yy ) * exp( -1.0 * t * td ); // / td );
+    float pp  = - 0.25  * rho0 * u_max * u_max
+              * (( ky / kx ) * cos( 2.0 * kx * xx ) + ( kx / ky ) * cos( 2.0 * ky * yy ))
+              * exp( - 2.0 * t * td ); // / td );
+    float rho = rho0 + 3.0 * pp;
+
+
+    // init velocities and densities
+    imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( ux, uy, 0, rho ));
+
+    const int dir_x[] = { 0, 1, 0, -1,  0, 1, -1, -1,  1 };
+    const int dir_y[] = { 0, 0, 1,  0, -1, 1,  1, -1, -1 };
+
+    // init all distribution f(unctions) with taylor green equilibrium, p = population
+    for( int p = 0; p < 9; ++p ) {
+        float pw_dot_u = dir_x[ p ] * ux + dir_y[ p ] * uy;
+        float pop = pw[ p ] * rho * ( 1.0 + 3.0 * pw_dot_u + 4.5 * pw_dot_u * pw_dot_u - 1.5 * ( ux * ux + uy * uy ));
+        imageStore( popul_buffer, p * cell_count + I, vec4( pop ));
+        if( p > 0 ) imageStore( popul_buffer, ( p + 8 ) * cell_count + I, vec4( pop ));
+    }
+}   // main
+
+
+
+/*
+void taylor_green( uint t, uint x, uint y, double *r, double *u, double *v ) {
+    float kx  = 2.0 * M_PI / NX;
+    float ky  = 2.0 * M_PI / NY;
+    float td  = 1.0 / ( nu * ( kx * kx + ky * ky ));
+    float xx  = X + 0.5;
+    float yy  = Y + 0.5;
+    float ux  = - u_max * sqrt( ky / kx ) * cos( kx * xx ) * sin( ky * yy ) * exp( -1.0 * t / td );
+    float uy  =   u_max * sqrt( kx / ky ) * sin( kx * xx ) * cos( ky * yy ) * exp( -1.0 * t / td );
+    float pp  = -0.25 * rho0 * u_max * u_max
+              * (( ky / kx ) * cos( 2.0 * kx * xx ) + ( kx / ky ) * cos( 2.0 * ky * yy ))
+              * exp( - 2.0 * t / td );
+    float rho = rho0 + 3.0 * pp;
+    *r = rho;
+    *u = ux;
+    *v = uy;
+}
+
+void taylor_green( uint t, double *r, double *u, double *v ) {
+    for(uint y = 0; y < Nyy; ++y) {
+        for(uint x = 0; x < Nxx; ++x) {
+            size_t sidx = scalar_index(x,y);
+            taylor_green(t,x,y,&r[sidx],&u[sidx],&v[sidx]);
+        }
+    }
+}
+*/
