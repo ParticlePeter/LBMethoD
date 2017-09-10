@@ -14,7 +14,7 @@ dependency          "erupted"           path    = "../ErupteD"
 dependency          "vdrive"            path    = "../V-Drive"
 dependency          "imgui_lib"         path    = "../../Lib_CPP/imgui_lib"
 
-libs                "../../Lib_CPP/imgui_lib/project/Debug/imgui"     // this should not be required or should simply be "imgui"
+libs                "../../Lib_CPP/imgui_lib/project/release/imgui"     // this should not be required or should simply be "imgui"
 
 //buildOptions      "profile"
 //buildOptions      "profileGC"
