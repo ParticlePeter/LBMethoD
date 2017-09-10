@@ -1205,7 +1205,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             // parse init shader through context menu
             if( ImGui.BeginPopupContextItem( "Init Shader Context Menu" )) {
                 if( ImGui.Selectable( "Parse Shader" )) {
-                    vg.createBoltzmannPSO( true, false, false );
+                    vg.createBoltzmannPSO( true, false, true );
                 } ImGui.EndPopup();
             }
 
@@ -1395,7 +1395,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 vg.updateDescriptorSet;
 
                 // recreate lattice boltzmann pipeline with possibly new shaders
-                vg.createBoltzmannPSO( true, true );
+                vg.createBoltzmannPSO( true, true, true );
                 vg.sim_init_shader_dirty = vg.sim_loop_shader_dirty = false;
 
                 if( vg.sim_use_cpu ) {
@@ -1407,8 +1407,8 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         } else if( vg.sim_init_shader_dirty || vg.sim_loop_shader_dirty ) {
             if( ImGui.Button( "Apply", button_size_2 )) {
-                vg.createBoltzmannPSO( vg.sim_init_shader_dirty, vg.sim_loop_shader_dirty );
                 vg.sim_init_shader_dirty = vg.sim_loop_shader_dirty = false;
+                vg.createBoltzmannPSO( vg.sim_init_shader_dirty, false, false );
             }
             ImGui.SameLine;
             ImGui.Text( "Changes" );
@@ -1417,7 +1417,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             if( ImGui.Button( "Apply", button_size_2 )) {
                 vg.sim_work_group_dirty     = false;
                 vg.vd.sim_work_group_size   = vg.sim_work_group_size;
-                vg.createBoltzmannPSO( false, false, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
+                vg.createBoltzmannPSO( true, true, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
             }
             ImGui.SameLine;
             ImGui.Text( "Changes" );
@@ -1562,7 +1562,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 vg.updateViscosity;
                 if( vg.sim_algorithm != 4 ) {
                     vg.sim_algorithm  = 4;
-                    vg.createBoltzmannPSO( false, true );
+                    vg.createBoltzmannPSO( false, true, false );
                 }
             }
             if( ImGui.Selectable( "Crazy Cascades" )) {
@@ -1572,7 +1572,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 vg.updateViscosity;
                 if( vg.sim_algorithm != 4 ) {
                     vg.sim_algorithm  = 4;
-                    vg.createBoltzmannPSO( false, true );
+                    vg.createBoltzmannPSO( false, true, false );
                 }
                 // set resolution to 1024 * 1024
 
@@ -1581,9 +1581,11 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         ImGui.Separator;
 
-        // kinematic viscosity
-        if( ImGui.DragFloat( "Kinematic Viscosity", & vg.sim_viscosity, 0.001f, 0.0f, 1000.0f, "%.8f", 2.0f )) {
-            vg.updateTauOmega;
+        // Relaxation Rate Tau
+        if( ImGui.DragFloat( "Relaxation Rate Tau",& vg.sim_relaxation_rate, 0.001f, 0.5f, 2.0f, "%.4f" )) {
+            vg.compute_ubo.collision_frequency = 1 / vg.sim_relaxation_rate;
+            vg.updateViscosity;
+            vg.updateComputeUBO;
         }
 
         // wall velocity
@@ -1594,7 +1596,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         // collision algorithm
         if( ImGui.Combo( "Collision Algorithm", cast( int* )( & vg.sim_algorithm ), "SRT-LBGK\0TRT\0MRT\0Cascaded\0Cascaded Drag\0\0" )) {
-            vg.createBoltzmannPSO( false, true );
+            vg.createBoltzmannPSO( false, true, false );
         }
 
         ImGui.Separator;
@@ -1605,17 +1607,18 @@ void drawGui( ref VDrive_Gui_State vg ) {
             // set width of items and their label - aligned visually with 8 pixels
             ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
 
+            // spatial and temporal unit
             if( ImGui.DragFloat2( "Spatial/Temporal Unit", & vg.sim_unit_spatial, 0.001f )) {  // next value in struct is vg.sim_unit_temporal
                 vg.sim_speed_of_sound = vg.sim_unit_speed_of_sound * vg.sim_unit_spatial / vg.sim_unit_temporal;
                 vg.updateTauOmega;
             }
 
-            if( ImGui.DragFloat( "Relaxation Rate Tau",& vg.sim_relaxation_rate, 0.001f, 0, 2 )) {
-                vg.compute_ubo.collision_frequency = 1 / vg.sim_relaxation_rate;
-                vg.updateViscosity;
-                vg.updateComputeUBO;
+            // kinematic viscosity
+            if( ImGui.DragFloat( "Kinematic Viscosity", & vg.sim_viscosity, 0.001f, 0.0f, 1000.0f, "%.9f", 2.0f )) {
+                vg.updateTauOmega;
             }
 
+            // Collision Frequency Omega
             if( ImGui.DragFloat( "Collision Frequency", & vg.compute_ubo.collision_frequency, 0.001f, 0, 2 )) {
                 vg.sim_relaxation_rate = 1 / vg.compute_ubo.collision_frequency;
                 vg.updateViscosity;

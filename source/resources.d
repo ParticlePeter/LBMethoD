@@ -571,7 +571,7 @@ void createRenderResources( ref VDrive_State vd ) {
 void createComputeResources( ref VDrive_State vd ) {
 
     vd.compute_cache = vd.createPipelineCache;
-    vd.createBoltzmannPSO( true, true );
+    vd.createBoltzmannPSO( true, true, true );
     vd.createParticleCompPipeline( true, true );
 
 }
@@ -582,7 +582,7 @@ void createComputeResources( ref VDrive_State vd ) {
 // create LBM init and loop PSOs as well as sim command buffers //
 //////////////////////////////////////////////////////////////////
 
-void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim = false ) {
+void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim ) {
 
     // create Meta_Specialization struct with static data array
     Meta_SC!( 4 ) meta_sc;
@@ -590,7 +590,7 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
         .addMapEntry( MapEntry32( vd.sim_work_group_size[0] ))  // default constantID is 0, next would be 1
         .addMapEntry( MapEntry32( vd.sim_work_group_size[1] ))  // default constantID is 1, next would be 2
         .addMapEntry( MapEntry32( vd.sim_work_group_size[2] ))  // default constantID is 2, next would be 3
-        .addMapEntry( MapEntry32( 1 + 255 ), 3 )                // latter is the constantID, must be passed in if the current constant id does not correspond
+        .addMapEntry( MapEntry32( vd.sim_algorithm ), 3 )       // latter is the constantID, must be passed in if the current constant id does not correspond
         .construct;
 
     void createComputePSO( Core_Pipeline* pso, string shader_path ) {
@@ -621,11 +621,16 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
     ];
     */
 
+    //import std.stdio;
+    //writeln( "sim_domain: ", vd.sim_domain );
+    //writeln( "group_size: ", vd.sim_work_group_size );
+    //writeln( "dispatch_x: ", dispatch_x );
+
     // possibly initialize the populations with initialization compute shader
     if( init_pso ) {
         createComputePSO( & vd.comp_init_pso, vd.sim_init_shader ); // putting responsibility to use the right double shader into users hand
         //  vd.sim_use_double ? "shader/init_D2Q9_double.comp" : "shader/init_D2Q9.comp" );
-        reset_sim = true;
+        //reset_sim = true;
     }
 
     if( reset_sim ) {
@@ -666,7 +671,7 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
 
     if( loop_pso ) {
         // reuse meta_compute to create loop compute pso with collision algorithm specialization
-        meta_sc.specialization_data[3] = MapEntry32( vd.sim_algorithm );    // all settings higher 0 are loop algorithms
+        //meta_sc.specialization_data[3] = MapEntry32( vd.sim_algorithm );    // all settings higher 0 are loop algorithms
         createComputePSO( & vd.comp_loop_pso, vd.sim_loop_shader );         // putting responsibility to use the right double shader into users hand
         //  vd.sim_use_double ? "shader/loop_D2Q9_ldc_double.comp" : "shader/loop_D2Q9_channel_flow.comp" );
     }
