@@ -1180,7 +1180,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             // select init shader
             static int init_shader_index = 0;
             ImGui.PushItemWidth( ImGui.GetWindowWidth * 0.75 );
-            if( ImGui.Combo( "Initialize", & init_shader_index, //"shader/init_D2Q9.comp\0\0" )
+            if( ImGui.Combo( "Initialize", & vg.init_shader_index, //"shader/init_D2Q9.comp\0\0" )
                 init_shader_start_index == size_t.max
                     ? "None found!"
                     : shader_names_ptr[ init_shader_start_index ] )
