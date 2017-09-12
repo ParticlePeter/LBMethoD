@@ -39,7 +39,7 @@ layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 layout( binding = 3, rgba32f ) uniform restrict writeonly image2DArray vel_rho_img;
 
 
-// population indices, +Z, 0Z, -Z
+// population indexes, +Z, 0Z, -Z
 // Z = 1 //     // Z = 0 //     // Z= -1 //
 // ===================================== //
 // 13  7 //     //   3   //     // 12  9 //
@@ -112,7 +112,7 @@ void main( void ) {
     // read from the ping population p of the current cell index, while the cell index can still be offset
     #define POP(p) (( ping + p ) * cell_count + I )
 
-    // population indices, +Z, 0Z, -Z
+    // population indexes, +Z, 0Z, -Z
     // Z = 1 //     // Z = 0 //     // Z= -1 //
     // ===================================== //
     // 13  7 //     //   3   //     // 12  9 //
@@ -241,7 +241,7 @@ void main( void ) {
 
 
 
-    // population indices, +Z, 0Z, -Z
+    // population indexes, +Z, 0Z, -Z
     // Z = 1 //     // Z = 0 //     // Z= -1 //
     // ===================================== //
     // 13  7 //     //   3   //     // 12  9 //

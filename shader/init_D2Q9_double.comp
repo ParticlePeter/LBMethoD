@@ -18,7 +18,7 @@ layout( binding = 2, rg32ui  ) uniform restrict uimageBuffer popul_buffer;
 layout( binding = 3, rgba32f ) uniform restrict writeonly image2DArray vel_rho_img;
 
 
-// population indices
+// population indexes
 // 6 2 5 //
 //  \|/  //
 // 3-0-1 //

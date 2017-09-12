@@ -31,7 +31,7 @@ layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 layout( binding = 8, r32f /*rgba16f*/ ) uniform restrict writeonly imageBuffer export_buffer[2];
 
 
-// population indices
+// population indexes
 // 6 2 5 //
 //  \|/  //
 // 3-0-1 //
@@ -88,7 +88,7 @@ int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
 // main simulation function
 void main( void ) {
 
-    // population indices
+    // population indexes
     // 6 2 5 //
     //  \|/  //
     // 3-0-1 //
