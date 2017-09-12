@@ -223,9 +223,9 @@ void createSimImage( ref VDrive_State vd ) {
             1, vd.sim_domain[2],                        // mip levels and array layers
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_SAMPLE_COUNT_1_BIT,
-            GREG ? VK_IMAGE_TILING_OPTIMAL : VK_IMAGE_TILING_LINEAR
+            VK_IMAGE_TILING_OPTIMAL     // : VK_IMAGE_TILING_LINEAR
             )
-        .createMemory( GREG ? VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT : VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )   // Todo(pp): check which memory property is required for the image format
+        .createMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT )    // : VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )   // Todo(pp): check which memory property is required for the image format
         .createView( subresource_range, VK_IMAGE_VIEW_TYPE_2D_ARRAY, image_format );
 
 
@@ -266,8 +266,6 @@ void createSimImage( ref VDrive_State vd ) {
 }
 
 
-
-enum GREG = true;
 
 //////////////////////////////////////////////////////////////
 // create or recreate simulation memory, buffers and images //
