@@ -119,7 +119,7 @@ void main( void ) {
     #define DY D.x
     #define DZ ( D.x * D.y )
 
-    // access the ping population p of the current cell index and grid offset o
+    // read from the ping population p of the current cell index and grid offset o
     //#define POO(p,o) (( ping + p ) * cell_count + ( I + o + cell_count + cell ) % cell_count )    // this alternative variant is not working correctly but worth looking into it one more time
     #define POP(p, xx, yy) (( ping + p ) * cell_count +  D.x * yy + xx )
     #define MOX(v) ((  D.x + v + X ) % D.x )
