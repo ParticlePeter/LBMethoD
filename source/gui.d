@@ -999,8 +999,8 @@ private {
 
         bool equal = cmp( gui_shader.fromStringz, sim_shader.stripExtension ) == 0;
         if( !equal ) sim_shader = gui_shader.fromStringz.to!string ~ sim_shader.extension;
-        import std.stdio;
-        writeln( sim_shader );
+        //import std.stdio;
+        //writeln( sim_shader );
         return equal;
     }
 
