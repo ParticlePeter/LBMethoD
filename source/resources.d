@@ -316,6 +316,14 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         .construct
         .sampler;
 
+    // reuse Meta_sampler to construct a new nearest neighbor sampler
+    vd.nearest_sampler = meta_sampler
+        .filter( VK_FILTER_NEAREST, VK_FILTER_NEAREST )
+    //  .addressMode( VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER )
+    //  .unnormalizedCoordinates( VK_TRUE )     // not requires to set as it is still set from edit before
+        .construct
+        .sampler;
+
     // Note(pp): immutable does not filter properly, either driver bug or module descriptor bug
     // Todo(pp): debug the issue
     ( *meta_descriptor_ptr )    // VDrive_State.descriptor is a Core_Descriptor
@@ -335,9 +343,10 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         // Sampler to read from macroscopic image in lines, display and export shader
         .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT )
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
+        .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.nearest_sampler )        // additional sampler if we want to examine each node
 
         // Compute UBO for compute parameter
-        .addLayoutBinding( 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
+        .addLayoutBinding( 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT )
         .addBufferInfo( vd.compute_ubo_buffer.buffer )
 
         // Display UBO for display parameter
@@ -374,6 +383,7 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
 
         .addBindingUpdate/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ) // immutable does not filter properly, either driver bug or module descriptor bug
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
+        .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.nearest_sampler )
 
         .addBindingUpdate( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
         .addTexelBufferView( vd.sim_particle_buffer_view )
@@ -405,7 +415,8 @@ void updateDescriptorSet( ref VDrive_State vd ) {
     vd.sim_descriptor_update.texel_buffer_views[0]    = vd.sim_buffer_view;             // populations buffer and optionally other data like temperature
     vd.sim_descriptor_update.texel_buffer_views[1]    = vd.sim_particle_buffer_view;    // particles to visualize LBM velocity
     vd.sim_descriptor_update.image_infos[0].imageView = vd.sim_image.image_view;        // image view for writing from compute shader
-    vd.sim_descriptor_update.image_infos[1].imageView = vd.sim_image.image_view;        // image view for reading in display fragment shader with linear sampling
+    vd.sim_descriptor_update.image_infos[1].imageView = vd.sim_image.image_view;        // image view for reading in display fragment shader with linear  sampling
+    vd.sim_descriptor_update.image_infos[2].imageView = vd.sim_image.image_view;        // image view for reading in display fragment shader with nearest sampling
     vd.sim_descriptor_update.update;
 
     // Note(pp):
@@ -564,7 +575,7 @@ void createRenderResources( ref VDrive_State vd ) {
 
     // create the graphics pipeline, can be called multiple time to parse shader at runtime
     vd.createGraphicsPSO;
-    vd.createLinePSO;           // line (and point) PSO to draw velocity lines coordinate axis, grid and 3D bounding box 
+    vd.createLinePSO;           // line (and point) PSO to draw velocity lines coordinate axis, grid and 3D bounding box
     vd.createParticleDrawPipeline;
 
     // create all resources for the compute pipeline
@@ -727,7 +738,7 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
 
 
 ////////////////////////////////////////////////
-// (re)create window size dependent resources // 
+// (re)create window size dependent resources //
 ////////////////////////////////////////////////
 
 void resizeRenderResources( ref VDrive_State vd ) {
@@ -940,6 +951,7 @@ void destroyResources( ref VDrive_State vd ) {
     // compute resources
     vd.destroy( vd.sim_buffer_view );
     vd.sim_image.destroyResources;
+    vd.destroy( vd.nearest_sampler );
     vd.sim_buffer.destroyResources;
     if( vd.sim_memory.is_constructed )
         vd.sim_memory.destroyResources;
