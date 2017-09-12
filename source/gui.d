@@ -1777,19 +1777,6 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
             // set width of items and their label - aligned visually with 8 pixels
             ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
-            /*
-            int[3] grid_lines = void;
-            foreach( i, ref gl; grid_lines )
-                gl = vg.sim_display.line_count[ i ];
-
-
-            if( ImGui.DragInt2( "Velocity Lines Count", grid_lines.ptr, 0.1, 0, 255 )) {
-                foreach( i, gl; grid_lines ) {
-                    gl = gl < 0 ? 0 : gl > 255 ? 255 : gl;
-                    vg.sim_display.line_count[ i ] = cast( ubyte )( gl & 255 );
-                }
-            }
-            */
 
             int line_count = vg.sim_display.repl_count;
             if( ImGui.DragInt( "Velocity Line Count", & vg.sim_display.repl_count, 0.1, 0, int.max ))
