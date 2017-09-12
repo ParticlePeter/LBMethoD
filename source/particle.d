@@ -34,6 +34,15 @@ void createTexelBuffer(
 */
 
 
+
+/// create particle resources
+void createParticleResources( ref VDrive_State vd ) {
+
+    vd.createParticleDrawPSO;
+    vd.createParticleCompPSO( true, true );
+
+}
+
 /// create particle buffer
 void createParticleBuffer( ref VDrive_State vd ) {
 
@@ -63,7 +72,7 @@ void createParticleBuffer( ref VDrive_State vd ) {
 
 
 
-void createParticleCompPipeline( ref VDrive_State vd, bool init_pso, bool loop_pso ) {
+void createParticleCompPSO( ref VDrive_State vd, bool init_pso, bool loop_pso ) {
 
     // create Meta_Specialization struct with static data array
     Meta_SC!( 1 ) meta_sc;
@@ -144,7 +153,7 @@ void createParticleCompPipeline( ref VDrive_State vd, bool init_pso, bool loop_p
 
 
 
-void createParticleDrawPipeline( ref VDrive_State vd ) {
+void createParticleDrawPSO( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
     if( vd.draw_part_pso.pipeline != VK_NULL_HANDLE ) {
