@@ -60,14 +60,19 @@ struct VDrive_Gui_State {
         axis,
         grid,
         bounds,
-        ghia___100,
-        ghia___400,
-        ghia__1000,
-        ghia__3200,
-        ghia__5000,
-        ghia__7500,
-        ghia_10000,
+        ghia,
+        count,
     };
+
+    enum Ghia_Type : int {
+        re___100,
+        re___400,
+        re__1000,
+        re__3200,
+        re__5000,
+        re__7500,
+        re_10000,
+    }
 
     struct Sim_Display {                // std140 conform
       align( 1 ):
@@ -93,8 +98,9 @@ struct VDrive_Gui_State {
     uint32_t    sim_play_cmd_buffer_count;
 
     // ldc (0,1), taylor_green (2,4),
-    int         init_shader_index = 0;  // 0-based default init shader index, from all shaders in shader dir starting with init
-    int         loop_shader_index = 1;  // 0-based default loop shader index, from all shaders in shader dir starting with loop   
+    int         init_shader_index   = 0;  // 0-based default init shader index, from all shaders in shader dir starting with init
+    int         loop_shader_index   = 1;  // 0-based default loop shader index, from all shaders in shader dir starting with loop   
+    Ghia_Type   sim_ghia_type       = Ghia_Type.re___100;
 
     bool        sim_use_double;
     bool        sim_use_3_dim;
@@ -109,6 +115,11 @@ struct VDrive_Gui_State {
     bool        sim_draw_axis;
     bool        sim_draw_grid;
     bool        sim_draw_bounds;
+    bool        sim_validate_ghia;
+    bool        sim_validate_poiseuille_flow;
+    bool        sim_validate_taylor_green;
+    bool        sim_validate_velocity = true;
+    bool        sim_validate_vel_base = false;
 
 }
 
@@ -1868,6 +1879,98 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
 
 
+    /////////////////////////
+    // Validate Simulation //
+    /////////////////////////
+
+    if( ImGui.CollapsingHeader( "Validate Simulation" )) {
+        ImGui.Separator;
+
+        //
+        // Ghia tree node
+        //
+        if( ImGui.TreeNode( "Ghia et. all - Lid Driven Cavity" )) {
+            ImGui.Separator;
+
+            // set width of items and their label - aligned visually with 8 pixels
+            ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
+
+            int axis = cast( int )( vg.sim_display.velocity_axis ) % 2;
+
+            ImGui.SetCursorPosX( 160 );
+
+            // setup parameter for profiling, sim_domain must be set manually
+            ImGui.SetCursorPosX( 160 );
+            if( ImGui.Checkbox( "Draw Ghia Profile", & vg.sim_validate_ghia )) {
+                if( vg.sim_validate_ghia ) {
+                    vg.sim_wall_velocity = 0.1;
+                    vg.updateWallVelocity;
+                }
+            }
+
+            ImGui.SetCursorPosX( 160 );
+            ImGui.Checkbox( "Draw Velocity Profile", & vg.sim_validate_velocity );
+
+            ImGui.SetCursorPosX( 160 );
+            ImGui.Checkbox( "Draw Velocity Base", & vg.sim_validate_vel_base );
+
+            if( ImGui.Combo( "Re Number", cast( int* )( & vg.sim_ghia_type ), "   100\0   400\0  1000\0  3200\0  5000\0  7500\0 10000\0\0" )) {
+                immutable float[7] re = [ 100, 400, 1000, 3200, 5000, 7500, 10000 ];
+                vg.sim_viscosity = 0.1 * vg.sim_typical_length / re[ vg.sim_ghia_type ];  // typical_vel * vg.sim_typical_length
+                vg.updateTauOmega;
+            }
+
+            ImGui.PopItemWidth;
+            ImGui.TreePop;
+        }
+
+        collapsingTerminator;
+
+
+        //
+        // poiseuille tree node
+        //
+        if( ImGui.TreeNode( "Poiseuille Flow" )) {
+            ImGui.Separator;
+
+            // set width of items and their label - aligned visually with 8 pixels
+            ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
+
+            ImGui.SetCursorPosX( 160 );
+            ImGui.Checkbox( "Draw Profile##1", & vg.sim_validate_poiseuille_flow );
+
+
+            ImGui.PopItemWidth;
+            ImGui.TreePop;
+        }
+
+        collapsingTerminator;
+
+
+        //
+        // taylor-green tree node
+        //
+        if( ImGui.TreeNode( "Taylor Green" )) {
+            ImGui.Separator;
+
+            // set width of items and their label - aligned visually with 8 pixels
+            ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
+
+            ImGui.SetCursorPosX( 160 );
+            ImGui.Checkbox( "Draw Profile##2", & vg.sim_validate_taylor_green );
+
+
+            ImGui.PopItemWidth;
+            ImGui.TreePop;
+        }
+
+
+        collapsingTerminator;
+
+    }
+
+
+
     ////////////////////////
     // Profile Simulation //
     ////////////////////////
@@ -2232,20 +2335,105 @@ void drawGuiData( ImDrawData* draw_data ) {
     }
 
 
+    //
+    // draw ghia validation profiles
+    //
+    if( vg.sim_validate_ghia ) {
 
-    // bind lbmd velocity lines pso
+        uint draw_as_points = vg.draw_velocity_lines_as_points ? 1 : 0;
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ draw_as_points ].pipeline );
+        auto pipeline_layout = vg.draw_line_pso[ draw_as_points ].pipeline_layout;
+
+        // push constant the whole sim_display struct
+        vg.sim_display.line_type = vg.Line_Type.ghia;
+
+        //
+        // store UI Values
+        //
+        int          repl_count     = vg.sim_display.repl_count;        
+        vg.Line_Axis line_axis      = vg.sim_display.line_axis;
+        vg.Line_Axis repl_axis      = vg.sim_display.repl_axis;
+        vg.Line_Axis velocity_axis  = vg.sim_display.velocity_axis;
+        float        line_offset    = vg.sim_display.line_offset;    
+
+
+        //
+        // vertical lines
+        //
+        vg.sim_display.repl_count = cast( int )vg.sim_ghia_type;    // choose Re
+        vg.sim_display.line_axis        = vg.Line_Axis.Y;
+        vg.sim_display.repl_axis        = vg.Line_Axis.X;
+        vg.sim_display.velocity_axis    = vg.Line_Axis.X;
+        vg.sim_display.line_offset      = 63;
+        cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Display.sizeof, & vg.sim_display );
+        cmd_buffer.vkCmdDraw( 17, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+
+        if( vg.sim_validate_velocity ) {
+            // adjust push constants and draw velocity line
+            vg.sim_display.line_type = vg.Line_Type.velocity;
+            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Display.sizeof, & vg.sim_display );
+            cmd_buffer.vkCmdDraw( vg.vd.sim_domain[ vg.sim_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        }
+
+        if( vg.sim_validate_vel_base ) {
+            // adjust push constants and draw velocity line
+            vg.sim_display.line_type = vg.Line_Type.vel_base;
+            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Display.sizeof, & vg.sim_display );
+            cmd_buffer.vkCmdDraw( vg.vd.sim_domain[ vg.sim_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        }
+
+
+        //
+        // horizontal lines
+        //
+        vg.sim_display.line_type        = vg.Line_Type.ghia;
+        vg.sim_display.velocity_axis    = vg.Line_Axis.Y;
+        vg.sim_display.repl_axis        = vg.Line_Axis.Y;
+        vg.sim_display.line_axis        = vg.Line_Axis.X;
+        cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Display.sizeof, & vg.sim_display );
+        cmd_buffer.vkCmdDraw( 17, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+
+        if( vg.sim_validate_velocity ) {
+            // adjust push constants and draw velocity line
+            vg.sim_display.line_type = vg.Line_Type.velocity;
+            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Display.sizeof, & vg.sim_display );
+            cmd_buffer.vkCmdDraw( vg.vd.sim_domain[ vg.sim_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        }
+
+        if( vg.sim_validate_vel_base ) {
+            // adjust push constants and draw velocity base line
+            vg.sim_display.line_type = vg.Line_Type.vel_base;
+            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Display.sizeof, & vg.sim_display );
+            cmd_buffer.vkCmdDraw( vg.vd.sim_domain[ vg.sim_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        }
+
+
+        //
+        // reconstruct UI values
+        //
+        vg.sim_display.repl_count       = repl_count;
+        vg.sim_display.line_axis        = line_axis;
+        vg.sim_display.repl_axis        = repl_axis;
+        vg.sim_display.velocity_axis    = velocity_axis;
+        vg.sim_display.line_offset      = line_offset;
+
+    }
+
+    //
+    // setup velocity and base lines drawing
+    //
     if( vg.sim_display.repl_count ) {
 
         uint draw_as_points = vg.draw_velocity_lines_as_points ? 1 : 0;
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ draw_as_points ].pipeline );
+        auto pipeline_layout = vg.draw_line_pso[ draw_as_points ].pipeline_layout;
 
         if( vg.sim_draw_vel_base ) {
 
             // push constant the whole sim_display struct
             vg.sim_display.line_type = vg.Line_Type.vel_base;
 
-            cmd_buffer.vkCmdPushConstants(
-                vg.draw_line_pso[ draw_as_points ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
+            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
 
             cmd_buffer.vkCmdDraw(
                 vg.vd.sim_domain[ vg.sim_display.line_axis ], vg.sim_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
@@ -2254,14 +2442,13 @@ void drawGuiData( ImDrawData* draw_data ) {
         // push constant the whole sim_display struct
         vg.sim_display.line_type = vg.Line_Type.velocity;
 
-        cmd_buffer.vkCmdPushConstants(
-            vg.draw_line_pso[ draw_as_points ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
+        cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
 
         cmd_buffer.vkCmdDraw(
             vg.vd.sim_domain[ vg.sim_display.line_axis ], vg.sim_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
         /*
-        if( vg.sim_display.line_count[0] > 0 ) // buffer-less draw with build in gl_VertexIndex exclusively to generate position and texcoord data
+        if( vg.sim_display.line_count[0] > 0 ) // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
             // the X lines run from top to bottom and repeat in X direction, hence their vertex count is the Y sim_domain
             cmd_buffer.vkCmdDraw( vg.vd.sim_domain[1] + 1, vg.sim_display.line_count[0], 0, 0 ); // vertex count, instance count, first vertex, first instance
 
