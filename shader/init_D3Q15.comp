@@ -15,12 +15,12 @@ layout( local_size_z =   1 ) in;
 layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 
 // velocity and density write target, will be rendered as texture in next pass
-layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict writeonly image2DArray vel_rho_img;
+layout( binding = 3, rgba32f /*rgba16f*/ ) uniform restrict writeonly image2DArray vel_rho_img;
 
 
 // population indices, +Z, 0Z, -Z
 // Z = 1 //     // Z = 0 //     // Z= -1 //
-// ===================================== // 
+// ===================================== //
 // 13  7 //     //   3   //     // 12  9 //
 //  \ /  //     //   |   //     //  \ /  //
 //   5   //     // 2-0-1 //     //   6   //
@@ -58,7 +58,7 @@ int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
 void main( void ) {
 
     // Init velocities and densities
-    imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( 0, 0, 0, 1 ));
+    imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( 0, 0, Y / 25.0, 1 ));
 
     // init all distribution f(unctions) with equilibrium, p = population
     for( int p = 0; p < 15; ++p )  {
@@ -112,7 +112,7 @@ void bounce( int p, float f ) {
 #define GID ivec3( gl_GlobalInvocationID )
 // define gl_WorkGroupIndex equivalent to gl_LocalInvocationIndex
 // this is confirmed on CPU, where is the crux ???
-uint work_group_index = 
+uint work_group_index =
     gl_WorkGroupID.z * gl_NumWorkGroups.z * gl_NumWorkGroups.y +
     gl_WorkGroupID.y * gl_NumWorkGroups.x +
     gl_WorkGroupID.x;
