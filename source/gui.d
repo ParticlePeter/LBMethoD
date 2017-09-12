@@ -1047,67 +1047,82 @@ private {
 void drawGui( ref VDrive_Gui_State vg ) {
 
     auto io = & ImGui.GetIO();
-    auto style = & ImGui.GetStyle();
+    
 
-    // Setup time step
-    auto current_time = cast( float )glfwGetTime();
-    io.DeltaTime = g_Time > 0.0f ? ( current_time - g_Time ) : ( 1.0f / 60.0f );
-    vg.xform_ubo.time_step = io.DeltaTime;
-    g_Time = current_time;
 
-    // Setup inputs
-    // (we already got mouse wheel, keyboard keys & characters from glfw callbacks polled in glfwPollEvents())
-    if( glfwGetWindowAttrib( vg.vd.window, GLFW_FOCUSED )) {
-        double mouse_x, mouse_y;
-        glfwGetCursorPos( vg.vd.window, &mouse_x, &mouse_y );
-        io.MousePos = ImVec2( cast( float )mouse_x, cast( float )mouse_y );   // Mouse position in screen coordinates (set to -1,-1 if no mouse / on another screen, etc.)
-    } else {
-        io.MousePos = ImVec2( -1, -1 );
+    //
+    // general per frame data
+    //
+    {
+        // Setup time step
+        auto current_time = cast( float )glfwGetTime();
+        io.DeltaTime = g_Time > 0.0f ? ( current_time - g_Time ) : ( 1.0f / 60.0f );
+        vg.xform_ubo.time_step = io.DeltaTime;
+        g_Time = current_time;
+
+        // Setup inputs
+        // (we already got mouse wheel, keyboard keys & characters from glfw callbacks polled in glfwPollEvents())
+        if( glfwGetWindowAttrib( vg.vd.window, GLFW_FOCUSED )) {
+            double mouse_x, mouse_y;
+            glfwGetCursorPos( vg.vd.window, &mouse_x, &mouse_y );
+            io.MousePos = ImVec2( cast( float )mouse_x, cast( float )mouse_y );   // Mouse position in screen coordinates (set to -1,-1 if no mouse / on another screen, etc.)
+        } else {
+            io.MousePos = ImVec2( -1, -1 );
+        }
+
+        // Todo(pp): move this into guiMouseButtonCallback
+        for( int i = 0; i < 3; i++ ) {
+            // If a mouse press event came, always pass it as "mouse held this frame", so we don't miss click-release events that are shorter than 1 frame.
+            io.MouseDown[ i ] = g_MousePressed[ i ] || glfwGetMouseButton( vg.vd.window, i ) != 0;
+            g_MousePressed[ i ] = false;
+        }
+
+        // Todo(pp): move this into guiScrollCallback
+        io.MouseWheel = g_MouseWheel;
+        g_MouseWheel = 0.0f;
+
+        // Hide OS mouse cursor if ImGui is drawing it
+        glfwSetInputMode( vg.vd.window, GLFW_CURSOR, io.MouseDrawCursor ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL );
+
+        // Start the frame
+        ImGui.NewFrame;
+
+        // 1. Show a simple window
+        // Tip: if we don't call ImGui.Begin()/ImGui.End() the widgets appears in a window automatically called "Debug"
+
+
+        ImGui.SetNextWindowPos(  main_win_pos,  ImGuiCond_Always );
+        ImGui.SetNextWindowSize( main_win_size, ImGuiCond_Always );
+        ImGui.Begin( "Main Window", null, window_flags );
+
+        // create transport controls at top of window
+        if( vg.isPlaying ) { if( ImGui.Button( "Pause", button_size_3 )) simPause( vg ); }
+        else               { if( ImGui.Button( "Play",  button_size_3 )) simPlay(  vg ); }
+        ImGui.SameLine;      if( ImGui.Button( "Step",  button_size_3 )) simStep(  vg );
+        ImGui.SameLine;      if( ImGui.Button( "Reset", button_size_3 )) simReset( vg );
+        ImGui.Separator;
+
+        // create transport controls at top of window
+        //if( vg.sim_play ) { if( ImGui.Button( "Pause", button_size_3 )) { draw_func = & drawSim; vg.drawCmdBufferCount = 2; }
+        //else              { if( ImGui.Button( "Play",  button_size_3 )) { draw_func = & draw;    vg.drawCmdBufferCount = 1; }
+        //ImGui.SameLine;     if( ImGui.Button( "Step",  button_size_3 ) && !sim_play ) { vg.drawCmdBufferCount = 2; vg.drawSim; vg.drawCmdBufferCount = 1; }
+        //ImGui.SameLine;     if( ImGui.Button( "Reset", button_size_3 )) vg.simReset;
+        //ImGui.Separator;
+
+        // set width of items and their label
+        ImGui.PushItemWidth( main_win_size.x / 2 );
     }
 
-    for( int i = 0; i < 3; i++ ) {
-        // If a mouse press event came, always pass it as "mouse held this frame", so we don't miss click-release events that are shorter than 1 frame.
-        io.MouseDown[ i ] = g_MousePressed[ i ] || glfwGetMouseButton( vg.vd.window, i ) != 0;
-        g_MousePressed[ i ] = false;
-    }
-
-    io.MouseWheel = g_MouseWheel;
-    g_MouseWheel = 0.0f;
-
-    // Hide OS mouse cursor if ImGui is drawing it
-    glfwSetInputMode( vg.vd.window, GLFW_CURSOR, io.MouseDrawCursor ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL );
-
-    // Start the frame
-    ImGui.NewFrame;
-
-    // 1. Show a simple window
-    // Tip: if we don't call ImGui.Begin()/ImGui.End() the widgets appears in a window automatically called "Debug"
 
 
-    ImGui.SetNextWindowPos(  main_win_pos,  ImGuiCond_Always );
-    ImGui.SetNextWindowSize( main_win_size, ImGuiCond_Always );
-    ImGui.Begin( "Main Window", null, window_flags );
-
-    // create transport controls at top of window
-    if( vg.isPlaying ) { if( ImGui.Button( "Pause", button_size_3 )) simPause( vg ); }
-    else               { if( ImGui.Button( "Play",  button_size_3 )) simPlay(  vg ); }
-    ImGui.SameLine;      if( ImGui.Button( "Step",  button_size_3 )) simStep(  vg );
-    ImGui.SameLine;      if( ImGui.Button( "Reset", button_size_3 )) simReset( vg );
-    ImGui.Separator;
-
-    // create transport controls at top of window
-    //if( vg.sim_play ) { if( ImGui.Button( "Pause", button_size_3 )) { draw_func = & drawSim; vg.drawCmdBufferCount = 2; }
-    //else              { if( ImGui.Button( "Play",  button_size_3 )) { draw_func = & draw;    vg.drawCmdBufferCount = 1; }
-    //ImGui.SameLine;     if( ImGui.Button( "Step",  button_size_3 ) && !sim_play ) { vg.drawCmdBufferCount = 2; vg.drawSim; vg.drawCmdBufferCount = 1; }
-    //ImGui.SameLine;     if( ImGui.Button( "Reset", button_size_3 )) vg.simReset;
-    //ImGui.Separator;
-
-    // set width of items and their label
-    ImGui.PushItemWidth( main_win_size.x / 2 );
-
+    //
     // ImGui example Widgets
+    //
     if( show_imgui_examples ) {
 
+        auto style = & ImGui.GetStyle();
+
+        // set gui transparency
         ImGui.SliderFloat( "Gui Alpha", &style.Colors[ ImGuiCol_WindowBg ].w, 0.0f, 1.0f );
 
         // little hacky, but works - as we know that the corresponding clear value index
