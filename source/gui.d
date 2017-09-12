@@ -56,10 +56,10 @@ struct VDrive_Gui_State {
     enum Line_Axis : uint8_t { X, Y, Z };
     enum Line_Type : uint8_t {
         velocity,
+        vel_base,
         axis,
         grid,
-        vel_base,
-        bound,
+        bounds,
         ghia___100,
         ghia___400,
         ghia__1000,

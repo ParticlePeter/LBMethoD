@@ -40,8 +40,9 @@ layout( location = 0 ) out vec4 vs_color;
 
 // specialization constants for init or loop phase
 #define DISPLAY_VELOCITY    0
-#define DISPLAY_AXIS        1
-#define DISPLAY_GRID        2
+#define DISPLAY_VEL_BASE    1
+#define DISPLAY_AXIS        2
+#define DISPLAY_GRID        3
 //layout( constant_id = 0 ) const uint DISPLAY_TYPE = DISPLAY_VELOCITY;
 uint DISPLAY_TYPE = pc.line_type___line_axis___repl_axis___velocity_axis & 0xff;
 uint LA = ( pc.line_type___line_axis___repl_axis___velocity_axis >>  8 ) & 0xff;
