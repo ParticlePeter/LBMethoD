@@ -185,7 +185,7 @@ void main( void ) {
     //
     // Collision Algorithms (Compile Time if), currently only LBGK implemented
     //
-    if( ALGORITHM == LOOP_SRT_LBGK )
+    if(( ALGORITHM & 0xff ) == LOOP_SRT_LBGK )
     {
         // compute equilibrium
         #define PXPYPZ ( vel.x + vel.y + vel.z )

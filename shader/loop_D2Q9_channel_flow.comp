@@ -146,7 +146,7 @@ void main( void ) {
     //
     // Collision Algorithms (Compile Time if)
     //
-    if( ALGORITHM == LOOP_SRT_LBGK ) {
+    if(( ALGORITHM & 0xff ) == LOOP_SRT_LBGK ) {
 
         // compute equilibrium
         #define X_P_Y ( vel.x + vel.y )
@@ -185,7 +185,7 @@ void main( void ) {
 
 
 
-    else if( ALGORITHM == LOOP_TRT ) {
+    else if(( ALGORITHM & 0xff ) == LOOP_TRT ) {
 
         // compute equilibrium
         #define X_P_Y ( vel.x + vel.y )
@@ -270,7 +270,7 @@ void main( void ) {
 
 
 
-    else if( ALGORITHM == LOOP_CASCADED || ALGORITHM == LOOP_CASCADED_DRAG ) {
+    else if(( ALGORITHM & 0xff ) == LOOP_CASCADED || ALGORITHM == LOOP_CASCADED_DRAG ) {
 
         #define vx vel.x
         #define vy vel.y
@@ -286,7 +286,7 @@ void main( void ) {
 
 
         // with the following "hack" the cascaded LBM will be ALWAYS stable!
-        if( ALGORITHM == LOOP_CASCADED_DRAG ) {
+        if(( ALGORITHM & 0xff ) == LOOP_CASCADED_DRAG ) {
             #define NORM 0.42f
             float norm = length( vel );//sqrt(vx*vx+vy*vy);
             if( norm > NORM ) vel *=  NORM / norm;

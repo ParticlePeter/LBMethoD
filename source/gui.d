@@ -1525,7 +1525,13 @@ void drawGui( ref VDrive_Gui_State vg ) {
         }
 
 
-
+        //
+        // Store Nth Step
+        //
+        int step_size = cast( int )vg.sim_step_size;
+        if( ImGui.DragInt( "Store Nth Step", & step_size, 0.1, 1, int.max )) {
+            vg.sim_step_size = step_size < 1 ? 1 : step_size;
+        }
         /*
         //////////////////////////////////////////////////////////////////////////////////////////////
         // Work Group Size alternative version when we can use multi dim work group sizes in shader //
