@@ -72,6 +72,7 @@ struct VDrive_Gui_State {
     uint32_t[3] sim_domain;
     uint32_t    sim_layers;
     uint32_t[3] sim_work_group_size;
+    float       sim_typical_length;
 
     // count of command buffers to be drawn when in play mode
     uint32_t    sim_play_cmd_buffer_count;
@@ -264,6 +265,7 @@ void createMemoryObjects( ref VDrive_Gui_State vg ) {
 
     // initialize VDrive_Gui_State member from VDrive_State member
     vg.sim_domain               = vg.vd.sim_domain;
+    vg.sim_typical_length       = vg.vd.sim_domain[0];
     vg.sim_layers               = vg.vd.sim_layers;
     vg.sim_work_group_size      = vg.vd.sim_work_group_size;
     vg.sim_use_double           = vg.vd.sim_use_double;
@@ -1646,33 +1648,32 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 ImGui.EndPopup();
             }
 
-            static float typical_len = 256;
-            ImGui.DragFloat( "Typical Length L", & typical_len, 0.001f );
+            ImGui.DragFloat( "Typical Length L", & vg.sim_typical_length, 0.001f );
 
             auto next_win_size = ImVec2( 200, 60 ); ImGui.SetNextWindowSize( next_win_size );
             if( ImGui.BeginPopupContextItem( "Typical Length Context Menu" )) {
 
-                if( ImGui.Selectable( "Spatial Lattice Unit" )) { typical_len = vg.sim_unit_spatial; }
+                if( ImGui.Selectable( "Spatial Lattice Unit" )) { vg.sim_typical_length = vg.sim_unit_spatial; }
                 ImGui.Separator;
 
                 ImGui.Columns( 2, "Typical Length Context Columns", true );
 
-                if( ImGui.Selectable( "Lattice X" )) { typical_len = vg.sim_domain[0]; }
+                if( ImGui.Selectable( "Lattice X" )) { vg.sim_typical_length = vg.sim_domain[0]; }
                 ImGui.NextColumn();
-                if( ImGui.Selectable( "Lattice Y" )) { typical_len = vg.sim_domain[1]; }
+                if( ImGui.Selectable( "Lattice Y" )) { vg.sim_typical_length = vg.sim_domain[1]; }
                 ImGui.NextColumn();
 
-                if( ImGui.Selectable( "Domain X" )) { typical_len = vg.sim_domain[0] * vg.sim_unit_spatial; }
+                if( ImGui.Selectable( "Domain X"  )) { vg.sim_typical_length = vg.sim_domain[0] * vg.sim_unit_spatial; }
                 ImGui.NextColumn();
-                if( ImGui.Selectable( "Domain Y" )) { typical_len = vg.sim_domain[1] * vg.sim_unit_spatial; }
+                if( ImGui.Selectable( "Domain Y"  )) { vg.sim_typical_length = vg.sim_domain[1] * vg.sim_unit_spatial; }
                 ImGui.NextColumn();
 
                 ImGui.EndPopup;
             }
 
-            float re = typical_vel * typical_len / vg.sim_viscosity;
+            float re = typical_vel * vg.sim_typical_length / vg.sim_viscosity;
             if( ImGui.DragFloat( "Re", & re, 0.001f )) {
-                vg.sim_viscosity = typical_vel * typical_len / re;
+                vg.sim_viscosity = typical_vel * vg.sim_typical_length / re;
                 vg.updateTauOmega;
             }
 
