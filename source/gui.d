@@ -2263,16 +2263,23 @@ void guiMouseButtonCallback( GLFWwindow* window, int button, int val, int mod ) 
     if( val == GLFW_PRESS && button >= 0 && button < 3 )
         g_MousePressed[ button ] = true;
 
-    // forward to input.guiKeyCallback
-    import input : inputMouseButtonCallback = mouseButtonCallback;
-    inputMouseButtonCallback( window, button, val, mod );
+    auto io = & ImGui.GetIO();
+    if( !io.WantCaptureMouse ) {
+        // forward to input.mouseButtonCallback
+        import input : mouseButtonCallback;
+        mouseButtonCallback( window, button, val, mod );
+    }
 }
 
 
 void guiScrollCallback( GLFWwindow* window, double xoffset, double yoffset ) {
     g_MouseWheel += cast( float )yoffset; // Use fractional mouse wheel, 1.0 unit 5 lines.
-    import input : scrollCallback;
-    scrollCallback( window, xoffset, yoffset );
+    auto io = & ImGui.GetIO();
+    if( !io.WantCaptureMouse ) {
+        // forward to input.scrollCallback
+        import input : scrollCallback;
+        scrollCallback( window, xoffset, yoffset );
+    }
 }
 
 
