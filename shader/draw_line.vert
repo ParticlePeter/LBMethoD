@@ -35,7 +35,7 @@ out gl_PerVertex {                              // not redifining gl_PerVertex u
 };                                              // error seems to have vanished by now, but it does no harm to keep this redefinition
 
 
-layout( location = 0 ) out vec3 vs_color;
+layout( location = 0 ) out vec4 vs_color;
 
 
 // specialization constants for init or loop phase
@@ -75,20 +75,7 @@ void main() {
 
     switch( DISPLAY_TYPE ) {
     case DISPLAY_VELOCITY :
-        /*
-        vec2 offset = ( vec2( 2 * II + 2 ) - vec2( IC + 1 )) / vec2( IC + 1 );
-        offset[ 1 - LA ] = 2 * VI * LN[ 1 - LA ] - 1; //SD[ 1 - LA ] - SD[ 1 - LA ];
-
-        vec2 tex_coord = 0.5 * offset + 0.5;
-        vec4 vel_rho = texture( vel_rho_tex, vec3( tex_coord, z_layer )); // access velocity density texture, result
-
-        offset *= SD.xy;
-        offset[ LA ] += dir[ LA ] * vel_rho[ LA ] * SD[ LA ];
-
-        vs_color = vec3( 1, 1, 0 );
-        pos = vec4( offset, 0, 1 );
-        */
-        vs_color = vec3( 1, 1, 0 );
+        vs_color = vec4( 1, 1, 0, 1 );
         pos[ LA ] += 0.5 + VI;
         pos[ RA ] += 0.5 + II * pc.repl_spread + pc.line_offset;
         pos[ VA ] += texture( vel_rho_tex, pos.xyz )[ VA ] * pc.sim_domain[ VA ] * vec3( 1, -1, 1 )[ VA ];  // latter param is fixing 
@@ -96,16 +83,15 @@ void main() {
 
 
     case DISPLAY_AXIS :
-        const vec3[3] colors = { vec3( 1, 0, 0 ), vec3( 0, 1, 0 ), vec3( 0, 0, 1 ) };
+        const vec4[3] colors = { vec4( 1, 0, 0, 1 ), vec4( 0, 1, 0, 1 ), vec4( 0, 0, 1, 1 ) };
         vs_color = colors[ II ];
-        pos = vec4( VI * vs_color, 1 );
-        //gl_Position = WVPM * pos;
+        pos = vec4( VI * vs_color.rgb, 1 );
         break;
 
 
     case DISPLAY_GRID :
-        //vs_color = vec3( 0.25 );
-        vs_color = vec3( 1, 0, 0 );
+        vs_color = vec4( 0.25 );
+        //vs_color = vec3( 1, 0, 0 );
         pos[ LA ] = float( II );
         pos[ 1 - LA ] = float( VI * SD[ 1 - LA ] );
         break;
