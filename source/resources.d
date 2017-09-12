@@ -8,6 +8,10 @@ import particle;
 
 import dlsl.matrix;
 
+public import compute;
+
+
+enum PARTICLE = false;
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -245,9 +249,10 @@ void createSimMemoryObjects( ref VDrive_State vd ) {
     // 5.) (re)create VkImageView and VkBufferView(s)
     // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
 
-    vd.createParticleBuffer;
     vd.createSimBuffer;
     vd.createSimImage;
+    if( PARTICLE )
+        vd.createParticleBuffer;
 
 }
 
@@ -316,14 +321,15 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         .addLayoutBinding( 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT )
         .addBufferInfo( vd.display_ubo_buffer.buffer )
 
-        // Particles Buffer, not used yet
-        .addLayoutBinding( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
-        .addTexelBufferView( vd.sim_particle_buffer_view )
-
         // Export Buffer views, these will be set and written when export is activated
         .addLayoutBinding( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 2 );
         //.addTexelBufferView( vd.export_buffer_view[0] );
         //.addTexelBufferView( vd.export_buffer_view[1] );
+
+    if( PARTICLE )  // Particles Buffer, not used yet
+        ( *meta_descriptor_ptr ) 
+            .addLayoutBinding( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
+            .addTexelBufferView( vd.sim_particle_buffer_view );
 
     // The app crashes here in construct sometimes, and it is not clear why
     // In Debug mode we see that some undefined exception is thrown, which cannot be caught here
@@ -348,11 +354,12 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.nearest_sampler )
 
-        .addBindingUpdate( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
-        .addTexelBufferView( vd.sim_particle_buffer_view )
-
         .attachSet( vd.descriptor.descriptor_set );
 
+    if( PARTICLE )  // Particles Buffer, not used yet
+        vd.sim_descriptor_update
+            .addBindingUpdate( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
+            .addTexelBufferView( vd.sim_particle_buffer_view );
 
     // this one is solely for export data purpose to be absolute lazy about resource construction
     // which is only necessary if we export at all, and then just before the export
@@ -376,10 +383,13 @@ void updateDescriptorSet( ref VDrive_State vd ) {
 
     // update the descriptor
     vd.sim_descriptor_update.texel_buffer_views[0]    = vd.sim_buffer_view;             // populations buffer and optionally other data like temperature
-    vd.sim_descriptor_update.texel_buffer_views[1]    = vd.sim_particle_buffer_view;    // particles to visualize LBM velocity
     vd.sim_descriptor_update.image_infos[0].imageView = vd.sim_image.image_view;        // image view for writing from compute shader
     vd.sim_descriptor_update.image_infos[1].imageView = vd.sim_image.image_view;        // image view for reading in display fragment shader with linear  sampling
     vd.sim_descriptor_update.image_infos[2].imageView = vd.sim_image.image_view;        // image view for reading in display fragment shader with nearest sampling
+
+    if( PARTICLE )  // Particles Buffer, not used yet
+        vd.sim_descriptor_update.texel_buffer_views[1]= vd.sim_particle_buffer_view;    // particles to visualize LBM velocity
+
     vd.sim_descriptor_update.update;
 
     // Note(pp):
@@ -539,10 +549,11 @@ void createRenderResources( ref VDrive_State vd ) {
     // create the graphics pipeline, can be called multiple time to parse shader at runtime
     vd.createGraphicsPSO;
     vd.createLinePSO;           // line (and point) PSO to draw velocity lines coordinate axis, grid and 3D bounding box
-    vd.createParticleDrawPipeline;
 
     // create all resources for the compute pipeline
     vd.createComputeResources;
+    if( PARTICLE )      // Particles are not used yet
+        vd.createParticleResources;
 }
 
 
@@ -746,7 +757,8 @@ void destroyResources( ref VDrive_State vd ) {
 
     vd.device.vkDeviceWaitIdle;
 
-    vd.destroyParticles;
+    if( PARTICLE )
+        vd.destroyParticles;
 
     // surface, swapchain and present image views
     vd.swapchain.destroyResources;
