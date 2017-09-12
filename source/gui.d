@@ -77,6 +77,10 @@ struct VDrive_Gui_State {
     // count of command buffers to be drawn when in play mode
     uint32_t    sim_play_cmd_buffer_count;
 
+    // ldc (0,1), taylor_green (2,4),
+    int         init_shader_index = 0;  // 0-based default init shader index, from all shaders in shader dir starting with init
+    int         loop_shader_index = 1;  // 0-based default loop shader index, from all shaders in shader dir starting with loop   
+
     bool        sim_use_double;
     bool        sim_use_3_dim;
     bool        sim_compute_dirty;
@@ -321,8 +325,11 @@ void createMemoryObjects( ref VDrive_Gui_State vg ) {
 
 
     // collect useable shaders
-    if( hasShaderDirChanged( "shader" ))
-        parseShaderDirectory;
+    //if( hasShaderDirChanged( "shader" ))
+    parseShaderDirectory;
+    compareShaderNamesAndReplace( shader_names_ptr[ init_shader_start_index + vg.init_shader_index ], vg.sim_init_shader );
+    compareShaderNamesAndReplace( shader_names_ptr[ loop_shader_start_index + vg.loop_shader_index ], vg.sim_loop_shader );
+
     /*
     import std.stdio;
     printf( shader_names_ptr[ 1 ] );
