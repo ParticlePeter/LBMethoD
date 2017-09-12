@@ -53,14 +53,29 @@ struct VDrive_Gui_State {
     float       sim_viscosity;          // at a relaxation rate of 1 and lattice units x, t = 1
     float       sim_wall_velocity;
 
+    enum Line_Axis : uint8_t { X, Y, Z };
+    enum Line_Type : uint8_t {
+        velocity,
+        axis,
+        grid,
+        vel_base,
+        bound,
+        ghia___100,
+        ghia___400,
+        ghia__1000,
+        ghia__3200,
+        ghia__5000,
+        ghia__7500,
+        ghia_10000,
+    };
 
     struct Sim_Display {                // std140 conform
       align( 1 ):
         uint[3]     sim_domain;
-        ubyte       line_type       = 0;
-        ubyte       line_axis       = 1;
-        ubyte       repl_axis       = 0;
-        ubyte       velocity_axis   = 0;
+        Line_Type   line_type       = Line_Type.velocity;
+        Line_Axis   line_axis       = Line_Axis.X;
+        Line_Axis   repl_axis       = Line_Axis.X;
+        Line_Axis   velocity_axis   = Line_Axis.X;
         int         repl_count      = 0;
         float       line_offset     = 0;
         float       repl_spread     = 1;
@@ -1148,6 +1163,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
     }
 
 
+
     ////////////////////
     // Compute Device //
     ////////////////////
@@ -1775,17 +1791,17 @@ void drawGui( ref VDrive_Gui_State vg ) {
             ImGui.DragFloat2( "Line Offset/Spread", & vg.sim_display.line_offset, 1.0f );  // next value in struct is repl_spread
 
             const( char )* axis_label = "X\0Y\0Z\0\0";
-            int axis = vg.sim_display.velocity_axis;
+            int axis = cast( int )vg.sim_display.velocity_axis;
             if( ImGui.Combo( "Velocity Direction", & axis, axis_label ))
-                vg.sim_display.velocity_axis = cast( ubyte )axis;
+                vg.sim_display.velocity_axis = cast( vg.Line_Axis )axis;
 
-            axis = vg.sim_display.repl_axis;
+            axis = cast( int )vg.sim_display.repl_axis;
             if( ImGui.Combo( "Replication Direction", & axis, axis_label ))
-                vg.sim_display.repl_axis = cast( ubyte )axis;
+                vg.sim_display.repl_axis = cast( vg.Line_Axis )axis;
 
-            axis = vg.sim_display.line_axis;
+            axis = cast( int )vg.sim_display.line_axis;
             if( ImGui.Combo( "Line Direction", & axis, axis_label ))
-                vg.sim_display.line_axis = cast( ubyte )axis;
+                vg.sim_display.line_axis = cast( vg.Line_Axis )axis;
 
             ImGui.SetCursorPosX( 160 );
             ImGui.Checkbox( "Draw as Points", & vg.draw_velocity_lines_as_points );
@@ -1866,7 +1882,6 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         collapsingTerminator;
     }
-
 
 
 
@@ -2127,14 +2142,15 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
-
+    //
     // bind lbmd graphics pso
+    //
     cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.graphics_pso.pipeline );
 
     // push constant the sim display scale
     cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, vg.vd.sim_domain.ptr ); //sim_display.scale.ptr );
 
-    // buffer-less draw with build in gl_VertexIndex exclusively to generate position and texcoord data
+    // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
     cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
 
@@ -2142,30 +2158,35 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
-
+    //
     // bind lines pipeline
+    //
     cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ 0 ].pipeline );
 
+
+    //
     // set push constants and record draw commands for axis drawing
-    vg.sim_display.line_type = 1;
-    cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.sim_domain.sizeof, uint32_t.sizeof, & vg.sim_display.line_type );
+    //
+    vg.sim_display.line_type = vg.Line_Type.axis;
+    cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
     cmd_buffer.vkCmdDraw( 2, 3, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
 
-    /*
+    //
     // set push constants and record draw commands for grid drawing
-    vg.sim_display.line_type = 2;
+    //
+    vg.sim_display.line_type = vg.Line_Type.grid;
 
-    // draw lines repeting in X direction
-    vg.sim_display.line_axis = 0;
+    // draw lines repeating in X direction
+    vg.sim_display.line_axis = vg.Line_Axis.X;
     cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * uint32_t.sizeof, & vg.sim_display );
     cmd_buffer.vkCmdDraw( 2, vg.sim_domain[0] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
     // draw lines repeating in Y direction
-    vg.sim_display.line_axis = 1;
-    cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.sim_domain.sizeof, uint32_t.sizeof, & vg.sim_display.line_type );
+    vg.sim_display.line_axis = vg.Line_Axis.Y;
+    cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
     cmd_buffer.vkCmdDraw( 2, vg.sim_domain[1] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
-    */
+    
 
 
 
@@ -2176,7 +2197,7 @@ void drawGuiData( ImDrawData* draw_data ) {
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ draw_as_points ].pipeline );
 
         // push constant the whole sim_display struct
-        vg.sim_display.line_type = 0;
+        vg.sim_display.line_type = vg.Line_Type.velocity;
         cmd_buffer.vkCmdPushConstants(
             vg.draw_line_pso[ draw_as_points ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
         cmd_buffer.vkCmdDraw(
@@ -2190,7 +2211,7 @@ void drawGuiData( ImDrawData* draw_data ) {
         if( vg.sim_display.line_count[1] > 0 ) {
             vg.sim_display.line_axis = 1;
             // the Y lines run from left to right and repeat in Y direction, hence their vertex count is the X sim_domain
-            cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ vg.Line_Type.velocity ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
+            cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ vg.vg.Line_Type.velocity ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
             cmd_buffer.vkCmdDraw( vg.vd.sim_domain[0] + 1, vg.sim_display.line_count[1], 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
         */
