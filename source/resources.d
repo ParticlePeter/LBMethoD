@@ -703,9 +703,6 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
         // begin command buffer recording
         cmd_buffer.vkBeginCommandBuffer( &cmd_buffer_begin_info );
 
-        // begin the render_pass
-        cmd_buffer.vkCmdBeginRenderPass( &vd.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
-
         // take care of dynamic state
         cmd_buffer.vkCmdSetViewport( 0, 1, &vd.viewport );
         cmd_buffer.vkCmdSetScissor(  0, 1, &vd.scissors );
@@ -721,15 +718,17 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
             null                                // const( uint32_t )*           pDynamicOffsets
         );
 
-        // bind graphics vd.geom_pipeline
+        // begin the render pass
+        cmd_buffer.vkCmdBeginRenderPass( &vd.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
+
+        // bind lbmd graphics pso
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.graphics_pso.pipeline );
 
         // push constant the sim display scale
-        auto sim_display_scale = vd.simDisplayScale( 2 );
-        cmd_buffer.vkCmdPushConstants( vd.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, sim_display_scale.ptr );
+        cmd_buffer.vkCmdPushConstants( vd.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, vd.sim_domain.ptr ); //sim_display.scale.ptr );
 
-        // buffer-less draw with build in gl_VertexIndex exclusively to generate position and texcoord data
-        cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count ,instance count ,first vertex ,first instance
+        // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
+        cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
         // end the render pass
         cmd_buffer.vkCmdEndRenderPass;
