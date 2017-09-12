@@ -83,6 +83,14 @@ void main() {
         break;
 
 
+    case DISPLAY_VEL_BASE :
+        vs_color = vec4( 0.375 );
+        pos[ LA ] += 0.5 + VI;
+        pos[ RA ] += 0.5 + II * pc.repl_spread + pc.line_offset;
+        //pos[ VA ] += texture( vel_rho_tex, pos.xyz )[ VA ] * pc.sim_domain[ VA ] * vec3( 1, -1, 1 )[ VA ];  // latter param is fixing 
+        break;
+
+
     case DISPLAY_AXIS :
         const vec4[3] colors = { vec4( 1, 0, 0, 1 ), vec4( 0, 1, 0, 1 ), vec4( 0, 0, 1, 1 ) };
         vs_color = colors[ II ];
