@@ -92,6 +92,7 @@ struct VDrive_Gui_State {
     uint32_t[3] sim_domain;
     uint32_t    sim_layers;
     uint32_t[3] sim_work_group_size;
+    uint32_t    sim_step_size;
     float       sim_typical_length;
 
     // count of command buffers to be drawn when in play mode
@@ -302,6 +303,7 @@ void createMemoryObjects( ref VDrive_Gui_State vg ) {
     vg.sim_typical_length       = vg.vd.sim_domain[0];
     vg.sim_layers               = vg.vd.sim_layers;
     vg.sim_work_group_size      = vg.vd.sim_work_group_size;
+    vg.sim_step_size            = vg.vd.sim_step_size;
     vg.sim_use_double           = vg.vd.sim_use_double;
     vg.sim_use_3_dim            = vg.vd.sim_use_3_dim;
     vg.sim_wall_velocity        = vg.compute_ubo.wall_velocity * vg.sim_speed_of_sound * vg.sim_speed_of_sound;
@@ -1448,6 +1450,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
                 vg.sim_compute_dirty        = vg.sim_work_group_dirty = false;
                 vg.vd.sim_work_group_size   = vg.sim_work_group_size;
+                vg.vd.sim_step_size         = vg.sim_step_size;
                 vg.vd.sim_use_double        = vg.sim_use_double;
                 vg.vd.sim_layers            = vg.sim_layers;
 
@@ -1471,7 +1474,16 @@ void drawGui( ref VDrive_Gui_State vg ) {
             if( ImGui.Button( "Apply", button_size_2 )) {
                 vg.sim_work_group_dirty     = false;
                 vg.vd.sim_work_group_size   = vg.sim_work_group_size;
+                vg.vd.sim_step_size         = vg.sim_step_size;
                 vg.createBoltzmannPSO( true, true, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
+            }
+            ImGui.SameLine;
+            ImGui.Text( "Changes" );
+
+        } else if( vg.vd.sim_step_size != vg.sim_step_size ) {
+            if( ImGui.Button( "Apply", button_size_2 )) {
+                vg.vd.sim_step_size         = vg.sim_step_size;
+                vg.createBoltzmannPSO( false, true, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
             }
             ImGui.SameLine;
             ImGui.Text( "Changes" );
