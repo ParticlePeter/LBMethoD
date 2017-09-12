@@ -1267,7 +1267,11 @@ void drawGui( ref VDrive_Gui_State vg ) {
         // Radio 2D or 3D
         //
         int dimensions = vg.sim_use_3_dim;
-        if( ImGui.RadioButton( "2D", & dimensions, 0 )) vg.sim_use_3_dim = false;
+        if( ImGui.RadioButton( "2D", & dimensions, 0 )) {
+            vg.sim_use_3_dim = false;
+            vg.sim_domain[2] = 1;
+            vg.checkComputeParams;
+        }
 
         ImGui.SameLine;
         ImGui.SetCursorPosX( main_win_size.x * 0.25 + 6 );
