@@ -1809,6 +1809,8 @@ void drawGui( ref VDrive_Gui_State vg ) {
             axis = cast( int )vg.sim_display.line_axis;
             if( ImGui.Combo( "Line Direction", & axis, axis_label ))
                 vg.sim_display.line_axis = cast( vg.Line_Axis )axis;
+            ImGui.SetCursorPosX( 160 );
+            ImGui.Checkbox( "Draw Base Lines", & vg.sim_draw_vel_base );
 
             ImGui.SetCursorPosX( 160 );
             ImGui.Checkbox( "Draw as Points", & vg.draw_velocity_lines_as_points );
@@ -2228,10 +2230,24 @@ void drawGuiData( ImDrawData* draw_data ) {
         uint draw_as_points = vg.draw_velocity_lines_as_points ? 1 : 0;
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ draw_as_points ].pipeline );
 
+        if( vg.sim_draw_vel_base ) {
+
+            // push constant the whole sim_display struct
+            vg.sim_display.line_type = vg.Line_Type.vel_base;
+
+            cmd_buffer.vkCmdPushConstants(
+                vg.draw_line_pso[ draw_as_points ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
+
+            cmd_buffer.vkCmdDraw(
+                vg.vd.sim_domain[ vg.sim_display.line_axis ], vg.sim_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        }
+
         // push constant the whole sim_display struct
         vg.sim_display.line_type = vg.Line_Type.velocity;
+
         cmd_buffer.vkCmdPushConstants(
             vg.draw_line_pso[ draw_as_points ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
+
         cmd_buffer.vkCmdDraw(
             vg.vd.sim_domain[ vg.sim_display.line_axis ], vg.sim_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
