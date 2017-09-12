@@ -181,13 +181,9 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
     //features.shaderCullDistance = available_features.shaderCullDistance;
     //features.tessellationShader = available_features.tessellationShader;
     features.shaderStorageImageExtendedFormats = available_features.shaderStorageImageExtendedFormats;
-    features.largePoints = available_features.largePoints;
-
-
-    if( available_features.shaderFloat64 ) {
-        vd.sim_shader_double = true;
-        features.shaderFloat64 = available_features.shaderFloat64;
-    }
+    vd.feature_shader_double    = 0 < ( features.shaderFloat64 = available_features.shaderFloat64 );
+    vd.feature_large_points     = 0 < ( features.largePoints = available_features.largePoints );
+    vd.feature_wide_lines       = 0 < ( features.wideLines = available_features.wideLines );
 
 
     // Todo(pp): the filtering bellow is not lazy and also allocates, change both to lazy range based

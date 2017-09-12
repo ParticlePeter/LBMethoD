@@ -201,7 +201,9 @@ version( LDC ) {
 
 
     // flags Todo(pp): create a proper uint32_t flag structure
-    bool            sim_shader_double       = false;
+    bool            feature_shader_double   = false;
+    bool            feature_large_points    = false;
+    bool            feature_wide_lines      = false;
     bool            sim_use_double          = false;
     bool            sim_use_3_dim           = false;
     bool            sim_use_cpu             = false;

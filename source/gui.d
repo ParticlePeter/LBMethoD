@@ -1199,7 +1199,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             } else {
                 vg.setDefaultSimFuncs;
                 vg.sim_use_cpu = false;
-                vg.sim_use_double &= vg.sim_shader_double;
+                vg.sim_use_double &= vg.feature_shader_double;
                 if( play_mode == Transport.play ) {     // in profile mode this must stay 1 (switches with play/pause )
                     vg.sim_play_cmd_buffer_count = 2;   // as we submitted compute and draw command buffers separately
                     if( transport == Transport.play ) { // if we are in play mode
@@ -1418,13 +1418,13 @@ void drawGui( ref VDrive_Gui_State vg ) {
         // Specify precision
         int precision = vg.sim_use_double;
         ImGui.SameLine;
-        if( ImGui.Combo( "Per Cell Values", & precision, vg.sim_shader_double || vg.sim_use_cpu ? "Float\0Double\0\0" : "Float\0\0" )) {
+        if( ImGui.Combo( "Per Cell Values", & precision, vg.feature_shader_double || vg.sim_use_cpu ? "Float\0Double\0\0" : "Float\0\0" )) {
             vg.sim_use_double = precision > 0;
             vg.checkComputeParams;
         }
 
         // inform if double precision is not available or CPU mode is deactivated
-        if( !( vg.sim_shader_double || vg.sim_use_cpu ))
+        if( !( vg.feature_shader_double || vg.sim_use_cpu ))
             showTooltip( "Shader double precision is not available on the selected device." );
 
         ImGui.PopItemWidth;
