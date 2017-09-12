@@ -131,9 +131,9 @@ struct VDrive_State {
     /////////////////////////////////////////////////
 
     // compute parameters
-    uint32_t[3] sim_domain                  = [ 256, 25, 1 ];   // [ 256, 64, 1 ];
+    uint32_t[3] sim_domain                  = [ 127, 127, 1 ]; //[ 256, 256, 1 ];   // [ 256, 64, 1 ];
     uint32_t    sim_layers                  = 17;
-    uint32_t[3] sim_work_group_size         = [ 256, 1, 1 ];
+    uint32_t[3] sim_work_group_size         = [ 127, 1, 1 ];
     uint32_t    sim_ping_pong               = 1;
 
     string      sim_init_shader             = "shader\\init_D2Q9.comp";
