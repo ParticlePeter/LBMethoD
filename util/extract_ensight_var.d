@@ -19,14 +19,14 @@ int main() {
     import std.stdio;
     writeln;
 
-    //int[15] coords = [ 125, 124, 123, 122, 117, 111, 104, 65, 31, 30, 21, 13, 11, 10, 9 ];
+    //int[15] coords_x = [ 125, 124, 123, 122, 117, 111, 104, 65, 31, 30, 21, 13, 11, 10, 9 ];
     //write( "[ " );
-    //foreach( c; coords[ 0 .. $-2 ] ) {
+    //foreach( c; coords_x[ 0 .. $-2 ] ) {
     //    write( c - 2, ", " );
     //}
-    //writeln( coords[ $-1 ] - 2, " ]\n" );
+    //writeln( coords_x[ $-1 ] - 2, " ]\n" );
 
-    int[15] coords = [ 123, 122, 121, 120, 115, 109, 102, 63, 29, 28, 19, 11, 9, 8, 7 ];
+    int[15] coords_x = [ 123, 122, 121, 120, 115, 109, 102, 63, 29, 28, 19, 11, 9, 8, 7 ];
 
     import std.file;
     auto varFile = read( "..//Ensight//Ensight_LDC_127_127//LDC_D2Q9.velocity_009" );
@@ -35,7 +35,7 @@ int main() {
     writeln( varFile.length );
     writeln( BinaryVariableHeader.sizeof);
 
-    foreach( c; coords ) {
+    foreach( c; coords_x ) {
         writefln( "%+.8f,       %-3.8f", binaryHeader.data[ 0 ][ c ][ 63 ], binaryHeader.data[ 0 ][ 63 ][ c ] );
     }
 
@@ -83,14 +83,16 @@ int main() {
     import std.stdio;
     writeln;
 
-    //int[15] coords = [ 125, 124, 123, 122, 117, 111, 104, 65, 31, 30, 21, 13, 11, 10, 9 ];
+    //int[15] coords_x = [ 125, 124, 123, 122, 117, 111, 104, 65, 31, 30, 21, 13, 11, 10, 9 ];
     //write( "[ " );
-    //foreach( c; coords[ 0 .. $-2 ] ) {
+    //foreach( c; coords_x[ 0 .. $-2 ] ) {
     //    write( c - 2, ", " );
     //}
-    //writeln( coords[ $-1 ] - 2, " ]\n" );
+    //writeln( coords_x[ $-1 ] - 2, " ]\n" );
 
-    int[15] coords = [ 123, 122, 121, 120, 115, 109, 102, 63, 29, 28, 19, 11, 9, 8, 7 ];
+    int[15] coords_y = [ 124, 123, 122, 121, 108,  93,  78, 63, 57, 29, 21, 12, 8, 7, 6 ];
+    int[15] coords_x = [ 123, 122, 121, 120, 115, 109, 102, 63, 29, 28, 19, 11, 9, 8, 7 ];
+
 
     
     import core.stdc.stdlib : malloc, free;
@@ -138,7 +140,7 @@ int main() {
         [ -0.53858, -0.55216, -0.52347, -0.48590, -0.41050, -0.36213, -0.30448,  0.00824,  0.27348,  0.28117,  0.35060,  0.41824,  0.43564,  0.44030,  0.43979 ],
         [ -0.54302, -0.52987, -0.49099, -0.45863, -0.41496, -0.36737, -0.30719,  0.00831,  0.27224,  0.28003,  0.35070,  0.41487,  0.43124,  0.43733,  0.43983 ],
     ];
-
+/*
     size_t offset_u = 0, offset_v = 0;  // try to offset in case center calc is not good 
     foreach( g; 0 .. cast( size_t )Ghia.count ) {
         // open ensight var file
@@ -149,14 +151,21 @@ int main() {
         auto data = cast( float* )( varFile.ptr );
 
         writeln;
-        foreach( i, c; coords ) {
+        foreach( i, c; coords_x ) {
             writefln( "%+.8f / %+.8f = %+.8f,      %+.8f / %+.8f = %+.8f", 
                 ghia_u[ g ][ i ], data.val( 63, c + offset_u, 0 ) * 10.0, ghia_u[ g ][ i ] / data.val( 63, c + offset_u, 0 ) / 10.0,
                 ghia_v[ g ][ i ], data.val( c + offset_v, 63, 2 ) * 10.0, ghia_v[ g ][ i ] / data.val( c + offset_v, 63, 2 ) / 10.0);
         }
     }
+*/
 
-    //writeln( binaryHeader.val( 63, 7, 0 ));
+    int[15] coords_y = [ 126, 125, 124, 123, 110, 95, 80, 65, 59, 31, 23, 14, 10, 9, 8 ];
+    writeln;
+    write( "{ ");
+    foreach( i; coords_y ) {
+        write( i - 2, ", " );
+    }
+    writeln( "};" );
 
     free( buffer );
     return 0;
