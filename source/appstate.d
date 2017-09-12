@@ -142,6 +142,7 @@ struct VDrive_State {
     struct Compute_UBO {
         float       collision_frequency     = 1;    // sim param omega
         float       wall_velocity           = 0;    // sim param for lid driven cavity
+        uint32_t    sim_index               = 0;
     }
 
     // simulation parameters
@@ -327,6 +328,8 @@ void drawInit( ref VDrive_State vd ) {
 void drawSim( ref VDrive_State vd ) @system {
     vd.sim_ping_pong = vd.sim_index % 2;    // compute new ping_pong value
     ++vd.sim_index;                         // increase the counter
+    vd.compute_ubo.sim_index = vd.sim_index;
+    vd.updateComputeUBO;
     vd.draw;                                // let vulkan dance
 }
 
