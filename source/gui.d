@@ -845,8 +845,8 @@ private {
     }
 
     void collapsingTerminator() {
-        ImGui.Spacing;
         ImGui.Separator;
+        ImGui.Spacing;
     }
 
     void showTooltip( const( char )* text, float wrap_position = 300 ) {
@@ -1233,7 +1233,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             ImGui.Spacing;
             ImGui.SetCursorPosX( 8 );
             ImGui.Text( "Compute Shader" );
-            //ImGui.Spacing;
+            ImGui.Separator;
 
             // select init shader
             ImGui.PushItemWidth( ImGui.GetWindowWidth * 0.75 );
@@ -1673,8 +1673,12 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         ImGui.Separator;
 
+
+        //
         // simulation details tree node
+        //
         if( ImGui.TreeNode( "Simulation Details" )) {
+            ImGui.Separator;
 
             // set width of items and their label - aligned visually with 8 pixels
             ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
@@ -1700,10 +1704,13 @@ void drawGui( ref VDrive_Gui_State vg ) {
             ImGui.TreePop;
         }
 
-        ImGui.Separator;
+        collapsingTerminator;
 
+        //
         // Reynolds number tree node
+        //
         if( ImGui.TreeNode( "Reynolds Number" )) {
+            ImGui.Separator;
 
             // set width of items and their label - aligned visually with 8 pixels
             ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
@@ -1803,6 +1810,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
         // velocity lines tree node
         //
         if( ImGui.TreeNode( "Velocity Lines" )) {
+            ImGui.Separator;
 
             // set width of items and their label - aligned visually with 8 pixels
             ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
@@ -1857,7 +1865,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             ImGui.TreePop;
         }
 
-        ImGui.Separator;
+        collapsingTerminator;
 
 
         //
@@ -1873,13 +1881,14 @@ void drawGui( ref VDrive_Gui_State vg ) {
             ImGui.TreePop;
         }
 
-        ImGui.Separator;
+        collapsingTerminator;
 
 
         //
         // scene objects tree node
         //
         if( ImGui.TreeNode( "Scene Objects" )) {
+            ImGui.Separator;
 
             // set width of items and their label - aligned visually with 8 pixels
             ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
