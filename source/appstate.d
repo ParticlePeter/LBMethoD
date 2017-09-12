@@ -391,8 +391,9 @@ void profileCompute( ref VDrive_State vd ) @system {
     vd.startStopWatch;
     vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );  // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
     vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max ); // wait for finished compute
-    vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
     vd.stopStopWatch;
+    vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
+
 
     // edit submmit info for display work
     with( vd.submit_info ) {
