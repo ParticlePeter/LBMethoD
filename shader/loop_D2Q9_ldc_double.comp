@@ -9,8 +9,9 @@ layout( push_constant ) uniform Push_Constant {
 
 // uniform buffer
 layout( std140, binding = 5 ) uniform Compute_UBO {
-    float omega;            // collision frequency
-    float wall_velocity;
+    float   omega;            // collision frequency
+    float   wall_velocity;
+    int     comp_index;
 };
 
 // specialization constants for local work group size
@@ -46,72 +47,36 @@ layout( binding = 3, rgba32f ) uniform restrict writeonly image2DArray vel_rho_i
 //  /|\  //
 // 7 4 8 //
 
-
-// Directions:          R       E       N       W       S       NE      NW      SW      SE
+// population weights:  R       E       N       W       S       NE      NW      SW      SE
 const double[9] pw = {  4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 };
-const int[9]   inv = {  0, 3, 4, 1, 2, 7, 8, 5, 6 };
-
-
-// Cell Type Attributes
-//#define NOSLIP 1
-//#define FORCE 2
 
 
 ////////////////////////////////////////////////////////
-// Common Indices and Counts for VkImage and VkBuffer //
+// Common Indexes and Counts for VkImage and VkBuffer //
 ////////////////////////////////////////////////////////
 
 // shortcut to imageSize, the Domain of the computation, same as Global Size
 //#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
 #define D imageSize( vel_rho_img )
 
-// define access indices for the population buffers
-#define ping ( 8 * pc.ping )
-#define pong ( 8 -    ping )
-
-
-
-/////////////////////////////////////////
-// Indices and Counts if using VkImage //
-/////////////////////////////////////////
-/*
-// indices velocity and density
-#define UX gl_GlobalInvocationID.x
-#define UY gl_GlobalInvocationID.y
-#define UZ gl_GlobalInvocationID.z
-
-#define X int( UX )
-#define Y int( UY )
-#define Z int( UZ )
-
-// buffer offsets coresponding streaming ( in 2D so far )
-int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
-
-// stream function if not near boundary
-void stream( int p, double f ) {
-    int i = ( I + buffer_offset[ p ] + cell_count ) % cell_count;
-    imageStore( popul_buf[ pong + p ], i, vec4( f ));
-}
-
-// bounce function if next to boundary and velocity is pointing towards it
-void bounce( int p, double f ) {
-    imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
-}
-*/
-
+// define access indexes for the population buffers
+// #define ping ( 8 * pc.ping )
+// #define pong ( 8 -    ping )
 
 
 //////////////////////////////////////////
-// Indices and Counts if using VkBuffer //
+// Indexes and Counts if using VkBuffer //
 //////////////////////////////////////////
 
-// We use one rest position and two times the other velocities due to double buffering
+// We use one rest position and two times the stream populations due to double buffering
 // loading populations p with variable ping = 0 V 8 and storing with pong = 8 V 0
-// All populations are stored in one contignuous double array/buffer
-// first come N rest populations then N east, etc.,
-// With the index variable I = [0..N) we can reach individual velocities of population intervall at p
-// We load with ( ping + 1 ) * N + I and store with ( pong + 1 ) * N + I
-// to reach the population of any node
+// All populations are stored in one continuous float array/buffer
+// first come N rest populations then N east, N north, ...etc.,
+// With the index variable I = [0..N) we can reach individual velocities of population interval at p
+// We load and store rest populations with index I
+// load stream populations index ( ping + 1 ) * N + I and store with ( pong + 1 ) * N + I
+// with this we reach the population of any node
+// the 2D output image is accessed simply with ivec2( X, Y )
 
 // define global equivalent for gl_LocalInvocationIndex
 #define UI gl_GlobalInvocationID.x
@@ -127,24 +92,9 @@ void bounce( int p, double f ) {
 int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
 #define buffer_size ( pc.values_per_cell * cell_count )  // count of elements in the passed in buffer, required for periodic boundary conditions
 
-// buffer offsets coresponding streaming ( in 2D so far )
-int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
-
-// stream function if not near boundary
-void stream( int p, double f ) {
-    int i = (( pong + p ) * cell_count + I + buffer_offset[ p ] );// + buffer_size ) % buffer_size; // latter for periodic bondary conditions
-    imageStore( popul_buffer, i, uvec4( unpackDouble2x32( f ), 0, 0 ));
-}
-
-// bounce function if next to boundary and velocity is pointing towards it
-void bounce( int p, double f ) {
-    imageStore( popul_buffer, ( pong + inv[ p ] ) * cell_count + I, uvec4( unpackDouble2x32( f ), 0, 0 ));
-}
-
-
 //#define tau 0.50001 //0.6
 //#define w (1.f/tau)
-#define tau 0.50001
+//#define tau 0.50001
 #define w omega
 #define wb 1
 #define w3 1
@@ -153,6 +103,17 @@ void bounce( int p, double f ) {
 
 // main simulation function
 void main( void ) {
+
+    // the count of step per draw is stored in the upper 24 bits of the ALGORITHM constant
+    // only if this value is 1, pc.ping is alternating between 0 and 1
+    // otherwise is greater than 1 it stores the step size of one command buffer submission
+    // hence the ping value must be computed accordingly 
+    int ping;
+    if(( ALGORITHM >> 8 ) > 1 )
+        ping = 8 * (( pc.ping + comp_index ) % 2 );
+    else
+        ping = 8 * pc.ping;
+    int pong = 8 -    ping;
 
     // population indexes
     // 6 2 5 //
@@ -207,7 +168,13 @@ void main( void ) {
     dvec2 vel = ( dvec2(f[1],f[2]) - dvec2(f[3],f[4]) + dvec2(f[5]) - dvec2(f[7]) + dvec2(f[8],f[6]) - dvec2(f[6],f[8])) / rho;
 
     // store properties in image
-    imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vel, 0, rho ));
+    if(( ALGORITHM >> 8 ) > 1 ) {
+        if(( ALGORITHM >> 8 ) == pc.ping + 1 ) {
+            imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vel, 0, rho ));
+        }
+    } else {
+        imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vel, 0, rho ));
+    }
 
 
 
@@ -376,7 +343,7 @@ void main( void ) {
         // off diagonal element of the stress tensor
         double Pxy = 1/rho*(((-vx)*(-vy))*f0+((1-vx)*(-vy))*f1+((-vx)*(1-vy))*f2+((-1-vx)*(-vy))*f3+((-vx)*(-1-vy))*f4+((1-vx)*(1-vy))*f5+((-1-vx)*(1-vy))*f6+((-1-vx)*(-1-vy))*f7+((1-vx)*(-1-vy))*f8);
 
-        // fisrt third order moment
+        // first third order moment
         double Qyxx = 1/rho*((((-vx)*(-vx))*(-vy))*f0+(((1-vx)*(1-vx))*(-vy))*f1+(((-vx)*(-vx))*(1-vy))*f2+(((-1-vx)*(-1-vx))*(-vy))*f3+(((-vx)*(-vx))*(-1-vy))*f4+(((1-vx)*(1-vx))*(1-vy))*f5+(((-1-vx)*(-1-vx))*(1-vy))*f6+(((-1-vx)*(-1-vx))*(-1-vy))*f7+(((1-vx)*(1-vx))*(-1-vy))*f8);
 
         // second third order moment
@@ -422,5 +389,60 @@ void main( void ) {
 
 
 
-// Directions   :   R   N   S   E   W   NE  SW  SE  NW
-// Cascaded     :   R   NW  W   SW  S   SE  E   NE  N
+/////////////////////////////////////////
+// Indexes and Counts if using VkImage //
+/////////////////////////////////////////
+/*
+// indexes velocity and density
+#define UX gl_GlobalInvocationID.x
+#define UY gl_GlobalInvocationID.y
+#define UZ gl_GlobalInvocationID.z
+
+#define X int( UX )
+#define Y int( UY )
+#define Z int( UZ )
+
+// buffer offsets corresponding streaming ( in 2D so far )
+int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
+
+// stream function if not near boundary
+void stream( int p, float f ) {
+    int i = ( I + buffer_offset[ p ] + cell_count ) % cell_count;
+    imageStore( popul_buf[ pong + p ], i, vec4( f ));
+}
+
+// bounce function if next to boundary and velocity is pointing towards it
+void bounce( int p, float f ) {
+    imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
+}
+*/
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// alternative access method using multi dim local work group size, currently not working properly //
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/*
+// shortcut to imageSize, the Domain of the computation, same as Global Size
+#define Domain ivec3( gl_WorkGroupSize * gl_NumWorkGroups )
+#define D ( Domain )
+//#define D imageSize( vel_rho_img )
+
+#define GID ivec3( gl_GlobalInvocationID )
+// define gl_WorkGroupIndex equivalent to gl_LocalInvocationIndex
+// this is confirmed on CPU, where is the crux ???
+uint work_group_index =
+    gl_WorkGroupID.z * gl_NumWorkGroups.z * gl_NumWorkGroups.y +
+    gl_WorkGroupID.y * gl_NumWorkGroups.x +
+    gl_WorkGroupID.x;
+
+// define linearization of the whole domain
+int I = int(
+    gl_WorkGroupSize.z *
+    gl_WorkGroupSize.y *
+    gl_WorkGroupSize.x * work_group_index + gl_LocalInvocationIndex );
+
+
+#define X int( GID.x )
+#define Y int( GID.y )
+#define Z ( I / ( D.x * D.y ))
+*/

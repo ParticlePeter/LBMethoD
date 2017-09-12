@@ -33,7 +33,7 @@ const float[15] pw = {  2.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  
 
 
 ////////////////////////////////////////////////////////
-// Common Indices and Counts for VkImage and VkBuffer //
+// Common Indexes and Counts for VkImage and VkBuffer //
 ////////////////////////////////////////////////////////
 
 // shortcut to imageSize, the Domain of the computation, same as Global Size
@@ -72,10 +72,10 @@ void main( void ) {
 
 
 /////////////////////////////////////////
-// Indices and Counts if using VkImage //
+// Indexes and Counts if using VkImage //
 /////////////////////////////////////////
 /*
-// indices velocity and density
+// indexes velocity and density
 #define UX gl_GlobalInvocationID.x
 #define UY gl_GlobalInvocationID.y
 #define UZ gl_GlobalInvocationID.z
@@ -84,7 +84,7 @@ void main( void ) {
 #define Y int( UY )
 #define Z int( UZ )
 
-// buffer offsets coresponding streaming ( in 2D so far )
+// buffer offsets corresponding streaming ( in 2D so far )
 int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
 
 // stream function if not near boundary

@@ -3,8 +3,9 @@
 
 // uniform buffer
 layout( std140, binding = 5 ) uniform Compute_UBO {
-    float omega;            // collision frequency
-    float wall_velocity;
+    float   omega;            // collision frequency
+    float   wall_velocity;
+    int     comp_index;
 };
 
 // specialization constants for local work group size
@@ -37,7 +38,7 @@ const float[9] pw = {   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 
 
 
 ////////////////////////////////////////////////////////
-// Common Indices and Counts for VkImage and VkBuffer //
+// Common Indexes and Counts for VkImage and VkBuffer //
 ////////////////////////////////////////////////////////
 
 // shortcut to imageSize, the Domain of the computation, same as Global Size
