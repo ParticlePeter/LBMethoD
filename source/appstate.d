@@ -85,6 +85,7 @@ struct VDrive_State {
     VkCommandPool               sim_cmd_pool;           // we do not reset this on window resize events
     VkCommandBuffer[2]          sim_cmd_buffers;        // using ping pong approach for now
     Meta_Image                  sim_image;              // output macroscopic moments density and velocity
+    VkSampler                   nearest_sampler;
     Meta_Buffer                 sim_buffer;             // mesoscopic velocity populations
     Meta_Memory                 sim_memory;             // memory backing image and buffer
     VkBufferView                sim_buffer_view;        // arbitrary count of buffer views, dynamic resizing is not that easy as we would have to recreate the descriptor set each time
