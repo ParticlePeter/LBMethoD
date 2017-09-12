@@ -11,8 +11,8 @@ import ensight;
 
 struct VDrive_Export_State {
     int             start_index     = 0;
-    int             step_count      = 200;
-    int             step_size       = 5;
+    int             step_count      = 21;
+    int             step_size       = 10001;
     int             store_index     = -1;
     char[256]       case_file_name  = "ensight/LDC_D2Q9";
     char[12]        variable_name   = "velocity\0\0\0\0";
@@ -419,8 +419,6 @@ void destroyExportResources( ref VDrive_State vd ) {
     if( vd.export_memory.is_constructed ) vd.export_memory.destroyResources;
     if( vd.export_buffer[0].is_constructed ) vd.export_buffer[0].destroyResources;
     if( vd.export_buffer[1].is_constructed ) vd.export_buffer[1].destroyResources;
-//  if( vd.export_buffer[0].buffer != VK_NULL_HANDLE ) vd.export_buffer[0].destroyResources;
-//  if( vd.export_buffer[1].buffer != VK_NULL_HANDLE ) vd.export_buffer[1].destroyResources;
     if( vd.export_buffer_view[0] != VK_NULL_HANDLE ) vd.destroy( vd.export_buffer_view[0] );
     if( vd.export_buffer_view[1] != VK_NULL_HANDLE ) vd.destroy( vd.export_buffer_view[1] );
 }
