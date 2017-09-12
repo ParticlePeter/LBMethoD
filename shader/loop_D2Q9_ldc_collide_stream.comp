@@ -116,23 +116,18 @@ void main( void ) {
         imageLoad( popul_buffer, ( ping + 8 ) * cell_count + I ).r
     };
 
-    // compute macroscopic density before applying wall velocity where required
+    // compute macroscopic properties density and velocity
     float rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8]; 
-
-    // Ladd's momentum correction for moving walls, applied to reflected populations not perpendicular to wall velocity
-    if( Y == D.y - 1 ) {    // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
-        f[7] -= 2 * pw[7] * rho * wall_velocity;
-        f[8] += 2 * pw[8] * rho * wall_velocity;
-    }
-
-    // compute macroscopic velocity after wall velocity is applied
     vec2  vel = ( vec2(f[1],f[2]) - vec2(f[3],f[4]) + vec2(f[5]) - vec2(f[7]) + vec2(f[8],f[6]) - vec2(f[6],f[8])) / rho;
-
 
     // store properties in image
     imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vel, 0, rho ));
 
 
+
+    //
+    // Collision Algorithms (Compile Time if)
+    //
     if( ALGORITHM == LOOP_SRT_LBGK ) {
 
         // compute equilibrium
@@ -288,19 +283,19 @@ void main( void ) {
 
         // trace of the pressure tensor
         float T = 1/rho*((((-vx)*(-vx)))*f0+(((1-vx)*(1-vx)))*f1+(((-vx)*(-vx)))*f2+(((-1-vx)*(-1-vx)))*f3+(((-vx)*(-vx)))*f4+(((1-vx)*(1-vx)))*f5+(((-1-vx)*(-1-vx)))*f6+(((-1-vx)*(-1-vx)))*f7+(((1-vx)*(1-vx)))*f8)+1/rho*((((-vy)*(-vy)))*f0+(((-vy)*(-vy)))*f1+(((1-vy)*(1-vy)))*f2+(((-vy)*(-vy)))*f3+(((-1-vy)*(-1-vy)))*f4+(((1-vy)*(1-vy)))*f5+(((1-vy)*(1-vy)))*f6+(((-1-vy)*(-1-vy)))*f7+(((-1-vy)*(-1-vy)))*f8);
-        
+
         // normal stress difference
         float N = 1/rho*((((-vx)*(-vx)))*f0+(((1-vx)*(1-vx)))*f1+(((-vx)*(-vx)))*f2+(((-1-vx)*(-1-vx)))*f3+(((-vx)*(-vx)))*f4+(((1-vx)*(1-vx)))*f5+(((-1-vx)*(-1-vx)))*f6+(((-1-vx)*(-1-vx)))*f7+(((1-vx)*(1-vx)))*f8)-(1/rho*((((-vy)*(-vy)))*f0+(((-vy)*(-vy)))*f1+(((1-vy)*(1-vy)))*f2+(((-vy)*(-vy)))*f3+(((-1-vy)*(-1-vy)))*f4+(((1-vy)*(1-vy)))*f5+(((1-vy)*(1-vy)))*f6+(((-1-vy)*(-1-vy)))*f7+(((-1-vy)*(-1-vy)))*f8));
-        
+
         // off diagonal element of the stress tensor
         float Pxy = 1/rho*(((-vx)*(-vy))*f0+((1-vx)*(-vy))*f1+((-vx)*(1-vy))*f2+((-1-vx)*(-vy))*f3+((-vx)*(-1-vy))*f4+((1-vx)*(1-vy))*f5+((-1-vx)*(1-vy))*f6+((-1-vx)*(-1-vy))*f7+((1-vx)*(-1-vy))*f8);
-        
+
         // fisrt third order moment
         float Qyxx = 1/rho*((((-vx)*(-vx))*(-vy))*f0+(((1-vx)*(1-vx))*(-vy))*f1+(((-vx)*(-vx))*(1-vy))*f2+(((-1-vx)*(-1-vx))*(-vy))*f3+(((-vx)*(-vx))*(-1-vy))*f4+(((1-vx)*(1-vx))*(1-vy))*f5+(((-1-vx)*(-1-vx))*(1-vy))*f6+(((-1-vx)*(-1-vx))*(-1-vy))*f7+(((1-vx)*(1-vx))*(-1-vy))*f8);
-        
+
         // second third order moment
         float Qxyy = 1/rho*(((-vx)*((-vy)*(-vy)))*f0+((1-vx)*((-vy)*(-vy)))*f1+((-vx)*((1-vy)*(1-vy)))*f2+((-1-vx)*((-vy)*(-vy)))*f3+((-vx)*((-1-vy)*(-1-vy)))*f4+((1-vx)*((1-vy)*(1-vy)))*f5+((-1-vx)*((1-vy)*(1-vy)))*f6+((-1-vx)*((-1-vy)*(-1-vy)))*f7+((1-vx)*((-1-vy)*(-1-vy)))*f8);
-        
+
         // fourth order moment
         float A = 1/rho*((((-vx)*(-vx))*((-vy)*(-vy)))*f0+(((1-vx)*(1-vx))*((-vy)*(-vy)))*f1+(((-vx)*(-vx))*((1-vy)*(1-vy)))*f2+(((-1-vx)*(-1-vx))*((-vy)*(-vy)))*f3+(((-vx)*(-vx))*((-1-vy)*(-1-vy)))*f4+(((1-vx)*(1-vx))*((1-vy)*(1-vy)))*f5+(((-1-vx)*(-1-vx))*((1-vy)*(1-vy)))*f6+(((-1-vx)*(-1-vx))*((-1-vy)*(-1-vy)))*f7+(((1-vx)*(1-vx))*((-1-vy)*(-1-vy)))*f8);
 
@@ -321,21 +316,33 @@ void main( void ) {
         f[6] = rho/4*((-vx)*vy+(-vx)*vy*vy+vy*vx*vx+(-1+4*vx*vy-2*vy+2*vx)*Pxy+((-vx*vx+vy*vy-(-vx)+vy)/2)*N+((vx*vx+vy*vy-vx+vy)/2)*T+(-1+2*vx)*Qxyy+(1+2*vy)*Qyxx+A);
         f[7] = rho/4*(vx*vy+(-vx)*vy*vy+(-vy)*vx*vx+(1+4*vx*vy-2*vy-2*vx)*Pxy+((-vx*vx+vy*vy-(-vx)-vy)/2)*N+((vx*vx+vy*vy-vx-vy)/2)*T+(-1+2*vx)*Qxyy+(-1+2*vy)*Qyxx+A);
         f[8] = rho/4*((-vx)*vy+vx*vy*vy+(-vy)*vx*vx+(-1+4*vx*vy+2*vy-2*vx)*Pxy+((-vx*vx+vy*vy-vx-vy)/2)*N+((vx*vx+vy*vy+vx-vy)/2)*T+(1+2*vx)*Qxyy+(-1+2*vy)*Qyxx+A);
-
     }
 
+    // 6 2 5 //
+    //  \|/  //
+    // 3-0-1 //
+    //  /|\  //
+    // 7 4 8 //
+    if( Y == D.y - 1 ) {    // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+        f[7] += 2 * pw[6] * rho * wall_velocity;
+        f[8] -= 2 * pw[5] * rho * wall_velocity;
+        //f[5] += 2 * pw[5] * rho * wall_velocity;
+        //f[6] -= 2 * pw[6] * rho * wall_velocity;
+    }
+
+    // write to the pong population p of the current cell index, while the cell index can still be offset
+    #define POP(p) (( pong + p ) * cell_count + I )
 
     // Store new populations
     imageStore( popul_buffer, I, vec4( f[0] ));
-    imageStore( popul_buffer, ( X == D.x - 1 )                  ? ( pong + 3 ) * cell_count + I : ( pong + 1 ) * cell_count +       1 + I, vec4( f[1] ));
-    imageStore( popul_buffer, ( Y ==       0 )                  ? ( pong + 4 ) * cell_count + I : ( pong + 2 ) * cell_count - D.x     + I, vec4( f[2] ));
-    imageStore( popul_buffer, ( X ==       0 )                  ? ( pong + 1 ) * cell_count + I : ( pong + 3 ) * cell_count -       1 + I, vec4( f[3] ));
-    imageStore( popul_buffer, ( Y == D.y - 1 )                  ? ( pong + 2 ) * cell_count + I : ( pong + 4 ) * cell_count + D.x     + I, vec4( f[4] ));
-    imageStore( popul_buffer, ( X == D.x - 1 || Y ==       0 )  ? ( pong + 7 ) * cell_count + I : ( pong + 5 ) * cell_count - D.x + 1 + I, vec4( f[5] ));
-    imageStore( popul_buffer, ( Y ==       0 || X ==       0 )  ? ( pong + 8 ) * cell_count + I : ( pong + 6 ) * cell_count - D.x - 1 + I, vec4( f[6] ));
-    imageStore( popul_buffer, ( X ==       0 || Y == D.y - 1 )  ? ( pong + 5 ) * cell_count + I : ( pong + 7 ) * cell_count + D.x - 1 + I, vec4( f[7] ));
-    imageStore( popul_buffer, ( Y == D.y - 1 || X == D.x - 1 )  ? ( pong + 6 ) * cell_count + I : ( pong + 8 ) * cell_count + D.x + 1 + I, vec4( f[8] ));
-
+    imageStore( popul_buffer, X == D.x - 1                  ? POP(3) : POP(1) + 1       , vec4( f[1] ));
+    imageStore( popul_buffer,                 Y ==       0  ? POP(4) : POP(2)     - D.x , vec4( f[2] ));
+    imageStore( popul_buffer, X ==       0                  ? POP(1) : POP(3) - 1       , vec4( f[3] ));
+    imageStore( popul_buffer,                 Y == D.y - 1  ? POP(2) : POP(4)     + D.x , vec4( f[4] ));
+    imageStore( popul_buffer, X == D.x - 1 || Y ==       0  ? POP(7) : POP(5) + 1 - D.x , vec4( f[5] ));
+    imageStore( popul_buffer, X ==       0 || Y ==       0  ? POP(8) : POP(6) - 1 - D.x , vec4( f[6] ));
+    imageStore( popul_buffer, X ==       0 || Y == D.y - 1  ? POP(5) : POP(7) - 1 + D.x , vec4( f[7] ));
+    imageStore( popul_buffer, X == D.x - 1 || Y == D.y - 1  ? POP(6) : POP(8) + 1 + D.x , vec4( f[8] ));
 }   // main
 
 
@@ -383,7 +390,7 @@ void bounce( int p, float f ) {
 #define GID ivec3( gl_GlobalInvocationID )
 // define gl_WorkGroupIndex equivalent to gl_LocalInvocationIndex
 // this is confirmed on CPU, where is the crux ???
-uint work_group_index = 
+uint work_group_index =
     gl_WorkGroupID.z * gl_NumWorkGroups.z * gl_NumWorkGroups.y +
     gl_WorkGroupID.y * gl_NumWorkGroups.x +
     gl_WorkGroupID.x;
