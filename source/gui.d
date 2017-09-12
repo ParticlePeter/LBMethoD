@@ -104,6 +104,12 @@ struct VDrive_Gui_State {
     bool        draw_velocity_lines_as_points = false;
     bool        sim_profile_mode = false;   // Todo(pp): this is redundant as we can use play_mode bellow as well, remove this one
 
+    bool        sim_draw_lines = true;
+    bool        sim_draw_vel_base = true;
+    bool        sim_draw_axis;
+    bool        sim_draw_grid;
+    bool        sim_draw_bounds;
+
 }
 
 
@@ -1764,8 +1770,9 @@ void drawGui( ref VDrive_Gui_State vg ) {
         // -> move / copy line settings into VDrive_State and include in createResizedCommands
 
 
-
+        //
         // velocity lines tree node
+        //
         if( ImGui.TreeNode( "Velocity Lines" )) {
 
             // set width of items and their label - aligned visually with 8 pixels
@@ -1812,12 +1819,34 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         ImGui.Separator;
 
+
+        //
         // particles tree node
+        //
         if( ImGui.TreeNode( "Particles" )) {
 
             // set width of items and their label - aligned visually with 8 pixels
             ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
 
+
+            ImGui.PopItemWidth;
+            ImGui.TreePop;
+        }
+
+        ImGui.Separator;
+
+
+        //
+        // scene objects tree node
+        //
+        if( ImGui.TreeNode( "Scene Objects" )) {
+
+            // set width of items and their label - aligned visually with 8 pixels
+            ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
+            ImGui.SetCursorPosX( 160 );
+            ImGui.Checkbox( "Draw Axis", & vg.sim_draw_axis );
+            ImGui.SetCursorPosX( 160 );
+            ImGui.Checkbox( "Draw Grid", & vg.sim_draw_grid );
 
             ImGui.PopItemWidth;
             ImGui.TreePop;
@@ -2161,32 +2190,35 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     // bind lines pipeline
     //
-    cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ 0 ].pipeline );
+    if( vg.sim_draw_lines )
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ 0 ].pipeline );
 
 
     //
     // set push constants and record draw commands for axis drawing
     //
-    vg.sim_display.line_type = vg.Line_Type.axis;
-    cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
-    cmd_buffer.vkCmdDraw( 2, 3, 0, 0 ); // vertex count, instance count, first vertex, first instance
-
+    if( vg.sim_draw_axis ) {
+        vg.sim_display.line_type = vg.Line_Type.axis;
+        cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
+        cmd_buffer.vkCmdDraw( 2, 3, 0, 0 ); // vertex count, instance count, first vertex, first instance
+    }
 
     //
     // set push constants and record draw commands for grid drawing
     //
-    vg.sim_display.line_type = vg.Line_Type.grid;
+    if( vg.sim_draw_grid ) {
+        vg.sim_display.line_type = vg.Line_Type.grid;
 
-    // draw lines repeating in X direction
-    vg.sim_display.line_axis = vg.Line_Axis.X;
-    cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * uint32_t.sizeof, & vg.sim_display );
-    cmd_buffer.vkCmdDraw( 2, vg.sim_domain[0] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        // draw lines repeating in X direction
+        vg.sim_display.line_axis = vg.Line_Axis.X;
+        cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * uint32_t.sizeof, & vg.sim_display );
+        cmd_buffer.vkCmdDraw( 2, vg.sim_domain[0] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
-    // draw lines repeating in Y direction
-    vg.sim_display.line_axis = vg.Line_Axis.Y;
-    cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
-    cmd_buffer.vkCmdDraw( 2, vg.sim_domain[1] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
-    
+        // draw lines repeating in Y direction
+        vg.sim_display.line_axis = vg.Line_Axis.Y;
+        cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
+        cmd_buffer.vkCmdDraw( 2, vg.sim_domain[1] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+    }
 
 
 
