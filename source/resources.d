@@ -199,19 +199,27 @@ void createSimImage( ref VDrive_State vd ) {
 
     // Todo(pp): the format should be choose-able
     // Todo(pp): here checks are required if this image format is available for VK_IMAGE_USAGE_STORAGE_BIT
+    //import vdrive.util.info;
+    //vd.imageFormatProperties(
+    //    VK_FORMAT_R32G32B32A32_SFLOAT,
+    //    VK_IMAGE_TYPE_2D,
+    //    VK_IMAGE_TILING_OPTIMAL,
+    //    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+    //).printTypeInfo;
+    
     auto image_format = VK_FORMAT_R32G32B32A32_SFLOAT; //VK_FORMAT_R16G16B16A16_SFLOAT
     VkImageSubresourceRange subresource_range = {
         aspectMask      : VK_IMAGE_ASPECT_COLOR_BIT,
         baseMipLevel    : cast( uint32_t )0,
         levelCount      : 1,
         baseArrayLayer  : cast( uint32_t )0,
-        layerCount      : vd.sim_domain[  2  ],
+        layerCount      : vd.sim_domain[2],
     };
     vd.sim_image( vd )
         .create(
             image_format,
-            vd.sim_domain[0], vd.sim_domain[1], vd.sim_use_3_dim ? vd.sim_domain[1] : 0,    // through the 0 we request a VK_IMAGE_TYPE_2D
-            1, 1, // mip levels and array layers
+            vd.sim_domain[0], vd.sim_domain[1], 0,      // through the 0 we request a VK_IMAGE_TYPE_2D
+            1, vd.sim_domain[2],                        // mip levels and array layers
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_SAMPLE_COUNT_1_BIT,
             GREG ? VK_IMAGE_TILING_OPTIMAL : VK_IMAGE_TILING_LINEAR
