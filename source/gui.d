@@ -80,8 +80,6 @@ struct VDrive_Gui_State {
     bool        sim_use_double;
     bool        sim_use_3_dim;
     bool        sim_compute_dirty;
-    bool        sim_init_shader_dirty;
-    bool        sim_loop_shader_dirty;
     bool        sim_work_group_dirty;
     bool        draw_gui = true;
     bool        draw_velocity_lines_as_points = false;
@@ -1178,7 +1176,6 @@ void drawGui( ref VDrive_Gui_State vg ) {
             //ImGui.Spacing;
 
             // select init shader
-            static int init_shader_index = 0;
             ImGui.PushItemWidth( ImGui.GetWindowWidth * 0.75 );
             if( ImGui.Combo( "Initialize", & vg.init_shader_index, //"shader/init_D2Q9.comp\0\0" )
                 init_shader_start_index == size_t.max
@@ -1186,9 +1183,9 @@ void drawGui( ref VDrive_Gui_State vg ) {
                     : shader_names_ptr[ init_shader_start_index ] )
                 ) {
                 if( init_shader_start_index != size_t.max ) {
-                    vg.sim_init_shader_dirty = !compareShaderNamesAndReplace(
-                        shader_names_ptr[ init_shader_start_index + init_shader_index ], vg.sim_init_shader
-                    );
+                    if(!compareShaderNamesAndReplace( shader_names_ptr[ init_shader_start_index + vg.init_shader_index ], vg.sim_init_shader )) {
+                        vg.createBoltzmannPSO( true, false, true );
+                    }
                 }
             }
 
@@ -1198,11 +1195,11 @@ void drawGui( ref VDrive_Gui_State vg ) {
                     parseShaderDirectory;
                     // a new shader might replace the shader at the current index
                     // when we would actually use the ImGui.Combo and select this new shader
-                    // it would not be registered
+                    // the shader change would not be recognized
                     if( init_shader_start_index != size_t.max ) {     // might all have been deleted
-                        vg.sim_init_shader_dirty = !compareShaderNamesAndReplace(
-                            shader_names_ptr[ init_shader_start_index + init_shader_index ], vg.sim_init_shader
-                        );
+                        if(!compareShaderNamesAndReplace( shader_names_ptr[ init_shader_start_index + vg.init_shader_index ], vg.sim_init_shader )) {
+                            vg.createBoltzmannPSO( true, false, true );
+                        }
                     }
                 }
             }
@@ -1217,16 +1214,15 @@ void drawGui( ref VDrive_Gui_State vg ) {
             ImGui.Spacing;
 
             // select loop shader
-            static int loop_shader_index = 0;
-            if( ImGui.Combo( "Simulate", & loop_shader_index, //"shader/loop_D2Q9_channel_flow.comp\0\0" )
+            if( ImGui.Combo( "Simulate", & vg.loop_shader_index, //"shader/loop_D2Q9_channel_flow.comp\0\0" )
                 loop_shader_start_index == size_t.max
                     ? "None found!"
                     : shader_names_ptr[ loop_shader_start_index ] )
                 ) {
                 if( loop_shader_start_index != size_t.max ) {
-                    vg.sim_loop_shader_dirty = !compareShaderNamesAndReplace(
-                        shader_names_ptr[ loop_shader_start_index + loop_shader_index ], vg.sim_loop_shader
-                    );
+                    if(!compareShaderNamesAndReplace( shader_names_ptr[ loop_shader_start_index + vg.loop_shader_index ], vg.sim_loop_shader )) {
+                        vg.createBoltzmannPSO( false, true, false );
+                    }
                 }
             }
 
@@ -1235,9 +1231,9 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 if( hasShaderDirChanged ) {
                     parseShaderDirectory;   // see comment in IsItemHovered above
                     if( loop_shader_start_index != size_t.max ) {
-                        vg.sim_loop_shader_dirty = !compareShaderNamesAndReplace(
-                            shader_names_ptr[ loop_shader_start_index + loop_shader_index ], vg.sim_loop_shader
-                        );
+                        if(!compareShaderNamesAndReplace( shader_names_ptr[ loop_shader_start_index + vg.loop_shader_index ], vg.sim_loop_shader )) {
+                            vg.createBoltzmannPSO( false, true, false );
+                        }
                     }
                 }
             }
@@ -1401,19 +1397,10 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
                 // recreate lattice boltzmann pipeline with possibly new shaders
                 vg.createBoltzmannPSO( true, true, true );
-                vg.sim_init_shader_dirty = vg.sim_loop_shader_dirty = false;
 
                 if( vg.sim_use_cpu ) {
                     vg.cpuReset;
                 }
-            }
-            ImGui.SameLine;
-            ImGui.Text( "Changes" );
-
-        } else if( vg.sim_init_shader_dirty || vg.sim_loop_shader_dirty ) {
-            if( ImGui.Button( "Apply", button_size_2 )) {
-                vg.sim_init_shader_dirty = vg.sim_loop_shader_dirty = false;
-                vg.createBoltzmannPSO( vg.sim_init_shader_dirty, false, false );
             }
             ImGui.SameLine;
             ImGui.Text( "Changes" );
