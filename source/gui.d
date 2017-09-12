@@ -73,7 +73,7 @@ struct VDrive_Gui_State {
       align( 1 ):
         uint[3]     sim_domain;
         Line_Type   line_type       = Line_Type.velocity;
-        Line_Axis   line_axis       = Line_Axis.X;
+        Line_Axis   line_axis       = Line_Axis.Y;
         Line_Axis   repl_axis       = Line_Axis.X;
         Line_Axis   velocity_axis   = Line_Axis.X;
         int         repl_count      = 0;
