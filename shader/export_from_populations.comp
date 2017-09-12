@@ -28,9 +28,6 @@ layout( local_size_z =   1 ) in;
 layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 
 // velocity and density write target, will be rendered as texture in next pass
-layout( binding = 3, rg32f /*rgba16f*/ ) uniform restrict readonly image2D vel_rho_img;
-
-// velocity and density write target, will be rendered as texture in next pass
 layout( binding = 8, r32f /*rgba16f*/ ) uniform restrict writeonly imageBuffer export_buffer[2];
 
 
@@ -55,10 +52,6 @@ const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
 ////////////////////////////////////////////////////////
 // Common Indices and Counts for VkImage and VkBuffer //
 ////////////////////////////////////////////////////////
-
-// shortcut to imageSize, the Domain of the computation, same as Global Size
-//#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
-#define D imageSize( vel_rho_img )
 
 // define access indices for the export buffers
 #define PCPING pc.ping
@@ -87,16 +80,8 @@ const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
 // U and I are also the index velocity population index
 #define I int( UI )
 
-#define X ( I % D.x )
-#define Y ( I / D.x )
-#define Z ( I / ( D.x * D.y ))
-
 // derived total count of nodes
 int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
-#define buffer_size ( pc.values_per_cell * cell_count )  // count of elements in the passed in buffer, required for periodic boundary conditions
-
-// buffer offsets coresponding streaming ( in 2D so far )
-int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
 
 
 
@@ -113,14 +98,14 @@ void main( void ) {
     // load populations
     float f[9] = {
         imageLoad( popul_buffer,                             I ).r,
-        imageLoad( popul_buffer, ( pong + 1 ) * cell_count + I ).r,
-        imageLoad( popul_buffer, ( pong + 2 ) * cell_count + I ).r,
-        imageLoad( popul_buffer, ( pong + 3 ) * cell_count + I ).r,
-        imageLoad( popul_buffer, ( pong + 4 ) * cell_count + I ).r,
-        imageLoad( popul_buffer, ( pong + 5 ) * cell_count + I ).r,
-        imageLoad( popul_buffer, ( pong + 6 ) * cell_count + I ).r,
-        imageLoad( popul_buffer, ( pong + 7 ) * cell_count + I ).r,
-        imageLoad( popul_buffer, ( pong + 8 ) * cell_count + I ).r
+        imageLoad( popul_buffer, ( PONG + 1 ) * cell_count + I ).r,
+        imageLoad( popul_buffer, ( PONG + 2 ) * cell_count + I ).r,
+        imageLoad( popul_buffer, ( PONG + 3 ) * cell_count + I ).r,
+        imageLoad( popul_buffer, ( PONG + 4 ) * cell_count + I ).r,
+        imageLoad( popul_buffer, ( PONG + 5 ) * cell_count + I ).r,
+        imageLoad( popul_buffer, ( PONG + 6 ) * cell_count + I ).r,
+        imageLoad( popul_buffer, ( PONG + 7 ) * cell_count + I ).r,
+        imageLoad( popul_buffer, ( PONG + 8 ) * cell_count + I ).r
     };
 
     // compute macroscopic properties

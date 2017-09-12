@@ -24,9 +24,6 @@ layout( local_size_y =   1 ) in;
 layout( local_size_z =   1 ) in;
 
 
-// populations 1 single buffered rest velocity, 8 double buffered link velocities
-layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
-
 // velocity and density write target, will be rendered as texture in next pass
 layout( binding = 3, rgba32f ) uniform restrict readonly image2DArray vel_rho_img;
 
@@ -93,8 +90,6 @@ const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
 
 // derived total count of nodes
 int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
-#define buffer_size ( pc.values_per_cell * cell_count )  // count of elements in the passed in buffer, required for periodic boundary conditions
-
 
 
 
