@@ -469,13 +469,13 @@ void createLinePSO( ref VDrive_State vd ) {
 
     // first create PSO to draw lines
     Meta_Graphics meta_graphics;
-    vd.draw_line_pso[ 0 ] = meta_graphics( vd )     
+    vd.draw_line_pso[ 0 ] = meta_graphics( vd )
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.vert" ))
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.frag" ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_LINE_STRIP )                          // set the inputAssembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
-        .depthState                                                                 // set depth state - enable depth test with default attributes
+        //.depthState                                                                 // set depth state - enable depth test with default attributes
         .addColorBlendState( VK_FALSE )                                             // color blend state - append common (default) color blend attachment state
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
         .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
@@ -486,7 +486,7 @@ void createLinePSO( ref VDrive_State vd ) {
         .extractCore;                                                               // extract core data into Core_Pipeline struct
 
     // now edit the Meta_Pipeline to create an alternate points PSO
-    vd.draw_line_pso[ 1 ] = meta_graphics           
+    vd.draw_line_pso[ 1 ] = meta_graphics
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_POINT_LIST )
         .construct( vd.graphics_cache )                                             // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
