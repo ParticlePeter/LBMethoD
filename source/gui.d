@@ -1797,18 +1797,40 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
             ImGui.DragFloat2( "Line Offset/Spread", & vg.sim_display.line_offset, 1.0f );  // next value in struct is repl_spread
 
-            const( char )* axis_label = "X\0Y\0Z\0\0";
-            int axis = cast( int )vg.sim_display.velocity_axis;
-            if( ImGui.Combo( "Velocity Direction", & axis, axis_label ))
-                vg.sim_display.velocity_axis = cast( vg.Line_Axis )axis;
+            ImGui.BeginGroup(); // Want to use popup on the following three items
+            {
+                const( char )* axis_label = "X\0Y\0Z\0\0";
+                int axis = cast( int )vg.sim_display.velocity_axis;
+                if( ImGui.Combo( "Velocity Direction", & axis, axis_label ))
+                    vg.sim_display.velocity_axis = cast( vg.Line_Axis )axis;
 
-            axis = cast( int )vg.sim_display.repl_axis;
-            if( ImGui.Combo( "Replication Direction", & axis, axis_label ))
-                vg.sim_display.repl_axis = cast( vg.Line_Axis )axis;
+                axis = cast( int )vg.sim_display.repl_axis;
+                if( ImGui.Combo( "Replication Direction", & axis, axis_label ))
+                    vg.sim_display.repl_axis = cast( vg.Line_Axis )axis;
 
-            axis = cast( int )vg.sim_display.line_axis;
-            if( ImGui.Combo( "Line Direction", & axis, axis_label ))
-                vg.sim_display.line_axis = cast( vg.Line_Axis )axis;
+                axis = cast( int )vg.sim_display.line_axis;
+                if( ImGui.Combo( "Line Direction", & axis, axis_label ))
+                    vg.sim_display.line_axis = cast( vg.Line_Axis )axis;
+            }
+            ImGui.EndGroup();
+
+            // line axis setup shortcut for U- and V-Velocities
+            if( ImGui.BeginPopupContextItem( "Velocity Lines Context Menu" )) {
+                if( ImGui.Selectable( "U-Velocity" )) {
+                    vg.sim_display.line_axis       = vg.Line_Axis.Y;
+                    vg.sim_display.repl_axis       = vg.Line_Axis.X;
+                    vg.sim_display.velocity_axis   = vg.Line_Axis.X;
+                }
+
+                if( ImGui.Selectable( "V-Velocity" )) {
+                    vg.sim_display.line_axis       = vg.Line_Axis.X;
+                    vg.sim_display.repl_axis       = vg.Line_Axis.Y;
+                    vg.sim_display.velocity_axis   = vg.Line_Axis.Y;
+                }
+
+                ImGui.EndPopup();
+            }
+
             ImGui.SetCursorPosX( 160 );
             ImGui.Checkbox( "Draw Base Lines", & vg.sim_draw_vel_base );
 
