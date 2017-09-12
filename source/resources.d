@@ -460,8 +460,8 @@ void createLinePSO( ref VDrive_State vd ) {
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_LINE_STRIP )                          // set the inputAssembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
-        //.depthState                                                                 // set depth state - enable depth test with default attributes
-        .addColorBlendState( VK_FALSE )                                             // color blend state - append common (default) color blend attachment state
+    //  .depthState                                                                 // set depth state - enable depth test with default attributes
+        .addColorBlendState( VK_TRUE )                                              // color blend state - append common (default) color blend attachment state
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
         .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )              // describe pipeline layout
