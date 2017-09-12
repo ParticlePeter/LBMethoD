@@ -277,6 +277,9 @@ void createMemoryObjects( ref VDrive_Gui_State vg ) {
     vg.sim_display.sim_domain   = vg.vd.sim_domain;
 
     vg.updateViscosity;
+
+    vg.sim_viscosity = 0.001 * vg.sim_typical_length;
+    vg.updateTauOmega;
     /*
     import dlsl.vector;
     import std.stdio;
@@ -1555,7 +1558,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
         // preset settings context menu
         if( ImGui.BeginPopupContextItem( "Simulation Parameter Context Menu" )) {
             if( ImGui.Selectable( "Unit Parameter" )) {
-                vg.sim_wall_velocity = 0.05; vg.updateWallVelocity;
+                vg.sim_wall_velocity = 0.1; vg.updateWallVelocity;
                 vg.compute_ubo.collision_frequency = vg.sim_relaxation_rate = 1; vg.updateViscosity;
             }
             if( ImGui.Selectable( "Zero Viscosity" )) {
