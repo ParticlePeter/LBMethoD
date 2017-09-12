@@ -768,11 +768,13 @@ private {
     }
 
     void updateTauOmega( ref VDrive_Gui_State vg ) {
-        float speed_of_sound_squared = vg.sim_speed_of_sound * vg.sim_speed_of_sound;
-        vg.compute_ubo.collision_frequency =
-            2 * speed_of_sound_squared /
-            ( vg.sim_unit_temporal * ( 2 * vg.sim_viscosity + speed_of_sound_squared ));
-        vg.sim_relaxation_rate = 1 / vg.compute_ubo.collision_frequency;
+        //float speed_of_sound_squared = vg.sim_speed_of_sound * vg.sim_speed_of_sound;
+        //vg.compute_ubo.collision_frequency =
+        //    2 * speed_of_sound_squared /
+        //    ( vg.sim_unit_temporal * ( 2 * vg.sim_viscosity + speed_of_sound_squared ));
+        //vg.sim_relaxation_rate = 1 / vg.compute_ubo.collision_frequency;
+        vg.sim_relaxation_rate = 3 * vg.sim_viscosity + 0.5;
+        vg.compute_ubo.collision_frequency = 1 / vg.sim_relaxation_rate;
         vg.updateComputeUBO;
     }
 
@@ -782,7 +784,8 @@ private {
     }
 
     void updateViscosity( ref VDrive_Gui_State vg ) {
-        vg.sim_viscosity = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
+        //vg.sim_viscosity = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
+        vg.sim_viscosity = 1.0 / 6 * ( 2 * vg.sim_relaxation_rate - 1 );
     }
 
     void pushButtonStyleDisable() {
