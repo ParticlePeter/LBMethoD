@@ -1837,9 +1837,14 @@ void drawGui( ref VDrive_Gui_State vg ) {
         sprintf( buffer.ptr, "%d", duration );
         ImGui.InputText( "Duration (hnsecs)", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
 
-        double  avg_per_step    = duration / cast( double )vg.sim_profile_step_index;
+        double avg_per_step = duration / cast( double )vg.sim_profile_step_index;
         sprintf( buffer.ptr, "%f", avg_per_step );
         ImGui.InputText( "Avg. / Step (hnsecs)", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
+
+        ulong  node_count = vg.vd.sim_domain[0] * vg.vd.sim_domain[1] * vg.vd.sim_domain[2];
+        double mlups = 10.0 * node_count * vg.sim_profile_step_index / duration;
+        sprintf( buffer.ptr, "%f", mlups );
+        ImGui.InputText( "Avg. MLups", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
 
         collapsingTerminator;
     }
