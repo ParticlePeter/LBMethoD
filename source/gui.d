@@ -1722,6 +1722,8 @@ void drawGui( ref VDrive_Gui_State vg ) {
         if( vg.sim_use_3_dim ) {
             if( ImGui.DragInt( "Z-Layer", & z_layer, 0.1f, 0, vg.sim_domain[2] - 1 )) {
                 z_layer = 0 > z_layer ? 0 : z_layer >= vg.sim_domain[2] ? vg.sim_domain[2] - 1 : z_layer;
+                vg.display_ubo.z_layer = z_layer;
+                vg.updateDisplayUBO;
             }
         }
 
