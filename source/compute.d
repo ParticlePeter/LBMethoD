@@ -67,7 +67,7 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
         .addMapEntry( MapEntry32( vd.sim_work_group_size[0] ))  // default constantID is 0, next would be 1
         .addMapEntry( MapEntry32( vd.sim_work_group_size[1] ))  // default constantID is 1, next would be 2
         .addMapEntry( MapEntry32( vd.sim_work_group_size[2] ))  // default constantID is 2, next would be 3
-        .addMapEntry( MapEntry32( vd.sim_algorithm ), 3 )       // latter is the constantID, must be passed in if the current constant id does not correspond
+        .addMapEntry( MapEntry32(( vd.sim_step_size << 8 ) + vd.sim_algorithm ))    // upper 24 bits is the step_size, lower 8 bits the algorithm
         .construct;
 
     void createComputePSO( Core_Pipeline* pso, string shader_path ) {
@@ -153,10 +153,17 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
         //  vd.sim_use_double ? "shader/loop_D2Q9_ldc_double.comp" : "shader/loop_D2Q9_channel_flow.comp" );
     }
 
+    // (re)create command buffers
+    vd.createComputeCommands;
+}
 
-    /////////////////////////////////////////////////
-    // create two reusable compute command buffers //
-    /////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////
+// create two reusable compute command buffers //
+/////////////////////////////////////////////////
+
+void createComputeCommands( ref VDrive_State vd ) nothrow {
 
     // reset the command pool to start recording drawing commands
     vd.graphics_queue.vkQueueWaitIdle;   // equivalent using a fence per Spec v1.0.48
@@ -166,47 +173,39 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
     vd.allocateCommandBuffers( vd.sim_cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vd.sim_cmd_buffers );
     auto sim_cmd_buffers_bi = createCmdBufferBI;
 
-    // record commands in loop, only difference is the push constant
-    foreach( i, ref cmd_buffer; vd.sim_cmd_buffers ) {
-        uint32_t[2] push_constant = [ i.toUint, vd.sim_layers ];
-        cmd_buffer.vkBeginCommandBuffer( &sim_cmd_buffers_bi );  // begin command buffer recording
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.comp_loop_pso.pipeline );    // bind compute vd.comp_loop_pso.pipeline
-        cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
-            VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
-            vd.comp_loop_pso.pipeline_layout,     // VkPipelineLayout             layout
-            0,                                  // uint32_t                     firstSet
-            1,                                  // uint32_t                     descriptorSetCount
-            &vd.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
-            0,                                  // uint32_t                     dynamicOffsetCount
-            null                                // const( uint32_t )*           pDynamicOffsets
-        );
-        cmd_buffer.vkCmdPushConstants( vd.comp_loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
-    //  cmd_buffer.vdCmdDispatch( work_group_count );       // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
-        cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );       // dispatch compute command
-        cmd_buffer.vkEndCommandBuffer;                      // finish recording and submit the command
+    // work group count in X direction only
+    uint32_t dispatch_x = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2] / vd.sim_work_group_size[0];
+
+
+
+    //
+    // record simple commands in loop, if sim_step_size is 1
+    //
+    if( vd.sim_step_size == 1 ) {
+        foreach( i, ref cmd_buffer; vd.sim_cmd_buffers ) {
+            uint32_t[2] push_constant = [ i.toUint, vd.sim_layers ];    // push constant to specify either 0-1 ping-pong and pass in the sim layer count
+            cmd_buffer.vkBeginCommandBuffer( &sim_cmd_buffers_bi );     // begin command buffer recording
+            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.comp_loop_pso.pipeline );    // bind compute vd.comp_loop_pso.pipeline
+            cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
+                VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
+                vd.comp_loop_pso.pipeline_layout,   // VkPipelineLayout             layout
+                0,                                  // uint32_t                     firstSet
+                1,                                  // uint32_t                     descriptorSetCount
+                &vd.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
+                0,                                  // uint32_t                     dynamicOffsetCount
+                null                                // const( uint32_t )*           pDynamicOffsets
+            );
+            cmd_buffer.vkCmdPushConstants( vd.comp_loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
+        //  cmd_buffer.vdCmdDispatch( work_group_count );       // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+            cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );       // dispatch compute command
+            cmd_buffer.vkEndCommandBuffer;                      // finish recording and submit the command
+        }
+        return;
     }
 
-    // init_pso ping pong variable to 1
-    // it will be switched to 0 ( pp = 1 - pp ) befor submitting compute commands
-    //vd.sim_ping_pong = 1;
-
-}
 
 
-
-void createComputeCommands( ref VDrive_State vd ) nothrow {
-
-    ///////////////////////////////////////////////////////////////////////////
-    // create two reusable compute command buffers with export functionality //
-    ///////////////////////////////////////////////////////////////////////////
-
-    // Wait till queue is drained, reset the command buffers individually with vkBeginCommandBuffer
-    vd.graphics_queue.vkQueueWaitIdle;   // equivalent using a fence per Spec v1.0.48
-
-    // common command buffer begin info
-    auto sim_cmd_buffers_bi = createCmdBufferBI;
-
-    // barrier for population access from export shader
+    // buffer barrier for population invoked after each dispatch
     VkBufferMemoryBarrier sim_buffer_memory_barrier = {
         srcAccessMask       : VK_ACCESS_SHADER_WRITE_BIT,
         dstAccessMask       : VK_ACCESS_SHADER_READ_BIT,
@@ -217,24 +216,14 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
         size                : VK_WHOLE_SIZE,
     };
 
-    uint32_t dispatch_x = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2] / vd.sim_work_group_size[0];
+    
 
-
-
-    // record commands in loop, only difference is the push constant
+    //
+    // otherwise record complex commands with memory barriers in loop
+    //
     foreach( i, ref cmd_buffer; vd.sim_cmd_buffers ) {
-
-        // - vd.ping_pong = ve.sim_index % 2;
-        // - vd.sim_index = ve.start_index + ve.export_index * ve.step_size;
-
-        //
-        // First export the current frame!
-        //
-
         cmd_buffer.vkBeginCommandBuffer( &sim_cmd_buffers_bi );  // begin command buffer recording
-
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.comp_loop_pso.pipeline );    // bind compute vd.comp_export_pso.pipeline
-
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.comp_loop_pso.pipeline );    // bind compute vd.comp_loop_pso.pipeline
         cmd_buffer.vkCmdBindDescriptorSets(             // VkCommandBuffer              commandBuffer
             VK_PIPELINE_BIND_POINT_COMPUTE,             // VkPipelineBindPoint          pipelineBindPoint
             vd.comp_loop_pso.pipeline_layout,           // VkPipelineLayout             layout
@@ -245,54 +234,17 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
             null                                        // const( uint32_t )*           pDynamicOffsets
         );
 
-        // with this approach we are able to export sim step zero, initial settings, where no simulation took place
-        // we export from the pong buffer, for any other case, after simulation took place
-        // hence we use ( i + 1 ) % 2 instead of i % 2
-        // to get proper results, the pong range of the population buffer and the macroscopic property image
-        // must be properly initialized
-
-        uint32_t[2] push_constant = [ ( i + 1 ).toUint % 2, vd.sim_layers ];
-        cmd_buffer.vkCmdPushConstants( vd.comp_loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr );    // push constant
-
-        cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );   // dispatch compute command
-        /*
-        export_buffer_memory_barrier.buffer = vd.export_buffer[i].buffer;
-        cmd_buffer.vkCmdPipelineBarrier(
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,       // VkPipelineStageFlags                 srcStageMask,
-            VK_PIPELINE_STAGE_HOST_BIT,                 // VkPipelineStageFlags                 dstStageMask,
-            0,                                          // VkDependencyFlags                    dependencyFlags,
-            0, null,                                    // uint32_t memoryBarrierCount,         const VkMemoryBarrier*  pMemoryBarriers,
-            1, & export_buffer_memory_barrier,          // uint32_t bufferMemoryBarrierCount,   const VkBufferMemoryBarrier* pBufferMemoryBarriers,
-            0, null,                                    // uint32_t imageMemoryBarrierCount,    const VkImageMemoryBarrier*  pImageMemoryBarriers,
-        );
-        */
 
         //
         // Now do step_size count simulations
         //
-        auto step_size = 10;
-        foreach( s; 0 .. step_size ) {   // vd.ve.step_size
-
-            //push_constant[0] = (( ve.sim_index + i + s ) % 2 ).toUint;
-            push_constant[0] = (( i + s ) % 2 ).toUint;
-
-            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.comp_loop_pso.pipeline );    // bind compute vd.comp_loop_pso.pipeline
-
-            cmd_buffer.vkCmdBindDescriptorSets(             // VkCommandBuffer              commandBuffer
-                VK_PIPELINE_BIND_POINT_COMPUTE,             // VkPipelineBindPoint          pipelineBindPoint
-                vd.comp_loop_pso.pipeline_layout,           // VkPipelineLayout             layout
-                0,                                          // uint32_t                     firstSet
-                1,                                          // uint32_t                     descriptorSetCount
-                &vd.descriptor.descriptor_set,              // const( VkDescriptorSet )*    pDescriptorSets
-                0,                                          // uint32_t                     dynamicOffsetCount
-                null                                        // const( uint32_t )*           pDynamicOffsets
-            );
-
+        foreach( s; 0 .. vd.sim_step_size ) {
+            uint32_t[2] push_constant = [ s.toUint, vd.sim_layers ];    // push constant to specify dispatch invocation counter and pass in the sim layer count
             cmd_buffer.vkCmdPushConstants( vd.comp_loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
-
             cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );   // dispatch compute command
 
-            cmd_buffer.vkCmdPipelineBarrier(
+            // buffer barrier to wait for all populations being written to memory
+            cmd_buffer.vkCmdPipelineBarrier(                
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,       // VkPipelineStageFlags                 srcStageMask,
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,       // VkPipelineStageFlags                 dstStageMask,
                 0,                                          // VkDependencyFlags                    dependencyFlags,
@@ -302,10 +254,7 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
             );
         }
 
-        cmd_buffer.vkEndCommandBuffer;                  // finish recording and submit the command
+        // finish recording current command buffer
+        cmd_buffer.vkEndCommandBuffer;                  
     }
-
-    // init_pso ping pong variable to 1
-    // it will be switched to 0 ( pp = 1 - pp ) befor submitting compute commands
-    //vd.sim_ping_pong = 1;
 }
