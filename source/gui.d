@@ -2684,8 +2684,11 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
 void guiWindowSizeCallback( GLFWwindow * window, int w, int h ) {
     auto io = & ImGui.GetIO();
     auto vg = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData
-    io.DisplaySize  = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
-    main_win_size.y = vg.vd.windowHeight;           // this sets the window gui height to the window height
+    io.DisplaySize  = ImVec2( w, h );
+    
+    scale_win_pos.x = w -  60;     // set x - position of scale window
+    scale_win_pos.y = h - 200;     // set y - position of scale window
+    main_win_size.y = h;           // this sets the window gui height to the window height
 
     // the extent might change at swapchain creation when the specified extent is not usable
     swapchainExtent( &vg.vd, w, h );
