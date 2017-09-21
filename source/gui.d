@@ -1630,10 +1630,10 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 vg.sim_wall_velocity = 0.1; vg.updateWallVelocity;
                 vg.compute_ubo.collision_frequency = vg.sim_relaxation_rate = 1; vg.updateViscosity;
             }
-            if( ImGui.Selectable( "Zero Viscosity" )) {
+            if( ImGui.Selectable( "Looow Viscosity" )) {
                 vg.sim_wall_velocity = 0.001; vg.updateWallVelocity;
                 vg.compute_ubo.collision_frequency = 2;
-                vg.sim_relaxation_rate = 0.5;
+                vg.sim_relaxation_rate = 0.5001;
                 vg.updateViscosity;
                 if( vg.sim_algorithm != 4 ) {
                     vg.sim_algorithm  = 4;
