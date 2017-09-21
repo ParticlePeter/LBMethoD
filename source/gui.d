@@ -2042,7 +2042,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         collapsingTerminator;
 
-
+        /*
         //
         // taylor-green tree node
         //
@@ -2060,8 +2060,8 @@ void drawGui( ref VDrive_Gui_State vg ) {
             ImGui.TreePop;
         }
 
-
         collapsingTerminator;
+        */
 
     }
 
