@@ -131,9 +131,9 @@ struct VDrive_State {
     /////////////////////////////////////////////////
 
     // compute parameters
-    uint32_t[3] sim_domain                  = [ 127, 127, 1 ]; //[ 256, 256, 1 ];   // [ 256, 64, 1 ];
+    uint32_t[3] sim_domain                  = [ 256, 256, 1 ]; //[ 256, 256, 1 ];   // [ 256, 64, 1 ];
     uint32_t    sim_layers                  = 17;
-    uint32_t[3] sim_work_group_size         = [ 127, 1, 1 ];
+    uint32_t[3] sim_work_group_size         = [ 256,  1, 1 ];
     uint32_t    sim_ping_pong               = 1;
     uint32_t    sim_step_size               = 1;
 
@@ -207,7 +207,6 @@ version( LDC ) {
     bool            sim_use_double          = false;
     bool            sim_use_3_dim           = false;
     bool            sim_use_cpu             = false;
-
     bool            export_as_vector        = true;
 
 
