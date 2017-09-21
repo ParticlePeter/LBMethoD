@@ -134,6 +134,21 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
 
     //  init_cmd_buffer.vdCmdDispatch( work_group_count );      // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
         init_cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );      // dispatch compute command
+        // add memory barrier after populations were initialized
+        VkMemoryBarrier memory_barrier = {
+            srcAccessMask : VK_ACCESS_SHADER_WRITE_BIT,
+            dstAccessMask : VK_ACCESS_SHADER_READ_BIT
+        };
+
+        init_cmd_buffer.vkCmdPipelineBarrier(
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,               // VkPipelineStageFlags                 srcStageMask,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,       // VkPipelineStageFlags                 dstStageMask,
+            0,                                                  // VkDependencyFlags                    dependencyFlags,
+            1, & memory_barrier,                                // uint32_t memoryBarrierCount,         const VkMemoryBarrier* pMemoryBarriers,
+            0, null,                                            // uint32_t bufferMemoryBarrierCount,   const VkBufferMemoryBarrier* pBufferMemoryBarriers,
+            0, null,                                            // uint32_t imageMemoryBarrierCount,    const VkImageMemoryBarrier*  pImageMemoryBarriers,
+        );
+
         init_cmd_buffer.vkEndCommandBuffer;                     // finish recording and submit the command
         auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
         vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
