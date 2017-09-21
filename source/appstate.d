@@ -331,7 +331,7 @@ void drawInit( ref VDrive_State vd ) {
 
 void drawSim( ref VDrive_State vd ) @system {
     vd.sim_ping_pong = vd.sim_index % 2;                            // compute new ping_pong value
-    vd.compute_ubo.comp_index = vd.sim_index * vd.sim_step_size;    // increase shader compute counter
+    vd.compute_ubo.comp_index += vd.sim_step_size;                  // increase shader compute counter
     if( vd.sim_step_size > 1 ) vd.updateComputeUBO;                 // we need this value in compute shader if its greater than 1
     ++vd.sim_index;                                                 // increment the compute buffer submission count
     vd.draw;                                                        // let vulkan dance
@@ -381,7 +381,7 @@ void draw( ref VDrive_State vd ) @system {
 void profileCompute( ref VDrive_State vd ) @system {
 
     vd.sim_ping_pong = vd.sim_index % 2;                            // compute new ping_pong value
-    vd.compute_ubo.comp_index = vd.sim_index * vd.sim_step_size;    // increase shader compute counter
+    vd.compute_ubo.comp_index += vd.sim_step_size;                  // increase shader compute counter
     if( vd.sim_step_size > 1 ) vd.updateComputeUBO;                 // we need this value in compute shader if its greater than 1
     ++vd.sim_index;                                                 // increment the compute buffer submission count
 
