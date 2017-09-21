@@ -162,6 +162,8 @@ void toggleFullscreen( GLFWwindow * window ) nothrow @nogc {
         glfwGetWindowSize( window, &win_w, &win_h );
         auto monitor = glfwGetPrimaryMonitor();
         auto vidmode = glfwGetVideoMode( monitor );
+        glfwSetWindowPos(  window, 0, 0 );
+        glfwSetWindowSize( window, vidmode.width, vidmode.height );
         glfwSetWindowMonitor( window, glfwGetPrimaryMonitor(), 0, 0, vidmode.width, vidmode.height, vidmode.refreshRate );
     }
 }
