@@ -730,7 +730,7 @@ private {
             vg.sim_profile_step_index = 0;
             vg.resetStopWatch;
         }
-        vg.sim_index = 0;
+        vg.sim_index = vg.compute_ubo.comp_index = 0;
         try {
             if( vg.sim_use_cpu ) {
                 vg.cpuInit;
@@ -2193,7 +2193,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             if( ImGui.Button( "Export Data", button_size_1 )) {
 
                 // reset simulation if we past the export step index
-                if( vg.ve.start_index < vg.sim_index ) {
+                if( vg.ve.start_index < vg.compute_ubo.comp_index ) {
                     vg.simReset;
                 }
 
