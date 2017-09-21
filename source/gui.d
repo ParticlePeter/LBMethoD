@@ -2727,6 +2727,12 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
         } catch( Exception ) {}
         break;
 
+        case GLFW_KEY_D :
+        try {
+            vg.vd.createGraphicsPSO;
+        } catch( Exception ) {}
+        break;
+
         default : break;
     }
 }
