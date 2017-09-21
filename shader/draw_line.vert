@@ -7,6 +7,7 @@ layout( push_constant ) uniform Push_Constant {
     int     repl_count;
     float   line_offset;
     float   repl_spread;
+    float   point_size;
 } pc;
 
 
@@ -104,7 +105,7 @@ uint VA = ( pc.line_type___line_axis___repl_axis___velocity_axis >> 24 ) & 0xff;
 //const vec2 xform = 2 * pc.scale / vec2( imageSize( vel_rho_tex[0] )) - pc.scale;
 const vec2 dir = vec2( 1, -1 );
 void main() {
-    gl_PointSize = 3;
+    gl_PointSize = pc.point_size;
     vec4 pos = vec4( 0, 0, 0, 1 );
 
     switch( DISPLAY_TYPE ) {

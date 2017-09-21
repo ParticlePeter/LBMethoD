@@ -84,6 +84,7 @@ struct VDrive_Gui_State {
         int         repl_count      = 0;
         float       line_offset     = 0;
         float       repl_spread     = 1;
+        float       point_size      = 1;
     }
 
     Sim_Display sim_display;
@@ -93,6 +94,8 @@ struct VDrive_Gui_State {
     uint32_t    sim_layers;
     uint32_t[3] sim_work_group_size;
     uint32_t    sim_step_size;
+    float[2]    recip_window_size = [ 2.0f / 1600, 2.0f / 900 ];
+    float[3]    point_size_line_width = [ 9, 3, 1 ];
     float       sim_typical_length;
 
     // count of command buffers to be drawn when in play mode
@@ -1916,6 +1919,16 @@ void drawGui( ref VDrive_Gui_State vg ) {
     if( ImGui.CollapsingHeader( "Validate Simulation" )) {
         ImGui.Separator;
 
+        ImGui.SetCursorPosX( 160 );
+        ImGui.Checkbox( "Draw as Points", & vg.draw_velocity_lines_as_points );
+
+        if( vg.draw_velocity_lines_as_points )
+            ImGui.DragFloat2( "Point Size##1", vg.point_size_line_width.ptr, 0.125f, 0.25f );
+        else
+            ImGui.DragFloat2( "Line Width##1", vg.point_size_line_width.ptr, 0.125f, 0.25f );
+
+        collapsingTerminator;
+
         //
         // Ghia tree node
         //
@@ -2364,27 +2377,38 @@ void drawGuiData( ImDrawData* draw_data ) {
         cmd_buffer.vkCmdDraw( 2, vg.sim_domain[1] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
 
+    void setPointSizeLineWidth( size_t index ) {
+        if( vg.draw_velocity_lines_as_points ) {
+            if( vg.vd.feature_large_points ) {
+                vg.sim_display.point_size = vg.point_size_line_width[ index ];
+            }
+        } else {
+            if( vg.vd.feature_wide_lines ) {
+                cmd_buffer.vkCmdSetLineWidth( vg.point_size_line_width[ index ] );
+            }
+        }
+    }
+
 
     //
     // draw ghia validation profiles
     //
     if( vg.sim_validate_ghia ) {
 
+        // setup pipeline, either lines or points drawing
         uint draw_as_points = vg.draw_velocity_lines_as_points ? 1 : 0;
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ draw_as_points ].pipeline );
         auto pipeline_layout = vg.draw_line_pso[ draw_as_points ].pipeline_layout;
 
-        // push constant the whole sim_display struct
-        vg.sim_display.line_type = vg.Line_Type.ghia;
 
         //
         // store UI Values
         //
-        int          repl_count     = vg.sim_display.repl_count;        
+        int          repl_count     = vg.sim_display.repl_count;
         vg.Line_Axis line_axis      = vg.sim_display.line_axis;
         vg.Line_Axis repl_axis      = vg.sim_display.repl_axis;
         vg.Line_Axis velocity_axis  = vg.sim_display.velocity_axis;
-        float        line_offset    = vg.sim_display.line_offset;    
+        float        line_offset    = vg.sim_display.line_offset;
 
 
         //
@@ -2395,17 +2419,23 @@ void drawGuiData( ImDrawData* draw_data ) {
         vg.sim_display.repl_axis        = vg.Line_Axis.X;
         vg.sim_display.velocity_axis    = vg.Line_Axis.X;
         vg.sim_display.line_offset      = 63;
+        setPointSizeLineWidth( 0 );
+
+        // push constant the whole sim_display struct and draw
+        vg.sim_display.line_type = vg.Line_Type.ghia;
         cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Display.sizeof, & vg.sim_display );
         cmd_buffer.vkCmdDraw( 17, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
         if( vg.sim_validate_velocity ) {
             // adjust push constants and draw velocity line
+            setPointSizeLineWidth( 1 );
             vg.sim_display.line_type = vg.Line_Type.velocity;
             cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Display.sizeof, & vg.sim_display );
             cmd_buffer.vkCmdDraw( vg.vd.sim_domain[ vg.sim_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
 
         if( vg.sim_validate_vel_base ) {
+            setPointSizeLineWidth( 2 );
             // adjust push constants and draw velocity line
             vg.sim_display.line_type = vg.Line_Type.vel_base;
             cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Display.sizeof, & vg.sim_display );
@@ -2420,11 +2450,14 @@ void drawGuiData( ImDrawData* draw_data ) {
         vg.sim_display.velocity_axis    = vg.Line_Axis.Y;
         vg.sim_display.repl_axis        = vg.Line_Axis.Y;
         vg.sim_display.line_axis        = vg.Line_Axis.X;
+        setPointSizeLineWidth( 0 );
+
         cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Display.sizeof, & vg.sim_display );
         cmd_buffer.vkCmdDraw( 17, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
         if( vg.sim_validate_velocity ) {
             // adjust push constants and draw velocity line
+            setPointSizeLineWidth( 1 );
             vg.sim_display.line_type = vg.Line_Type.velocity;
             cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Display.sizeof, & vg.sim_display );
             cmd_buffer.vkCmdDraw( vg.vd.sim_domain[ vg.sim_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
@@ -2432,6 +2465,7 @@ void drawGuiData( ImDrawData* draw_data ) {
 
         if( vg.sim_validate_vel_base ) {
             // adjust push constants and draw velocity base line
+            setPointSizeLineWidth( 2 );
             vg.sim_display.line_type = vg.Line_Type.vel_base;
             cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Display.sizeof, & vg.sim_display );
             cmd_buffer.vkCmdDraw( vg.vd.sim_domain[ vg.sim_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
@@ -2454,26 +2488,24 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     if( vg.sim_display.repl_count ) {
 
+        // setup pipeline, either lines or points drawing
         uint draw_as_points = vg.draw_velocity_lines_as_points ? 1 : 0;
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ draw_as_points ].pipeline );
         auto pipeline_layout = vg.draw_line_pso[ draw_as_points ].pipeline_layout;
 
         if( vg.sim_draw_vel_base ) {
-
             // push constant the whole sim_display struct
+            setPointSizeLineWidth( 2 );
             vg.sim_display.line_type = vg.Line_Type.vel_base;
-
             cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
-
             cmd_buffer.vkCmdDraw(
                 vg.vd.sim_domain[ vg.sim_display.line_axis ], vg.sim_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
 
-        // push constant the whole sim_display struct
+        // push constant the whole sim_display struct and draw
+        setPointSizeLineWidth( 1 );
         vg.sim_display.line_type = vg.Line_Type.velocity;
-
         cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
-
         cmd_buffer.vkCmdDraw(
             vg.vd.sim_domain[ vg.sim_display.line_axis ], vg.sim_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
@@ -2552,6 +2584,7 @@ void drawGuiData( ImDrawData* draw_data ) {
         }
         vtx_offset += cmd_list.VtxBuffer.Size;
     }
+
 
     // end the render pass
     cmd_buffer.vkCmdEndRenderPass;

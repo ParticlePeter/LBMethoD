@@ -314,7 +314,7 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.nearest_sampler )        // additional sampler if we want to examine each node
 
         // Compute UBO for compute parameter
-        .addLayoutBinding( 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT )
+        .addLayoutBinding( 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT )
         .addBufferInfo( vd.compute_ubo_buffer.buffer )
 
         // Display UBO for display parameter
@@ -454,10 +454,10 @@ void createLinePSO( ref VDrive_State vd ) {
 
     // first create PSO to draw lines
     Meta_Graphics meta_graphics;
-    vd.draw_line_pso[ 0 ] = meta_graphics( vd )
+    vd.draw_line_pso[ 1 ] = meta_graphics( vd )
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.vert" ))
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.frag" ))
-        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_LINE_STRIP )                          // set the inputAssembly
+        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_POINT_LIST )                          // set the inputAssembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
     //  .depthState                                                                 // set depth state - enable depth test with default attributes
@@ -465,14 +465,18 @@ void createLinePSO( ref VDrive_State vd ) {
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
         .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )              // describe pipeline layout
-        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 28 )                  // specify push constant range
+        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 32 )                  // specify push constant range
         .renderPass( vd.render_pass.render_pass )                                   // describe compatible render pass
         .construct( vd.graphics_cache )                                             // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
         .extractCore;                                                               // extract core data into Core_Pipeline struct
 
     // now edit the Meta_Pipeline to create an alternate points PSO
-    vd.draw_line_pso[ 1 ] = meta_graphics
-        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_POINT_LIST )
+    meta_graphics.inputAssembly( VK_PRIMITIVE_TOPOLOGY_LINE_STRIP );
+
+    if( vd.feature_wide_lines )
+        meta_graphics.addDynamicState( VK_DYNAMIC_STATE_LINE_WIDTH );
+
+    vd.draw_line_pso[ 0 ] = meta_graphics
         .construct( vd.graphics_cache )                                             // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct and delete temporary data
