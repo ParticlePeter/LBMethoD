@@ -1522,6 +1522,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
         //
         // Work Group Size
         //
+        //*
         if( ImGui.DragInt( "Work Group Size X", cast( int* )( & vg.sim_work_group_size[0] ), drag_step, 1, 1024 )) vg.checkComputePSO;
 
         if( ImGui.BeginPopupContextItem( "Work Group Size Context Menu" )) {
@@ -1546,21 +1547,10 @@ void drawGui( ref VDrive_Gui_State vg ) {
             } ImGui.EndPopup();
         }
 
-
+        /*/
         //
-        // Store Every Nth Step
+        // Work Group Size alternative version when we can use multi dim work group sizes in shader
         //
-        int step_size = cast( int )vg.sim_step_size;
-        if( ImGui.DragInt( "Store Every Nth Step", & step_size, 0.1, 1, int.max )) {
-            vg.sim_step_size = step_size < 1 ? 1 : step_size;
-        }
-
-        ImGui.DragInt( "Compute Index", cast( int* )( & vg.compute_ubo.comp_index ), 0.1, 1, int.max );
-
-        /*
-        //////////////////////////////////////////////////////////////////////////////////////////////
-        // Work Group Size alternative version when we can use multi dim work group sizes in shader //
-        //////////////////////////////////////////////////////////////////////////////////////////////
         if( dimensions == 0
             ? ImGui.DragInt2( "Work Group Size", cast( int* )( & vg.sim_work_group_size[0] ), drag_step, 1, 1024 )
             : ImGui.DragInt3( "Work Group Size", cast( int* )( & vg.sim_work_group_size[0] ), drag_step, 1, 1024 ))
@@ -1634,7 +1624,33 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 }
             } ImGui.EndPopup();
         }
-        */
+        //*/
+
+
+        //
+        // Store Every Nth Step
+        //
+        int step_size = cast( int )vg.sim_step_size;
+        if( ImGui.DragInt( "Store Every Nth Step", & step_size, 0.1, 1, int.max )) {
+            vg.sim_step_size = step_size < 1 ? 1 : step_size;
+        }
+
+        // shortcut to set values
+        if( ImGui.BeginPopupContextItem( "Step Size Context Menu" )) {
+            if( ImGui.Selectable( "1" ))     { vg.vd.sim_step_size = vg.sim_step_size = 1;     vg.createBoltzmannPSO( false, true, false ); }
+            if( ImGui.Selectable( "5" ))     { vg.vd.sim_step_size = vg.sim_step_size = 5;     vg.createBoltzmannPSO( false, true, false ); }
+            if( ImGui.Selectable( "10" ))    { vg.vd.sim_step_size = vg.sim_step_size = 10;    vg.createBoltzmannPSO( false, true, false ); }
+            if( ImGui.Selectable( "50" ))    { vg.vd.sim_step_size = vg.sim_step_size = 50;    vg.createBoltzmannPSO( false, true, false ); }
+            if( ImGui.Selectable( "100" ))   { vg.vd.sim_step_size = vg.sim_step_size = 100;   vg.createBoltzmannPSO( false, true, false ); }
+            if( ImGui.Selectable( "500" ))   { vg.vd.sim_step_size = vg.sim_step_size = 500;   vg.createBoltzmannPSO( false, true, false ); }
+            if( ImGui.Selectable( "1000" ))  { vg.vd.sim_step_size = vg.sim_step_size = 1000;  vg.createBoltzmannPSO( false, true, false ); }
+            if( ImGui.Selectable( "5000" ))  { vg.vd.sim_step_size = vg.sim_step_size = 5000;  vg.createBoltzmannPSO( false, true, false ); }
+            if( ImGui.Selectable( "10000" )) { vg.vd.sim_step_size = vg.sim_step_size = 10000; vg.createBoltzmannPSO( false, true, false ); }
+            if( ImGui.Selectable( "50000" )) { vg.vd.sim_step_size = vg.sim_step_size = 50000; vg.createBoltzmannPSO( false, true, false ); }
+            ImGui.EndPopup();
+        }
+
+        ImGui.DragInt( "Compute Index", cast( int* )( & vg.compute_ubo.comp_index ), 0.1, 1, int.max );
 
         collapsingTerminator;
     }
