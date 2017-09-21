@@ -176,7 +176,7 @@ void createSimImage( ref VDrive_State vd ) {
     //    VK_IMAGE_TILING_OPTIMAL,
     //    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
     //).printTypeInfo;
-    
+
     auto image_format = VK_FORMAT_R32G32B32A32_SFLOAT; //VK_FORMAT_R16G16B16A16_SFLOAT
     VkImageSubresourceRange subresource_range = {
         aspectMask      : VK_IMAGE_ASPECT_COLOR_BIT,
@@ -327,7 +327,7 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         //.addTexelBufferView( vd.export_buffer_view[1] );
 
     if( PARTICLE )  // Particles Buffer, not used yet
-        ( *meta_descriptor_ptr ) 
+        ( *meta_descriptor_ptr )
             .addLayoutBinding( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
             .addTexelBufferView( vd.sim_particle_buffer_view );
 
