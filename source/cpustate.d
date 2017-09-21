@@ -176,102 +176,103 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_Gui_State vg ) nothrow @syste
     ubyte pong = vg.vc.ping;
     vg.vc.ping = cast( ubyte )( 8 - vg.vc.ping );
 
-    static if( PROFILE )
-        vg.startStopWatch;
 
     //foreach( I, ref cell; parallel( popul_buffer[ 0 .. vg.vc.cell_count ], vg.sim_work_group_size[0] )) {
-    for( int I = 0; I < vg.vc.cell_count; ++I ) {
-        // load populations
-        //import std.stdio;
-        //writeln( vg.vc.cell_count );
+    import std.range : iota;
+    //  try {
+        static if( PROFILE ) vg.startStopWatch;
+        foreach( I; iota( 0, vg.vc.cell_count, 1 )) {
+        //foreach( I; parallel( iota( 0, vg.vc.cell_count, 1 ), vg.sim_work_group_size[0] )) {
 
-        T[9] f = [
-            popul_buffer[                             I ],
-            popul_buffer[ ( vg.vc.ping + 1 ) * vg.vc.cell_count + I ],
-            popul_buffer[ ( vg.vc.ping + 2 ) * vg.vc.cell_count + I ],
-            popul_buffer[ ( vg.vc.ping + 3 ) * vg.vc.cell_count + I ],
-            popul_buffer[ ( vg.vc.ping + 4 ) * vg.vc.cell_count + I ],
-            popul_buffer[ ( vg.vc.ping + 5 ) * vg.vc.cell_count + I ],
-            popul_buffer[ ( vg.vc.ping + 6 ) * vg.vc.cell_count + I ],
-            popul_buffer[ ( vg.vc.ping + 7 ) * vg.vc.cell_count + I ],
-            popul_buffer[ ( vg.vc.ping + 8 ) * vg.vc.cell_count + I ],
-        ];
+            // load populations
+            T[9] f = [
+                popul_buffer[                             I ],
+                popul_buffer[ ( vg.vc.ping + 1 ) * vg.vc.cell_count + I ],
+                popul_buffer[ ( vg.vc.ping + 2 ) * vg.vc.cell_count + I ],
+                popul_buffer[ ( vg.vc.ping + 3 ) * vg.vc.cell_count + I ],
+                popul_buffer[ ( vg.vc.ping + 4 ) * vg.vc.cell_count + I ],
+                popul_buffer[ ( vg.vc.ping + 5 ) * vg.vc.cell_count + I ],
+                popul_buffer[ ( vg.vc.ping + 6 ) * vg.vc.cell_count + I ],
+                popul_buffer[ ( vg.vc.ping + 7 ) * vg.vc.cell_count + I ],
+                popul_buffer[ ( vg.vc.ping + 8 ) * vg.vc.cell_count + I ],
+            ];
 
-        // compute macroscopic density before applying wall velocity where required
-        T rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
+            // compute macroscopic density before applying wall velocity where required
+            T rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
 
-        // compute 2D coordinates X and Y;
-        size_t X = I % D_x;
-        size_t Y = I / D_x;
+            // compute 2D coordinates X and Y;
+            size_t X = I % D_x;
+            size_t Y = I / D_x;
 
-        // Ladd's momentum correction for moving walls, applied to reflected populations not perpendicular to wall velocity
-        if( Y == D_y - 1 /*|| Y == 0*/ ) {  // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
-            f[7] -= 2 * vg.vc.pw[7] * rho * wall_velocity;
-            f[8] += 2 * vg.vc.pw[8] * rho * wall_velocity;
+            // Ladd's momentum correction for moving walls, applied to reflected populations not perpendicular to wall velocity
+            if( Y == D_y - 1 /*|| Y == 0*/ ) {  // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+                f[7] -= 2 * vg.vc.pw[7] * rho * wall_velocity;
+                f[8] += 2 * vg.vc.pw[8] * rho * wall_velocity;
+            }
+
+            // compute macroscopic velocity after wall velocity is applied
+            T v_x = ( f[1] - f[3] + f[5] - f[7] + f[8] - f[6] ) / rho;
+            T v_y = ( f[2] - f[4] + f[5] - f[7] + f[6] - f[8] ) / rho;
+
+            // store velocities and densities in stage buffer to copy to image with format VK_FORMAT_R32G32B32A32_SFLOAT
+            vg.sim_image_ptr[ 4 * I + 0 ] = cast( float )v_x;
+            vg.sim_image_ptr[ 4 * I + 1 ] = cast( float )v_y;
+            vg.sim_image_ptr[ 4 * I + 2 ] = 0;
+            vg.sim_image_ptr[ 4 * I + 3 ] = 1;
+
+
+            //T X_P_Y = v_x + v_y;
+            //T X_M_Y = v_x - v_y;
+            //T V_X_2 = 4.5 * v_x * v_x;
+            //T V_Y_2 = 4.5 * v_y * v_y;
+            //T XPY_2 = 4.5 * X_P_Y * X_P_Y;
+            //T XMY_2 = 4.5 * X_M_Y * X_M_Y;
+            //T V_D_V = 1.5 * ( v_x * v_x + v_y * v_y );
+
+            T[9] f_eq = [                                              // #define SQ(x) ((x) * (x))
+                vg.vc.pw[0] * rho * (1                                                        - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[0] * rho * ( 1                     - V_D_V ), // 
+                vg.vc.pw[1] * rho * (1 + 3 * ( v_x)       + 4.5 * ( v_x)       * ( v_x)       - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[1] * rho * ( 1 + 3 *  v_x  + V_X_2 - V_D_V ), // 
+                vg.vc.pw[2] * rho * (1 + 3 * ( v_y)       + 4.5 * ( v_y)       * ( v_y)       - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[2] * rho * ( 1 + 3 *  v_y  + V_Y_2 - V_D_V ), // 
+                vg.vc.pw[3] * rho * (1 + 3 * (-v_x)       + 4.5 * (-v_x)       * (-v_x)       - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[3] * rho * ( 1 - 3 *  v_x  + V_X_2 - V_D_V ), // 
+                vg.vc.pw[4] * rho * (1 + 3 * (-v_y)       + 4.5 * (-v_y)       * (-v_y)       - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[4] * rho * ( 1 - 3 *  v_y  + V_Y_2 - V_D_V ), // 
+                vg.vc.pw[5] * rho * (1 + 3 * ( v_x + v_y) + 4.5 * ( v_x + v_y) * ( v_x + v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[5] * rho * ( 1 + 3 * X_P_Y + XPY_2 - V_D_V ), // 
+                vg.vc.pw[6] * rho * (1 + 3 * (-v_x + v_y) + 4.5 * (-v_x + v_y) * (-v_x + v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[6] * rho * ( 1 - 3 * X_M_Y + XMY_2 - V_D_V ), // 
+                vg.vc.pw[7] * rho * (1 + 3 * (-v_x - v_y) + 4.5 * (-v_x - v_y) * (-v_x - v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[7] * rho * ( 1 - 3 * X_P_Y + XPY_2 - V_D_V ), // 
+                vg.vc.pw[8] * rho * (1 + 3 * ( v_x - v_y) + 4.5 * ( v_x - v_y) * ( v_x - v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[8] * rho * ( 1 + 3 * X_M_Y + XMY_2 - V_D_V )  // 
+            ];
+
+            // Collide - inlining is not working properly, hence manually
+            f[0] = f[0] * ( 1 - omega ) + f_eq[0] * omega; // mix( f[0], f_eq[0], omega );
+            f[1] = f[1] * ( 1 - omega ) + f_eq[1] * omega; // mix( f[1], f_eq[1], omega );
+            f[2] = f[2] * ( 1 - omega ) + f_eq[2] * omega; // mix( f[2], f_eq[2], omega );
+            f[3] = f[3] * ( 1 - omega ) + f_eq[3] * omega; // mix( f[3], f_eq[3], omega );
+            f[4] = f[4] * ( 1 - omega ) + f_eq[4] * omega; // mix( f[4], f_eq[4], omega );
+            f[5] = f[5] * ( 1 - omega ) + f_eq[5] * omega; // mix( f[5], f_eq[5], omega );
+            f[6] = f[6] * ( 1 - omega ) + f_eq[6] * omega; // mix( f[6], f_eq[6], omega );
+            f[7] = f[7] * ( 1 - omega ) + f_eq[7] * omega; // mix( f[7], f_eq[7], omega );
+            f[8] = f[8] * ( 1 - omega ) + f_eq[8] * omega; // mix( f[8], f_eq[8], omega );
+
+            // Store new populations
+            popul_buffer[ I ] = f[0];
+
+            //immutable int[9] inv = [ 0, 3, 4, 1, 2, 7, 8, 5, 6 ];                                buf_off              buf_off         buffer_offset
+            popul_buffer[ X == D_x - 1 ? ( pong + 3 ) * vg.vc.cell_count + I : ( pong + 1 ) * vg.vc.cell_count +   1 + I ] = f[1];
+            popul_buffer[ Y ==       0 ? ( pong + 4 ) * vg.vc.cell_count + I : ( pong + 2 ) * vg.vc.cell_count - D_x + I ] = f[2];
+            popul_buffer[ X ==       0 ? ( pong + 1 ) * vg.vc.cell_count + I : ( pong + 3 ) * vg.vc.cell_count -   1 + I ] = f[3];
+            popul_buffer[ Y == D_y - 1 ? ( pong + 2 ) * vg.vc.cell_count + I : ( pong + 4 ) * vg.vc.cell_count + D_x + I ] = f[4];
+
+            //writefln( "I: %s, X: %s, Y: %s, D_x: %s, D_y: %s, vg.vc.ping: %s, pong: %s, vg.vc.cell_count: %s, B: %s, S: %s, P: %s", I, X, Y, D_x, D_y, vg.vc.ping, pong, vg.vc.cell_count,
+            //    ( pong + 7 ) * vg.vc.cell_count + I, ( pong + 5 ) * vg.vc.cell_count - D_x + 1 + I, popul_buffer.length );
+            popul_buffer[ ( X == D_x - 1 || Y ==       0 ) ? ( pong + 7 ) * vg.vc.cell_count + I : ( pong + 5 ) * vg.vc.cell_count - D_x + 1 + I ] = f[5];
+            popul_buffer[ ( Y ==       0 || X ==       0 ) ? ( pong + 8 ) * vg.vc.cell_count + I : ( pong + 6 ) * vg.vc.cell_count - D_x - 1 + I ] = f[6];
+            popul_buffer[ ( X ==       0 || Y == D_y - 1 ) ? ( pong + 5 ) * vg.vc.cell_count + I : ( pong + 7 ) * vg.vc.cell_count + D_x - 1 + I ] = f[7];
+            popul_buffer[ ( Y == D_y - 1 || X == D_x - 1 ) ? ( pong + 6 ) * vg.vc.cell_count + I : ( pong + 8 ) * vg.vc.cell_count + D_x + 1 + I ] = f[8];
+
         }
-
-        // compute macroscopic velocity after wall velocity is applied
-        T v_x = ( f[1] - f[3] + f[5] - f[7] + f[8] - f[6] ) / rho;
-        T v_y = ( f[2] - f[4] + f[5] - f[7] + f[6] - f[8] ) / rho;
-
-        // store velocities and densities in stage buffer to copy to image with format VK_FORMAT_R32G32B32A32_SFLOAT
-        vg.sim_image_ptr[ 4 * I + 0 ] = cast( float )v_x;
-        vg.sim_image_ptr[ 4 * I + 1 ] = cast( float )v_y;
-        vg.sim_image_ptr[ 4 * I + 2 ] = 0;
-        vg.sim_image_ptr[ 4 * I + 3 ] = 1;
+        static if( PROFILE ) vg.stopStopWatch;
+    //  } catch( Exception ) {}
 
 
-        //T X_P_Y = v_x + v_y;
-        //T X_M_Y = v_x - v_y;
-        //T V_X_2 = 4.5 * v_x * v_x;
-        //T V_Y_2 = 4.5 * v_y * v_y;
-        //T XPY_2 = 4.5 * X_P_Y * X_P_Y;
-        //T XMY_2 = 4.5 * X_M_Y * X_M_Y;
-        //T V_D_V = 1.5 * ( v_x * v_x + v_y * v_y );
-
-        T[9] f_eq = [                                              // #define SQ(x) ((x) * (x))
-            vg.vc.pw[0] * rho * (1                                                        - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[0] * rho * ( 1                     - V_D_V ), // 
-            vg.vc.pw[1] * rho * (1 + 3 * ( v_x)       + 4.5 * ( v_x)       * ( v_x)       - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[1] * rho * ( 1 + 3 *  v_x  + V_X_2 - V_D_V ), // 
-            vg.vc.pw[2] * rho * (1 + 3 * ( v_y)       + 4.5 * ( v_y)       * ( v_y)       - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[2] * rho * ( 1 + 3 *  v_y  + V_Y_2 - V_D_V ), // 
-            vg.vc.pw[3] * rho * (1 + 3 * (-v_x)       + 4.5 * (-v_x)       * (-v_x)       - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[3] * rho * ( 1 - 3 *  v_x  + V_X_2 - V_D_V ), // 
-            vg.vc.pw[4] * rho * (1 + 3 * (-v_y)       + 4.5 * (-v_y)       * (-v_y)       - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[4] * rho * ( 1 - 3 *  v_y  + V_Y_2 - V_D_V ), // 
-            vg.vc.pw[5] * rho * (1 + 3 * ( v_x + v_y) + 4.5 * ( v_x + v_y) * ( v_x + v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[5] * rho * ( 1 + 3 * X_P_Y + XPY_2 - V_D_V ), // 
-            vg.vc.pw[6] * rho * (1 + 3 * (-v_x + v_y) + 4.5 * (-v_x + v_y) * (-v_x + v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[6] * rho * ( 1 - 3 * X_M_Y + XMY_2 - V_D_V ), // 
-            vg.vc.pw[7] * rho * (1 + 3 * (-v_x - v_y) + 4.5 * (-v_x - v_y) * (-v_x - v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[7] * rho * ( 1 - 3 * X_P_Y + XPY_2 - V_D_V ), // 
-            vg.vc.pw[8] * rho * (1 + 3 * ( v_x - v_y) + 4.5 * ( v_x - v_y) * ( v_x - v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vg.vc.pw[8] * rho * ( 1 + 3 * X_M_Y + XMY_2 - V_D_V )  // 
-        ];
-
-        // Collide - inlining is not working properly, hence manually
-        f[0] = f[0] * ( 1 - omega ) + f_eq[0] * omega; // mix( f[0], f_eq[0], omega );
-        f[1] = f[1] * ( 1 - omega ) + f_eq[1] * omega; // mix( f[1], f_eq[1], omega );
-        f[2] = f[2] * ( 1 - omega ) + f_eq[2] * omega; // mix( f[2], f_eq[2], omega );
-        f[3] = f[3] * ( 1 - omega ) + f_eq[3] * omega; // mix( f[3], f_eq[3], omega );
-        f[4] = f[4] * ( 1 - omega ) + f_eq[4] * omega; // mix( f[4], f_eq[4], omega );
-        f[5] = f[5] * ( 1 - omega ) + f_eq[5] * omega; // mix( f[5], f_eq[5], omega );
-        f[6] = f[6] * ( 1 - omega ) + f_eq[6] * omega; // mix( f[6], f_eq[6], omega );
-        f[7] = f[7] * ( 1 - omega ) + f_eq[7] * omega; // mix( f[7], f_eq[7], omega );
-        f[8] = f[8] * ( 1 - omega ) + f_eq[8] * omega; // mix( f[8], f_eq[8], omega );
-
-        // Store new populations
-        popul_buffer[ I ] = f[0];
-
-        //immutable int[9] inv = [ 0, 3, 4, 1, 2, 7, 8, 5, 6 ];                                buf_off              buf_off         buffer_offset
-        popul_buffer[ X == D_x - 1 ? ( pong + 3 ) * vg.vc.cell_count + I : ( pong + 1 ) * vg.vc.cell_count +   1 + I ] = f[1];
-        popul_buffer[ Y ==       0 ? ( pong + 4 ) * vg.vc.cell_count + I : ( pong + 2 ) * vg.vc.cell_count - D_x + I ] = f[2];
-        popul_buffer[ X ==       0 ? ( pong + 1 ) * vg.vc.cell_count + I : ( pong + 3 ) * vg.vc.cell_count -   1 + I ] = f[3];
-        popul_buffer[ Y == D_y - 1 ? ( pong + 2 ) * vg.vc.cell_count + I : ( pong + 4 ) * vg.vc.cell_count + D_x + I ] = f[4];
-
-        //writefln( "I: %s, X: %s, Y: %s, D_x: %s, D_y: %s, vg.vc.ping: %s, pong: %s, vg.vc.cell_count: %s, B: %s, S: %s, P: %s", I, X, Y, D_x, D_y, vg.vc.ping, pong, vg.vc.cell_count,
-        //    ( pong + 7 ) * vg.vc.cell_count + I, ( pong + 5 ) * vg.vc.cell_count - D_x + 1 + I, popul_buffer.length );
-        popul_buffer[ ( X == D_x - 1 || Y ==       0 ) ? ( pong + 7 ) * vg.vc.cell_count + I : ( pong + 5 ) * vg.vc.cell_count - D_x + 1 + I ] = f[5];
-        popul_buffer[ ( Y ==       0 || X ==       0 ) ? ( pong + 8 ) * vg.vc.cell_count + I : ( pong + 6 ) * vg.vc.cell_count - D_x - 1 + I ] = f[6];
-        popul_buffer[ ( X ==       0 || Y == D_y - 1 ) ? ( pong + 5 ) * vg.vc.cell_count + I : ( pong + 7 ) * vg.vc.cell_count + D_x - 1 + I ] = f[7];
-        popul_buffer[ ( Y == D_y - 1 || X == D_x - 1 ) ? ( pong + 6 ) * vg.vc.cell_count + I : ( pong + 8 ) * vg.vc.cell_count + D_x + 1 + I ] = f[8];
-
-    }
-
-    static if( PROFILE )
-        vg.stopStopWatch;
 
     import vdrive.memory;
     //vg.sim_image.flushMappedMemoryRange;
@@ -279,6 +280,7 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_Gui_State vg ) nothrow @syste
 
     // sim index is now controled through the draw_step function like this one
     ++vg.sim_index;
+    ++vg.compute_ubo.comp_index;
 
     import appstate;
     vg.vd.draw;                                // let vulkan dance
