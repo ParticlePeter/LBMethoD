@@ -118,6 +118,7 @@ struct VDrive_Gui_State {
     bool        sim_draw_vel_base = true;
     bool        sim_draw_axis;
     bool        sim_draw_grid;
+    bool        sim_draw_scale = true;
     bool        sim_draw_bounds;
     bool        sim_validate_ghia;
     bool        sim_validate_poiseuille_flow;
@@ -789,6 +790,9 @@ private {
     immutable auto main_win_pos     = ImVec2( 0, 0 );
     auto main_win_size              = ImVec2( 352, 900 );
 
+    auto scale_win_pos              = ImVec2( 1550, 710 );
+    immutable auto scale_win_size   = ImVec2(   50,  20 );
+
     immutable auto button_size_1    = ImVec2( 344, 20 );
     immutable auto button_size_2    = ImVec2( 176, 20 );
     immutable auto button_size_3    = ImVec2( 112, 20 );
@@ -1126,6 +1130,20 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         // 1. Show a simple window
         // Tip: if we don't call ImGui.Begin()/ImGui.End() the widgets appears in a window automatically called "Debug"
+
+        //auto scale_win_pos  = ImVec2( 500, 500 );
+        //auto scale_win_size = ImVec2( 50, 20 );
+
+        ImGui.SetNextWindowPos(  scale_win_pos,  ImGuiCond_Always );
+        ImGui.SetNextWindowSize( scale_win_size, ImGuiCond_Always );
+
+        if( vg.sim_draw_scale ) {
+            ImGui.PushStyleColor( ImGuiCol_WindowBg, 0 );
+            ImGui.Begin( "Scale Window", null, window_flags );
+            ImGui.Text( "%.3f", 1 / vg.display_ubo.amplify_property );
+            ImGui.End();
+            ImGui.PopStyleColor;
+        }
 
 
         ImGui.SetNextWindowPos(  main_win_pos,  ImGuiCond_Always );
@@ -1902,6 +1920,8 @@ void drawGui( ref VDrive_Gui_State vg ) {
             ImGui.Checkbox( "Draw Axis", & vg.sim_draw_axis );
             ImGui.SetCursorPosX( 160 );
             ImGui.Checkbox( "Draw Grid", & vg.sim_draw_grid );
+            ImGui.SetCursorPosX( 160 );
+            ImGui.Checkbox( "Draw Scale", & vg.sim_draw_scale );
 
             ImGui.PopItemWidth;
             ImGui.TreePop;
@@ -2334,13 +2354,11 @@ void drawGuiData( ImDrawData* draw_data ) {
     cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.graphics_pso.pipeline );
 
     // push constant the sim display scale
-    cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, vg.vd.sim_domain.ptr ); //sim_display.scale.ptr );
+    float[4] sim_domain = [ vg.vd.sim_domain[0], vg.vd.sim_domain[1], vg.recip_window_size[0], vg.recip_window_size[1] ];
+    cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * float.sizeof, sim_domain.ptr ); //sim_display.scale.ptr );
 
     // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
-    cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
-
-
-
+    cmd_buffer.vkCmdDraw( 4, 1 + vg.sim_draw_scale, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
 
 
@@ -2718,10 +2736,16 @@ void guiWindowSizeCallback( GLFWwindow * window, int w, int h ) {
     auto io = & ImGui.GetIO();
     auto vg = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData
     io.DisplaySize  = ImVec2( w, h );
-    
-    scale_win_pos.x = w -  60;     // set x - position of scale window
-    scale_win_pos.y = h - 200;     // set y - position of scale window
+
+    //import std.stdio;
+    //printf( "WindowSize: %d, %d\n", w, h );
+
+    scale_win_pos.x = w -  50;     // set x - position of scale window
+    scale_win_pos.y = h - 190;     // set y - position of scale window
     main_win_size.y = h;           // this sets the window gui height to the window height
+
+    vg.recip_window_size[0] = 2.0f / w;
+    vg.recip_window_size[1] = 2.0f / h;
 
     // the extent might change at swapchain creation when the specified extent is not usable
     swapchainExtent( &vg.vd, w, h );

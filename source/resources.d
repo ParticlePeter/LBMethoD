@@ -426,7 +426,7 @@ void createGraphicsPSO( ref VDrive_State vd ) {
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
         .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )              // describe pipeline layout
-        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT , 0, 8 )                  // specify push constant range
+        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 16 )                  // specify push constant range
         .renderPass( vd.render_pass.render_pass )                                   // describe compatible render pass
         .construct( vd.graphics_cache )                                             // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
@@ -729,7 +729,8 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.graphics_pso.pipeline );
 
         // push constant the sim display scale
-        cmd_buffer.vkCmdPushConstants( vd.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, vd.sim_domain.ptr ); //sim_display.scale.ptr );
+        float[4] sim_domain = [ vd.sim_domain[0], vd.sim_domain[1], 0, 0 ];
+        cmd_buffer.vkCmdPushConstants( vd.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * float.sizeof, sim_domain.ptr ); //sim_display.scale.ptr );
 
         // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
         cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
