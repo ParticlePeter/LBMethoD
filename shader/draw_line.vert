@@ -18,6 +18,14 @@ layout( std140, binding = 0 ) uniform uboViewer {
 
 
 // uniform buffer
+layout( std140, binding = 5 ) uniform Compute_UBO {
+    float   omega;            // collision frequency
+    float   wall_velocity;
+    int     comp_index;
+};
+
+
+// uniform buffer
 layout( std140, binding = 6 ) uniform Display_UBO {
     uint    display_property;
     float   amplify_property;
@@ -47,6 +55,7 @@ layout( location = 0 ) out vec4 vs_color;
 #define DISPLAY_GRID        3
 #define DISPLAY_BOUNDS      4
 #define DISPLAY_GHIA        5
+#define DISPLAY_POISEUILLE  6
 
 
 const float[2][17] ghia_idx = {
@@ -112,8 +121,9 @@ void main() {
     case DISPLAY_VELOCITY :
         vs_color = vec4( 1, 1, 0, 1 );
         pos[ LA ] += 0.5 + VI;
+    //  pos[ LA ] += 0.5 + vel_idx[ LA ][ min( VI, 16 ) ];
         pos[ RA ] += 0.5 + II * pc.repl_spread + pc.line_offset;
-        pos[ VA ] += texture( vel_rho_tex, pos.xyz )[ VA ] * pc.sim_domain[ VA ] * vec3( 1, -1, 1 )[ VA ];  // latter param is fixing 
+        pos[ VA ] += texture( vel_rho_tex, pos.xyz )[ VA ] * pc.sim_domain[ LA ] * vec3( 1, -1, 1 )[ VA ];  // latter param is fixing 
         break;
 
 
@@ -146,7 +156,18 @@ void main() {
         pos[ LA ] = ghia_idx[ LA ][ VI ] + 0.5;
         pos[ 1 - LA ] = ghia_uv[ 1 - LA ][ pc.repl_count ][ VI ] * 12.6 + 63.5;
         break;
+
+
+    case DISPLAY_POISEUILLE :
+        vs_color = vec4( 1, 0, 0, 1 );
+        pos[ LA ] += 0.5 + VI;
+        pos[ RA ] += 0.5 + II * pc.repl_spread + pc.line_offset;
+        float Y_1 = VI - 0.5 * ( pc.sim_domain[ LA ] - 1 );
+        float H_2 = 0.25 * pc.sim_domain[ LA ] * pc.sim_domain[ LA ];
+        pos[ VA ] -= 1.5 * wall_velocity / H_2 * ( Y_1 * Y_1 - H_2 ) * pc.sim_domain[ LA ] / 3; // 2.84;
+        break;
     }
+
 
     gl_Position = WVPM * pos;
 }
