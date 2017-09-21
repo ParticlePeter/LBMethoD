@@ -6,3 +6,4 @@ dub.selections.json
 *.sln
 .vs/
 ensight/
+backup/
