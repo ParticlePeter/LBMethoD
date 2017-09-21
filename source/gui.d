@@ -429,10 +429,10 @@ void createDescriptorSet( ref VDrive_Gui_State vg ) {
 
 
 
-
 //////////////////////////////////////////////////////
 // create appstate and gui related render resources //
 //////////////////////////////////////////////////////
+
 
 void createRenderResources( ref VDrive_Gui_State vg ) {
 
@@ -449,8 +449,8 @@ void createRenderResources( ref VDrive_Gui_State vg ) {
 
     // create pipeline for gui rendering
     import vdrive.shader, vdrive.swapchain, vdrive.pipeline;
-    Meta_Graphics meta_graphics = vg;   // temporary construction struct
-    vg.gui_graphics_pso = meta_graphics
+    Meta_Graphics meta_graphics;   // temporary construction struct
+    vg.gui_graphics_pso = meta_graphics( vg )
         .addShaderStageCreateInfo( vg.createPipelineShaderStage( VK_SHADER_STAGE_VERTEX_BIT,   "shader/imgui.vert" ))
         .addShaderStageCreateInfo( vg.createPipelineShaderStage( VK_SHADER_STAGE_FRAGMENT_BIT, "shader/imgui.frag" ))
         .addBindingDescription( 0, ImDrawVert.sizeof, VK_VERTEX_INPUT_RATE_VERTEX ) // add vertex binding and attribute descriptions
@@ -1081,7 +1081,7 @@ private {
 void drawGui( ref VDrive_Gui_State vg ) {
 
     auto io = & ImGui.GetIO();
-    
+
 
 
     //
@@ -1482,7 +1482,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
         } else if( vg.vd.sim_step_size != vg.sim_step_size ) {
             if( ImGui.Button( "Apply", button_size_2 )) {
-                vg.vd.sim_step_size         = vg.sim_step_size;
+                vg.vd.sim_step_size = vg.sim_step_size;
                 vg.createBoltzmannPSO( false, true, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
             }
             ImGui.SameLine;
