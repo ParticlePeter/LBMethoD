@@ -1522,7 +1522,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
         //
         // Work Group Size
         //
-        //*
+        /*
         if( ImGui.DragInt( "Work Group Size X", cast( int* )( & vg.sim_work_group_size[0] ), drag_step, 1, 1024 )) vg.checkComputePSO;
 
         if( ImGui.BeginPopupContextItem( "Work Group Size Context Menu" )) {
