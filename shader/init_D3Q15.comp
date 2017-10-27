@@ -3,8 +3,8 @@
 
 // specialization constants for local work group size
 layout( local_size_x_id = 0 ) in;
-//layout( local_size_y_id = 1 ) in;
-//layout( local_size_z_id = 2 ) in;
+layout( local_size_y_id = 1 ) in;
+layout( local_size_z_id = 2 ) in;
 
 // local work group defaults, when constants are not defined
 layout( local_size_x = 256 ) in;
@@ -31,40 +31,82 @@ layout( binding = 3, rgba32f /*rgba16f*/ ) uniform restrict writeonly image2DArr
 // Directions:          R       +X      -X      +Y      -Y      +Z     -Z       +X+Y+Z  -X-Y-Z  +X+Y-Z  -X-Y+Z  +X-Y+Z  -X+Y-Z  -X+Y+Z  +X-Y-Z
 const float[15] pw = {  2.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72 };
 
-
-////////////////////////////////////////////////////////
-// Common Indexes and Counts for VkImage and VkBuffer //
-////////////////////////////////////////////////////////
-
 // shortcut to imageSize, the Domain of the computation, same as Global Size
-//#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
-#define D imageSize( vel_rho_img )
+#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
 
 // define global equivalent for gl_LocalInvocationIndex
 #define UI gl_GlobalInvocationID.x
 
 // U and I are also the index velocity population index
-#define I int( UI )
+#define NWG gl_NumWorkGroups
+#define WGI gl_WorkGroupID
+#define WGS gl_WorkGroupSize
+#define GII gl_GlobalInvocationID
+#define LII gl_LocalInvocationID
+#define LI gl_LocalInvocationIndex
+//#define I int(( NWG.x * NWG.y * WGI.z + NWG.x * WGI.y + WGI.x ) * WGS.x * WGS.y * WGS.z + LI )
+//              4       4       [0..4]  4       [0..4]  [0..4]      8       8       8   + [0..8*8*8]
+#define DIM D
+#define I int( DIM.x * DIM.y * GII.z + DIM.x * GII.y + GII.x )
 
-#define X ( I % D.x )
-#define Y ( I / D.x )
-#define Z ( I / ( D.x * D.y ))
+// in th 3D case we must modulate Y with with D.y
+//#define X (  I % D.x )
+//#define Y (( I / D.x ) % D.y  )
+//#define Z (  I / ( D.x * D.y ))
+
+// We cannot use these as they do not correspond to the X, Y, Z algorithm above and do not work correctly
+// when a multi dimensional work group size is setup. In that case all one work group is consecutive in memory
+// but we require first the whole domain in X laying consecutively
+#define X gl_GlobalInvocationID.x
+#define Y gl_GlobalInvocationID.y
+#define Z gl_GlobalInvocationID.z
+
+// We cannot use these as they do not correspond to the X, Y, Z algorithm above and do not work correctly
+// when a multi dimensional work group size is setup. In that case all one work group is consecutive in memory
+// but we require first the whole domain in X laying consecutively
+#define GX gl_GlobalInvocationID.x
+#define GY gl_GlobalInvocationID.y
+#define GZ gl_GlobalInvocationID.z
 
 // derived total count of nodes
-int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
+int cell_count = int( NWG.x * NWG.y * NWG.z * WGS.x * WGS.y * WGS.z );
 
 
 // main simulation function
 void main( void ) {
 
     // Init velocities and densities
-    imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( 0, 0, Y / 25.0, 1 ));
+    imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( 0, 0, 0, 1 ));
+    //imageStore( vel_rho_img, ivec3( GX, GY, GZ ), vec4( vec3( I % 256 ) / 255, 1 ));
+    //imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vec3( X, Y, Z ) / D, 1 ));
 
-    // init all distribution f(unctions) with equilibrium, p = population
+    //*
     for( int p = 0; p < 15; ++p )  {
         imageStore( popul_buffer, p * cell_count + I, vec4( pw[ p ] ));
-        if( p > 0 ) imageStore( popul_buffer, ( p + 14 ) * cell_count + I, vec4( pw[ p ] ));
+        if( p > 0 ) {
+            imageStore( popul_buffer, ( p + 14 ) * cell_count + I, vec4( pw[ p ] ));
+        }
     }
+    /*/
+    // init all distribution f(unctions) with equilibrium, p = population
+    if(( X == 8 ) && ( Y == 8 ) && ( Z == 8 )) {
+        for( int p = 0; p < 15; ++p )  {
+            imageStore( popul_buffer, p * cell_count + I, vec4( pw[ p ] ));
+            if( p > 0 ) {
+                imageStore( popul_buffer, ( p + 14 ) * cell_count + I, vec4( pw[ p ] ));
+            }
+        }
+    } else {
+
+        // init all distribution f(unctions) with zero
+        for( int p = 0; p < 15; ++p )  {
+            imageStore( popul_buffer, p * cell_count + I, vec4( 0 ));
+            if( p > 0 ) {
+                imageStore( popul_buffer, p * cell_count + I, vec4( 0 ));
+            } 
+        }
+    }
+    //*/
 }   // main
 
 
