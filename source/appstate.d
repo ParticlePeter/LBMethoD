@@ -1,4 +1,3 @@
-//module appstate;
 
 import derelict.glfw3;
 import dlsl.matrix;
@@ -8,6 +7,7 @@ import input;
 
 
 
+enum Transport { pause, play, step, profile };
 
 
 struct VDrive_State {
@@ -72,10 +72,7 @@ struct VDrive_State {
     // render setup
     Meta_Renderpass             render_pass;
     Core_Pipeline               graphics_pso;
-    Core_Pipeline               comp_loop_pso;
-    Core_Pipeline               comp_init_pso;
     VkPipelineCache             graphics_cache;
-    VkPipelineCache             compute_cache;
     Meta_FB!( 4, 2 )            framebuffers;
     VkViewport                  viewport;               // dynamic state viewport
     VkRect2D                    scissors;               // dynamic state scissors
@@ -89,9 +86,11 @@ struct VDrive_State {
     Meta_Buffer                 sim_buffer;             // mesoscopic velocity populations
     Meta_Memory                 sim_memory;             // memory backing image and buffer
     VkBufferView                sim_buffer_view;        // arbitrary count of buffer views, dynamic resizing is not that easy as we would have to recreate the descriptor set each time
+    Core_Pipeline               comp_loop_pso;
+    Core_Pipeline               comp_init_pso;
+    VkPipelineCache             compute_cache;
     Meta_Buffer                 compute_ubo_buffer;
     VkMappedMemoryRange         compute_ubo_flush;
-
     Meta_Buffer                 sim_stage_buffer;
 
 
@@ -138,7 +137,7 @@ struct VDrive_State {
     uint32_t    sim_step_size               = 1;
 
     string      sim_init_shader             = "shader\\init_D2Q9.comp";
-    string      sim_loop_shader             = "shader\\loop_D2Q9_channel_flow.comp";
+    string      sim_loop_shader             = "shader\\loop_D2Q9_ldc.comp";
     string      export_shader               = "shader\\export_from_image.comp";
 
     struct Compute_UBO {
@@ -152,7 +151,7 @@ struct VDrive_State {
     float           sim_speed_of_sound      = sim_unit_speed_of_sound;
     float           sim_unit_spatial        = 1;
     float           sim_unit_temporal       = 1;
-    uint32_t        sim_algorithm           = 0; //3;
+    uint32_t        sim_algorithm           = 4; // Cascaded Drag //0;
     uint32_t        sim_index               = 0;
 
     struct Display_UBO {
@@ -172,31 +171,31 @@ struct VDrive_State {
     uint32_t        sim_profile_step_index;
 
 
-version( LDC ) {
-    import std.datetime; // ldc is behind and datetime is a module and not a package yet
-    StopWatch stop_watch;
-    nothrow {
-        void resetStopWatch()       { try { stop_watch.reset; } catch( Exception ) {} }
-        void startStopWatch()       { try { stop_watch.start; } catch( Exception ) {} }
-        void stopStopWatch()        { try { stop_watch.stop;  } catch( Exception ) {} }
-        long getStopWatch_nsecs()   { try { return stop_watch.peek.to!( "nsecs" , long ); } catch( Exception ) { return 0; } }
-        long getStopWatch_hnsecs()  { try { return stop_watch.peek.to!( "hnsecs", long ); } catch( Exception ) { return 0; } }
-        long getStopWatch_usecs()   { try { return stop_watch.peek.to!( "usecs" , long ); } catch( Exception ) { return 0; } }
-        long getStopWatch_msecs()   { try { return stop_watch.peek.to!( "msecs" , long ); } catch( Exception ) { return 0; } }
+    version( LDC ) {
+        import std.datetime; // ldc is behind and datetime is a module and not a package yet
+        StopWatch stop_watch;
+        nothrow {
+            void resetStopWatch()       { try { stop_watch.reset; } catch( Exception ) {} }
+            void startStopWatch()       { try { stop_watch.start; } catch( Exception ) {} }
+            void stopStopWatch()        { try { stop_watch.stop;  } catch( Exception ) {} }
+            long getStopWatch_nsecs()   { try { return stop_watch.peek.to!( "nsecs" , long ); } catch( Exception ) { return 0; } }
+            long getStopWatch_hnsecs()  { try { return stop_watch.peek.to!( "hnsecs", long ); } catch( Exception ) { return 0; } }
+            long getStopWatch_usecs()   { try { return stop_watch.peek.to!( "usecs" , long ); } catch( Exception ) { return 0; } }
+            long getStopWatch_msecs()   { try { return stop_watch.peek.to!( "msecs" , long ); } catch( Exception ) { return 0; } }
+        }
+    } else {
+        import std.datetime.stopwatch; // ldc is behind and datetime is a module and not a package yet
+        StopWatch stop_watch;
+        nothrow {
+            void resetStopWatch()       { stop_watch.reset; }
+            void startStopWatch()       { stop_watch.start; }
+            void stopStopWatch()        { stop_watch.stop; }
+            long getStopWatch_nsecs()   { return stop_watch.peek.total!"nsecs"; }
+            long getStopWatch_hnsecs()  { return stop_watch.peek.total!"hnsecs"; }
+            long getStopWatch_usecs()   { return stop_watch.peek.total!"usecs"; }
+            long getStopWatch_msecs()   { return stop_watch.peek.total!"msecs"; }
+        }
     }
-} else {
-    import std.datetime.stopwatch; // ldc is behind and datetime is a module and not a package yet
-    StopWatch stop_watch;
-    nothrow {
-        void resetStopWatch()       { stop_watch.reset; }
-        void startStopWatch()       { stop_watch.start; }
-        void stopStopWatch()        { stop_watch.stop; }
-        long getStopWatch_nsecs()   { return stop_watch.peek.total!"nsecs"; }
-        long getStopWatch_hnsecs()  { return stop_watch.peek.total!"hnsecs"; }
-        long getStopWatch_usecs()   { return stop_watch.peek.total!"usecs"; }
-        long getStopWatch_msecs()   { return stop_watch.peek.total!"msecs"; }
-    }
-}
 
 
 
@@ -212,171 +211,252 @@ version( LDC ) {
 
     // window resize callback result
     bool            window_resized          = false;
+
+
+
+    // new mwmbers
+    // count of command buffers to be drawn when in play mode
+    uint32_t    sim_play_cmd_buffer_count;
+    Transport   transport = Transport.pause;
+    Transport   play_mode = Transport.play;
+
+    nothrow:
+
+
+
+    //
+    // transport control funcs
+    //
+
+    bool isPlaying() @system {
+        return transport != Transport.pause;
+    }
+
+    void simPause() @system {
+        transport = Transport.pause;
+        drawCmdBufferCount = 1;
+    }
+
+    void simPlay() @system {
+        if( transport == Transport.profile && sim_profile_step_count <= sim_profile_step_index ) {
+            sim_profile_step_index = 0;
+            resetStopWatch;
+        }
+        transport = play_mode; // Transport.play or Transport.profile;
+        drawCmdBufferCount = sim_play_cmd_buffer_count;
+    }
+
+    void simStep() @system {
+        if( !isPlaying ) {
+            transport = Transport.step;
+        }
+    }
+
+
+    void simReset() @system {
+        if( transport == Transport.profile ) {
+            sim_profile_step_index = 0;
+            resetStopWatch;
+        }
+        sim_index = compute_ubo.comp_index = 0;
+        try {
+            if( sim_use_cpu ) {
+                import cpustate : cpuInit; 
+                this.cpuInit;
+            } else {
+                import compute : createBoltzmannPSO;
+                this.createBoltzmannPSO( false, false, true );  // rebuild init pipeline, rebuild loop pipeline, reset domain
+            }
+        } catch( Exception ) {}
+
+    }
+
+
+    // convenience functions for perspective computations in main
+    auto windowWidth()  { return swapchain.imageExtent.width;  }
+    auto windowHeight() { return swapchain.imageExtent.height; }
+
+
+    void updateWVPM() {
+        xform_ubo.wvpm = projection * tb.matrix;
+        xform_ubo.eyep = tb.eye;
+        vk.device.vkFlushMappedMemoryRanges( 1, &xform_ubo_flush );
+        //vk.device.vkInvalidateMappedMemoryRanges( 1, &wvpm_ubo_flush );
+    }
+
+
+    void updateComputeUBO() {
+        // data will be updated elsewhere
+        vk.device.vkFlushMappedMemoryRanges( 1, &compute_ubo_flush );
+    }
+
+
+    void updateDisplayUBO() {
+        // data will be updated elsewhere
+        vk.device.vkFlushMappedMemoryRanges( 1, &display_ubo_flush );
+    }
+
+
+    /// Scale the display based on the aspect(s) of vd.sim_domain
+    /// Parameter signals dimension count, 2D vs 3D
+    /// Params:
+    ///     vd = reference to this modules VDrive_State struct
+    ///     dim = the current dimensions
+    /// Returns: scale factor for the plane or box, in the fomer case result[2] should be ignored
+    float[3] simDisplayScale( int dim ) {
+        float scale =  sim_domain[0] < sim_domain[1] ?  sim_domain[0] : sim_domain[1];
+        if( dim > 2 && sim_domain[2] < sim_domain[0] && sim_domain[2] < sim_domain[1] )
+            scale = sim_domain[2];
+        float[3] result;
+        result[] = sim_domain[] / scale;
+        return result;
+    }
+
+
+    void recreateSwapchain() {
+        // swapchain might not have the same extent as the window dimension
+        // the data we use for projection computation is the glfw window extent at this place
+        updateProjection;            // compute projection matrix from new window extent
+        updateWVPM;                  // multiplies projection trackball (view) matrix and uploads to uniform buffer
+
+        // notify trackball manipulator about win height change, this has effect on panning speed
+        tb.windowHeight( windowHeight );
+
+        // wait till device is idle
+        vk.device.vkDeviceWaitIdle;
+
+        // recreate swapchain and other dependent resources
+        try {
+            //swapchain.create_info.imageExtent  = VkExtent2D( win_w, win_h );  // Set the desired swapchain extent, this might change at swapchain creation
+            import resources : resizeRenderResources;
+            this.resizeRenderResources;   // destroy old and recreate window size dependant resources
+
+        } catch( Exception ) {}
+    }
+
+
+    // this is used in windowResizeCallback
+    // there only a VDrive_State pointer is available and we avoid ugly dereferencing
+    void swapchainExtent( uint32_t win_w, uint32_t win_h ) {
+        swapchain.create_info.imageExtent = VkExtent2D( win_w, win_h );
+    }
+
+
+    // update projection matrix from member data _fovy, _near, _far
+    // and the swapchain extent converted to aspect
+    void updateProjection() {
+        import dlsl.projection;
+        projection = vkPerspective( projection_fovy, cast( float )windowWidth / windowHeight, projection_near, projection_far );
+    }
+
+
+    void drawCmdBufferCount( uint32_t count ) {
+       submit_info.commandBufferCount = count;
+    }
+
+    uint32_t drawCmdBufferCount() {
+       return submit_info.commandBufferCount;
+    }
+
+
+    void drawInit() {
+        // check if window was resized and handle the case
+        if( window_resized ) {
+            window_resized = false;
+            recreateSwapchain;
+            import resources : createResizedCommands;
+            this.createResizedCommands;
+        } else if( tb.dirty ) {
+            updateWVPM;  // this happens anyway in recreateSwapchain
+        }
+
+        // acquire next swapchain image
+        vk.device.vkAcquireNextImageKHR( swapchain.swapchain, uint64_t.max, acquired_semaphore, VK_NULL_HANDLE, &next_image_index );
+
+        // wait for finished drawing
+        vk.device.vkWaitForFences( 1, &submit_fence[ next_image_index ], VK_TRUE, uint64_t.max );
+        vk.device.vkResetFences( 1, &submit_fence[ next_image_index ] ).vkAssert;
+    }
+
+    void drawStep() @system {
+        drawCmdBufferCount = sim_play_cmd_buffer_count;
+        this.draw_func_play;
+        drawCmdBufferCount = 1;
+        transport = Transport.pause;
+    }
+
+    void drawProfile() @system {
+        sim_profile_step_index += sim_profile_step_size;
+        this.draw_func_profile;
+
+        if( 0 < sim_profile_step_count && sim_profile_step_index >= sim_profile_step_count ) {
+            simPause;
+        }
+    }
+
+    void drawDisplay() @system {
+
+        VkCommandBuffer[2] cmd_buffers = [ cmd_buffers[ next_image_index ], sim_cmd_buffers[ sim_ping_pong ]];
+        submit_info.pCommandBuffers = cmd_buffers.ptr;
+        graphics_queue.vkQueueSubmit( 1, &submit_info, submit_fence[ next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
+
+        // exclude the compute buffer for the next sim step
+        // module gui.draw might reenable it
+        //submit_info.commandBufferCount = 1;
+
+
+        // present rendered image
+        present_info.pImageIndices = &next_image_index;
+        swapchain.present_queue.vkQueuePresentKHR( &present_info );
+
+
+        // check if window was resized and handle the case
+        if( window_resized ) {
+            window_resized = false;
+            recreateSwapchain;
+            import resources : createResizedCommands;
+            this.createResizedCommands;
+        } else if( tb.dirty ) {
+            updateWVPM;  // this happens anyway in recreateSwapchain
+            //import core.stdc.stdio : printf;
+            //printf( "%d\n", (*( wvpm ))[0].y );
+        }
+
+        // acquire next swapchain image
+        vk.device.vkAcquireNextImageKHR( swapchain.swapchain, uint64_t.max, acquired_semaphore, VK_NULL_HANDLE, &next_image_index );
+
+        // wait for finished drawing
+        vk.device.vkWaitForFences( 1, &submit_fence[ next_image_index ], VK_TRUE, uint64_t.max );
+        vk.device.vkResetFences( 1, &submit_fence[ next_image_index ] ).vkAssert;
+    }
+
+    void draw() {
+
+        final switch( transport ) {
+            case Transport.pause    : drawDisplay;          break;
+            case Transport.play     : this.draw_func_play;  break;
+            case Transport.step     : drawStep;             break;
+            case Transport.profile  : drawProfile;          break;
+        }
+    }
 }
-
-
-
 
 
 nothrow:
 
-
-// convenience functions for perspective computations in main
-auto windowWidth(  ref VDrive_State vd ) { return vd.swapchain.imageExtent.width;  }
-auto windowHeight( ref VDrive_State vd ) { return vd.swapchain.imageExtent.height; }
-
-
-void updateWVPM( ref VDrive_State vd ) {
-    vd.xform_ubo.wvpm = vd.projection * vd.tb.matrix;
-    vd.xform_ubo.eyep = vd.tb.eye;
-    vd.device.vkFlushMappedMemoryRanges( 1, &vd.xform_ubo_flush );
-    //vk.device.vkInvalidateMappedMemoryRanges( 1, &wvpm_ubo_flush );
-}
-
-
-void updateComputeUBO( ref VDrive_State vd ) {
-    // data will be updated elsewhere
-    vd.device.vkFlushMappedMemoryRanges( 1, &vd.compute_ubo_flush );
-}
-
-
-void updateDisplayUBO( ref VDrive_State vd ) {
-    // data will be updated elsewhere
-    vd.device.vkFlushMappedMemoryRanges( 1, &vd.display_ubo_flush );
-}
-
-
-/// Scale the display based on the aspect(s) of vd.sim_domain
-/// Parameter signals dimension count, 2D vs 3D
-/// Params:
-///     vd = reference to this modules VDrive_State struct
-///     dim = the current dimensions
-/// Returns: scale factor for the plane or box, in the fomer case result[2] should be ignored
-float[3] simDisplayScale( ref VDrive_State vd, int dim ) {
-    float scale = vd.sim_domain[0] < vd.sim_domain[1] ? vd.sim_domain[0] : vd.sim_domain[1];
-    if( dim > 2 && vd.sim_domain[2] < vd.sim_domain[0] && vd.sim_domain[2] < vd.sim_domain[1] )
-        scale = vd.sim_domain[2];
-    float[3] result;
-    result[] = vd.sim_domain[] / scale;
-    return result;
-}
-
-
-void recreateSwapchain( ref VDrive_State vd ) {
-    // swapchain might not have the same extent as the window dimension
-    // the data we use for projection computation is the glfw window extent at this place
-    vd.updateProjection;            // compute projection matrix from new window extent
-    vd.updateWVPM;                  // multiplies projection trackball (view) matrix and uploads to uniform buffer
-
-    // notify trackball manipulator about win height change, this has effect on panning speed
-    vd.tb.windowHeight( vd.windowHeight );
-
-    // wait till device is idle
-    vd.device.vkDeviceWaitIdle;
-
-    // recreate swapchain and other dependent resources
-    try {
-        //swapchain.create_info.imageExtent  = VkExtent2D( win_w, win_h );  // Set the desired swapchain extent, this might change at swapchain creation
-        import resources : resizeRenderResources;
-        vd.resizeRenderResources;   // destroy old and recreate window size dependant resources
-
-    } catch( Exception ) {}
-}
-
-
-// this is used in windowResizeCallback
-// there only a VDrive_State pointer is available and we avoid ugly dereferencing
-void swapchainExtent( VDrive_State* vd, uint32_t win_w, uint32_t win_h ) {
-    vd.swapchain.create_info.imageExtent = VkExtent2D( win_w, win_h );
-}
-
-
-// update projection matrix from member data _fovy, _near, _far
-// and the swapchain extent converted to aspect
-void updateProjection( ref VDrive_State vd ) {
-    import dlsl.projection;
-    vd.projection = vkPerspective( vd.projection_fovy, cast( float )vd.windowWidth / vd.windowHeight, vd.projection_near, vd.projection_far );
-}
-
-
-void drawCmdBufferCount( ref VDrive_State vd, uint32_t count ) {
-   vd.submit_info.commandBufferCount = count;
-}
-
-uint32_t drawCmdBufferCount( ref VDrive_State vd ) {
-   return vd.submit_info.commandBufferCount;
-}
-
-
-void drawInit( ref VDrive_State vd ) {
-    // check if window was resized and handle the case
-    if( vd.window_resized ) {
-        vd.window_resized = false;
-        vd.recreateSwapchain;
-        import resources : createResizedCommands;
-        vd.createResizedCommands;
-    } else if( vd.tb.dirty ) {
-        vd.updateWVPM;  // this happens anyway in recreateSwapchain
-    }
-
-    // acquire next swapchain image
-    vd.device.vkAcquireNextImageKHR( vd.swapchain.swapchain, uint64_t.max, vd.acquired_semaphore, VK_NULL_HANDLE, &vd.next_image_index );
-
-    // wait for finished drawing
-    vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );
-    vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
-}
-
+//////////////////////////////////////////////////////////
+// Free functions called via function pointer mechanism //
+//////////////////////////////////////////////////////////
 
 void drawSim( ref VDrive_State vd ) @system {
     vd.sim_ping_pong = vd.sim_index % 2;                            // compute new ping_pong value
     vd.compute_ubo.comp_index += vd.sim_step_size;                  // increase shader compute counter
     if( vd.sim_step_size > 1 ) vd.updateComputeUBO;                 // we need this value in compute shader if its greater than 1
     ++vd.sim_index;                                                 // increment the compute buffer submission count
-    vd.draw;                                                        // let vulkan dance
+    vd.drawDisplay;                                                 // let vulkan dance
 }
 
 
-
-void draw( ref VDrive_State vd ) @system {
-
-    VkCommandBuffer[2] cmd_buffers = [ vd.cmd_buffers[ vd.next_image_index ], vd.sim_cmd_buffers[ vd.sim_ping_pong ]];
-    vd.submit_info.pCommandBuffers = cmd_buffers.ptr;
-    vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-
-    // exclude the compute buffer for the next sim step
-    // module gui.draw might reenable it
-    //vd.submit_info.commandBufferCount = 1;
-
-
-    // present rendered image
-    vd.present_info.pImageIndices = &vd.next_image_index;
-    vd.swapchain.present_queue.vkQueuePresentKHR( &vd.present_info );
-
-
-    // check if window was resized and handle the case
-    if( vd.window_resized ) {
-        vd.window_resized = false;
-        vd.recreateSwapchain;
-        import resources : createResizedCommands;
-        vd.createResizedCommands;
-    } else if( vd.tb.dirty ) {
-        vd.updateWVPM;  // this happens anyway in recreateSwapchain
-        //import core.stdc.stdio : printf;
-        //printf( "%d\n", (*( vd.wvpm ))[0].y );
-    }
-
-    // acquire next swapchain image
-    vd.device.vkAcquireNextImageKHR( vd.swapchain.swapchain, uint64_t.max, vd.acquired_semaphore, VK_NULL_HANDLE, &vd.next_image_index );
-
-    // wait for finished drawing
-    vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );
-    vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
-
-
-}
-
-//*
 void profileCompute( ref VDrive_State vd ) @system {
 
     vd.sim_ping_pong = vd.sim_index % 2;                            // compute new ping_pong value
@@ -446,26 +526,28 @@ void profileCompute( ref VDrive_State vd ) @system {
 }
 
 
-/*/
-void profileCompute( ref VDrive_State vd ) @system {
 
 
-    vd.sim_ping_pong = vd.sim_index % 2;    // compute new ping_pong value
-    ++vd.sim_index;                         // increase the counter
+////////////////////////////////////////////////////
+// Draw function pointer for sim play and profile //
+////////////////////////////////////////////////////
 
-    vd.startStopWatch;
+alias   Draw_Func = void function( ref VDrive_State vd ) nothrow @system;
+private Draw_Func draw_func_play;
+private Draw_Func draw_func_profile;
 
-    VkSubmitInfo submit_info;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = & vd.sim_cmd_buffers[ vd.sim_ping_pong ];
-    vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-    vd.graphics_queue.vkQueueWaitIdle;
 
-    //vd.graphics_queue.vkQueueSubmit( 1, &submit_info, vd.profile_fence );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-    //vd.device.vkWaitForFences( 1, &vd.profile_fence, VK_TRUE, uint64_t.max );
-    //vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
-
-    vd.stopStopWatch;
-
+void setDefaultSimFuncs( ref VDrive_State vd ) nothrow @system {
+    draw_func_play      = & drawSim;
+    draw_func_profile   = & profileCompute;
+    vd.sim_play_cmd_buffer_count = 2;
 }
-//*/
+
+
+void setSimFuncPlay( Draw_Func func ) nothrow @system {
+    draw_func_play = func;
+}
+
+void setSimFuncProfile( Draw_Func func ) nothrow @system {
+    draw_func_profile = func;
+}

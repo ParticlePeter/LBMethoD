@@ -132,10 +132,13 @@ extern( C ) void keyCallback( GLFWwindow * window, int key, int scancode, int va
     // use key press results only
     if( val != GLFW_PRESS ) return;
     switch( key ) {
-        case GLFW_KEY_ESCAPE    : glfwSetWindowShouldClose( window, GLFW_TRUE ); break;
-        case GLFW_KEY_HOME      : vd.tb.camHome; break;
-        case GLFW_KEY_KP_ENTER  : if( mod == GLFW_MOD_ALT ) window.toggleFullscreen; break;
-        default : break;
+        case GLFW_KEY_ESCAPE    : glfwSetWindowShouldClose( window, GLFW_TRUE );        break;
+        case GLFW_KEY_HOME      : vd.tb.camHome;                                        break;
+        case GLFW_KEY_KP_ENTER  : if( mod == GLFW_MOD_ALT ) window.toggleFullscreen;    break;
+        case GLFW_KEY_F5        : if( vd.isPlaying ) vd.simPause; else vd.simPlay;      break;
+        case GLFW_KEY_F6        : vd.simStep;                                           break;
+        case GLFW_KEY_F7        : vd.simReset;                                          break;
+        default                 :                                                       break;
     }
 }
 

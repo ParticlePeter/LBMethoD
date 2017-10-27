@@ -24,23 +24,21 @@ struct VDrive_Export_State {
 
 
 
-void drawExportWait( ref VDrive_Gui_State vg ) nothrow @system {
+void drawExportWait( ref VDrive_State vd ) nothrow @system {
     // draw the normal simulation before we hit the start index
-    if( vg.sim_index < vg.ve.start_index ) {
-        vg.vd.drawSim;
+    if( vd.sim_index < vd.ve.start_index ) {
+        vd.drawSim;
     // now draw with the export version
     } else {
-        //setDrawFuncSim( & drawExport );
-        //setDrawFunc( & drawExport );
-        vg.setSimFuncPlay( & drawExport );
-        vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count = 1;
-        vg.createExportCommands;        // create export commands now
-        vg.drawExport;                  // call once as we skipped drawSim above
+        setSimFuncPlay( & drawExport );
+        vd.drawCmdBufferCount = vd.sim_play_cmd_buffer_count = 1;
+        vd.createExportCommands;        // create export commands now
+        vd.drawExport;                  // call once as we skipped drawSim above
     }
 }
 
 
-void drawExport( ref VDrive_Gui_State vg ) nothrow @system {
+void drawExport( ref VDrive_State vd ) nothrow @system {
 
     // call the export command buffers step_count times
     // use ve.export_index counter to keeo track of steps
@@ -53,98 +51,98 @@ void drawExport( ref VDrive_Gui_State vg ) nothrow @system {
     // it should be possible to replace vd.sim_command_buffers with our once
     // and simply call vd.draw
 
-    if( vg.ve.export_index < vg.ve.step_count ) {
+    if( vd.ve.export_index < vd.ve.step_count ) {
 
         // here we must draw explicitely appstate draw func! othervise we would loop, as gui.draw calls drawExport
-        //vg.vd.draw;
-        vg.sim_profile_step_index += vg.ve.step_size;
-        vg.vd.profileCompute;
+        //vd.draw;
+        vd.sim_profile_step_index += vd.ve.step_size;
+        vd.profileCompute;
 
         // invlidate
-        vg.export_buffer[ vg.ve.export_index % 2 ].invalidateMappedMemoryRange;
+        vd.export_buffer[ vd.ve.export_index % 2 ].invalidateMappedMemoryRange;
 
         // now we have to export the data
         // best way is to write it out raw
-        vg.export_data[ vg.ve.export_index % 2 ][ 0 .. vg.export_size ]
-            .ensRawWriteBinaryVarFile( vg.ve.var_file_name, vg.ve.export_index );
+        vd.export_data[ vd.ve.export_index % 2 ][ 0 .. vd.export_size ]
+            .ensRawWriteBinaryVarFile( vd.ve.var_file_name, vd.ve.export_index );
 
         // update indexes and ping pong
-        vg.sim_ping_pong = ( vg.ve.start_index + vg.ve.export_index ) % 2;
-        ++vg.ve.export_index;
-        vg.sim_index = vg.ve.start_index + vg.ve.export_index * vg.ve.step_size;
+        vd.sim_ping_pong = ( vd.ve.start_index + vd.ve.export_index ) % 2;
+        ++vd.ve.export_index;
+        vd.sim_index = vd.ve.start_index + vd.ve.export_index * vd.ve.step_size;
 
     } else {
         // recreate original vd.sim_cmd_buffers
         // don't reset or recreate the pipeline
         // attach set vd.draw as new draw_func
         try {
-            vg.createBoltzmannPSO( false, false, false );
+            vd.createBoltzmannPSO( false, false, false );
         } catch( Exception ) {}
 
         // set default function pointer for play, step, pause
         // this also pauses the playback
-        vg.setDefaultSimFuncs;
+        vd.setDefaultSimFuncs;
 
         // draw the graphics display once
         // otherwisethis draw would be omitted, and the gui rebuild immediatelly
-        vg.vd.draw;
+        vd.draw;
 
     }
 }
 
 
 
-void createExportResources( ref VDrive_Gui_State vg ) {
+void createExportResources( ref VDrive_State vd ) {
 
     // create vulkan resources
-    vg.createExportBuffer;
-    vg.createExportPipeline;
-    vg.createExportCommands;
+    vd.createExportBuffer;
+    vd.createExportPipeline;
+    vd.createExportCommands;
 
     // setup export draw function
-    vg.setSimFuncPlay( & drawExportWait );
+    setSimFuncPlay( & drawExportWait );
 
     // initialize profile data
-    vg.sim_profile_step_index = 0;
-    vg.resetStopWatch;
+    vd.sim_profile_step_index = 0;
+    vd.resetStopWatch;
 
 
     // setup ensight options
     import std.string : fromStringz;
     import std.conv : to;
     Export_Options options = {
-        output      : vg.ve.case_file_name.ptr.fromStringz.to!string,
-        variable    : vg.ve.variable_name,
-        format      : vg.ve.file_format,
+        output      : vd.ve.case_file_name.ptr.fromStringz.to!string,
+        variable    : vd.ve.variable_name,
+        format      : vd.ve.file_format,
         overwrite   : true,
     };
     options.set_default_options;
 
     // setup domain parameter
-    if( vg.sim_use_3_dim ) vg.sim_domain[2] = 1;
+    if( vd.sim_use_3_dim ) vd.sim_domain[2] = 1;
     float[3] minDomain = [ 0, 0, 0 ];
-    float[3] maxDomain = [ vg.sim_domain[0], vg.sim_domain[1], vg.sim_domain[2] ];
+    float[3] maxDomain = [ vd.sim_domain[0], vd.sim_domain[1], vd.sim_domain[2] ];
     float[3] incDomain = [ 1, 1, 1 ];
-    uint [3] cellCount = vg.sim_domain[ 0..3 ];
+    uint [3] cellCount = vd.sim_domain[ 0..3 ];
 
     // export case and geo file
-    options.ensStoreCase( vg.ve.start_index, vg.ve.step_count, vg.ve.step_size );
+    options.ensStoreCase( vd.ve.start_index, vd.ve.step_count, vd.ve.step_size );
     options.ensStoreGeo( minDomain, maxDomain, incDomain, cellCount );
 
     // get var file name from options
 
     auto length = options.outVar.length;
-    //vg.ve.var_file_buffer[ ] = '\0';
-    vg.ve.var_file_buffer[ 0 .. length ] = options.outVar[];
-    vg.ve.var_file_buffer[ length .. length + 3 ] = cast( char )( 48 );
+    //vd.ve.var_file_buffer[ ] = '\0';
+    vd.ve.var_file_buffer[ 0 .. length ] = options.outVar[];
+    vd.ve.var_file_buffer[ length .. length + 3 ] = cast( char )( 48 );
 
     // assign the prepared buffer to the name slice
-    vg.ve.var_file_name = vg.ve.var_file_buffer[ 0 .. length + 3 ];
-    vg.ve.export_index = 0;
+    vd.ve.var_file_name = vd.ve.var_file_buffer[ 0 .. length + 3 ];
+    vd.ve.export_index = 0;
 
     // set a Export_Binary_Variable_Header in the beginning
-    vg.ve.variable_name.ptr.ensGetBinaryVarHeader( vg.export_data[0] );
-    vg.ve.variable_name.ptr.ensGetBinaryVarHeader( vg.export_data[1] );
+    vd.ve.variable_name.ptr.ensGetBinaryVarHeader( vd.export_data[0] );
+    vd.ve.variable_name.ptr.ensGetBinaryVarHeader( vd.export_data[1] );
 
 }
 
@@ -255,7 +253,7 @@ void createExportPipeline( ref VDrive_State vd ) {
 }
 
 
-void createExportCommands( ref VDrive_Gui_State vd ) nothrow {
+void createExportCommands( ref VDrive_State vd ) nothrow {
 
     ///////////////////////////////////////////////////////////////////////////
     // create two reusable compute command buffers with export functionality //

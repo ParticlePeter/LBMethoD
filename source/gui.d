@@ -100,7 +100,7 @@ struct VDrive_Gui_State {
     float       sim_typical_length;
 
     // count of command buffers to be drawn when in play mode
-    uint32_t    sim_play_cmd_buffer_count;
+    //uint32_t    sim_play_cmd_buffer_count;
 
     // ldc (0,1), taylor_green (2,4),
     int         init_shader_index   = 0;  // 0-based default init shader index, from all shaders in shader dir starting with init
@@ -113,7 +113,7 @@ struct VDrive_Gui_State {
     bool        sim_work_group_dirty;
     bool        draw_gui = true;
     bool        draw_velocity_lines_as_points = false;
-    bool        sim_profile_mode = false;   // Todo(pp): this is redundant as we can use play_mode bellow as well, remove this one
+    bool        sim_profile_mode = false;   // Todo(pp): this is redundant as we can use vg.play_mode bellow as well, remove this one
 
     bool        sim_draw_lines = true;
     bool        sim_draw_vel_base = true;
@@ -126,6 +126,26 @@ struct VDrive_Gui_State {
     bool        sim_validate_taylor_green;
     bool        sim_validate_velocity = true;
     bool        sim_validate_vel_base = false;
+
+    void draw() {
+
+        // record next command buffer asynchronous
+        if( draw_gui )      // this can't be a function pointer as well
+            this.drawGui;   // as we wouldn't know what else has to be drawn (drawFunc or drawFuncPlay etc. )
+
+        //appstate.draw( vg.vd );
+        vd.draw;
+        /*
+        final switch( vg.transport ) {
+            case Transport.pause    : appstate.draw( vg.vd );   break;
+            case Transport.play     : vg.draw_func_play;        break;
+            case Transport.step     : vg.drawStep;              break;
+            case Transport.profile  : vg.drawProfile;           break;
+        }
+        // call function pointer
+        //vg.draw_func;
+        */
+    }
 
 }
 
@@ -311,53 +331,8 @@ void createMemoryObjects( ref VDrive_Gui_State vg ) {
 
     vg.updateViscosity;
 
-    vg.sim_viscosity = 0.001 * vg.sim_typical_length;
-    vg.updateTauOmega;
-    /*
-    import dlsl.vector;
-    import std.stdio;
-    uvec3 Domain = uvec3( vg.sim_domain );
-    uvec3 gl_WorkGroupSize = uvec3( vg.sim_work_group_size );
-    uvec3 gl_NumWorkGroups = uvec3( vg.sim_domain ) / gl_WorkGroupSize;
-    uvec3 gl_WorkGroupID;
-    uvec3 gl_LocalInvocationID;
-    uvec3 gl_GlobalInvocationID;
-    foreach( gl_WorkGroupID_z; 0 .. gl_NumWorkGroups.z )        { gl_WorkGroupID.z = gl_WorkGroupID_z;
-    foreach( gl_WorkGroupID_y; 0 .. gl_NumWorkGroups.y )        { gl_WorkGroupID.y = gl_WorkGroupID_y;
-    foreach( gl_WorkGroupID_x; 0 .. gl_NumWorkGroups.x )        { gl_WorkGroupID.x = gl_WorkGroupID_x;
-    foreach( gl_LocalInvocationID_z; 0 .. gl_WorkGroupSize.z )  { gl_LocalInvocationID.z = gl_LocalInvocationID_z;
-    foreach( gl_LocalInvocationID_y; 0 .. gl_WorkGroupSize.y )  { gl_LocalInvocationID.y = gl_LocalInvocationID_y;
-    foreach( gl_LocalInvocationID_x; 0 .. gl_WorkGroupSize.x )  { gl_LocalInvocationID.x = gl_LocalInvocationID_x;
-        gl_GlobalInvocationID = gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID;
-
-        uint gl_LocalInvocationIndex =
-            gl_LocalInvocationID.z * gl_WorkGroupSize.x * gl_WorkGroupSize.y +
-            gl_LocalInvocationID.y * gl_WorkGroupSize.x +
-            gl_LocalInvocationID.x;
-
-        uint gl_WorkGroupIndex =
-            gl_WorkGroupID.z * gl_NumWorkGroups.z * gl_NumWorkGroups.y +
-            gl_WorkGroupID.y * gl_NumWorkGroups.x +
-            gl_WorkGroupID.x;
-
-        uint I = gl_WorkGroupIndex * gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z + gl_LocalInvocationIndex;
-
-
-            //gl_WorkGroupID.z * gl_WorkGroupSize.z + gl_LocalInvocationID.z * Domain.x * Domain.y + // in the 2D case gl_GlobalInvocationID.z is const and 0
-            //gl_WorkGroupID.y * gl_WorkGroupSize.y + gl_LocalInvocationID.y * Domain.x +
-            //gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
-
-        //writeln( "         gl_WorkGroupID : ", gl_WorkGroupID );
-        //writeln( "       gl_WorkGroupSize : ", gl_WorkGroupSize );
-        //writeln( "   gl_LocalInvocationID : ", gl_LocalInvocationID );
-        //writeln( "  gl_GlobalInvocationID : ", gl_GlobalInvocationID );
-        //writeln( "gl_LocalInvocationIndex : ", gl_LocalInvocationIndex );
-        writeln( "                      I : ", I );
-        //writeln;
-    }}}}}}
-    */
-
-
+    //vg.sim_viscosity = 0.001 * vg.sim_typical_length;
+    //vg.updateTauOmega;
 
 
     // collect useable shaders
@@ -366,24 +341,12 @@ void createMemoryObjects( ref VDrive_Gui_State vg ) {
     compareShaderNamesAndReplace( shader_names_ptr[ init_shader_start_index + vg.init_shader_index ], vg.sim_init_shader );
     compareShaderNamesAndReplace( shader_names_ptr[ loop_shader_start_index + vg.loop_shader_index ], vg.sim_loop_shader );
 
-    /*
-    import std.stdio;
-    printf( shader_names_ptr[ 1 ] );
-    writefln( " and %s are %s", vg.sim_init_shader,
-        compareShaderNamesAndReplace( shader_names_ptr[ 1 ], vg.sim_init_shader ) ? "equal!" : "not equal!" );
-
-    printf( shader_names_ptr[ 1 ] );
-    writefln( " and %s are %s", vg.sim_init_shader,
-        compareShaderNamesAndReplace( shader_names_ptr[ 1 ], vg.sim_init_shader ) ? "equal!" : "not equal!" );
-    */
 
     // Initialize gui draw buffers
     foreach( i; 0 .. vg.GUI_QUEUED_FRAMES ) {
         vg.gui_vtx_buffers[ i ] = vg;
         vg.gui_idx_buffers[ i ] = vg;
     }
-
-    // Todo(pp): memory objects should be created here in such a way that memory could be shared among all
 
     auto io = & ImGui.GetIO();
 
@@ -622,15 +585,15 @@ void destroyResources( ref VDrive_Gui_State vg ) {
 }
 
 
-
+/*
 ///////////////////////////////////////////////////////
 // Draw function pointer for play, pause and profile //
 ///////////////////////////////////////////////////////
 
 enum Transport { pause, play, step, profile };
 
-Transport transport = Transport.pause;
-Transport play_mode = Transport.play;
+Transport vg.transport = Transport.pause;
+Transport vg.play_mode = Transport.play;
 
 //
 // Actually a function pointer so that we can set it with the purpose of cpu sim or export
@@ -669,6 +632,7 @@ private {
     // now we can perfectly control single stepping through the gui
     // we must wrap the VDrive_State functions as they require a VDrive_State reference
     // but other functions require the whole VDrive_Gui_State
+    
     void drawFuncPlay( ref VDrive_Gui_State vg ) nothrow @system {
         appstate.drawSim( vg.vd );
     }
@@ -684,7 +648,7 @@ private {
         vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count;
         vg.draw_func_play;
         vg.drawCmdBufferCount = 1;
-        transport = Transport.pause;
+        vg.transport = Transport.pause;
     }
 
     void drawProfile( ref VDrive_Gui_State vg ) nothrow @system {
@@ -697,10 +661,10 @@ private {
     }
 
     //
-    // transport control funcs
+    // vg.transport control funcs
     //
     void simPause( ref VDrive_Gui_State vg ) nothrow @system {
-        transport = Transport.pause;
+        vg.transport = Transport.pause;
         vg.drawCmdBufferCount = 1;
     }
 
@@ -709,13 +673,13 @@ private {
             vg.sim_profile_step_index = 0;
             vg.resetStopWatch;
         }
-        transport = play_mode; // Transport.play or Transport.profile;
+        vg.transport = vg.play_mode; // Transport.play or Transport.profile;
         vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count;
     }
 
     void simStep( ref VDrive_Gui_State vg ) nothrow @system {
         if( !vg.isPlaying ) {
-            transport = Transport.step;
+            vg.transport = Transport.step;
         }
     }
 
@@ -735,10 +699,10 @@ private {
     }
 
     bool isPlaying( ref VDrive_Gui_State vg ) nothrow @system {
-        return transport != Transport.pause;
+        return vg.transport != Transport.pause;
     }
 }
-
+*/
 
 
 ///////////////////////////////////
@@ -751,7 +715,10 @@ void draw( ref VDrive_Gui_State vg ) {
     if( vg.draw_gui )   // this can't be a function pointer as well
         vg.drawGui;     // as we wouldn't know what else has to be drawn (drawFunc or drawFuncPlay etc. )
 
-    final switch( transport ) {
+    //appstate.draw( vg.vd );
+    vg.vd.draw;
+    /*
+    final switch( vg.transport ) {
         case Transport.pause    : appstate.draw( vg.vd );   break;
         case Transport.play     : vg.draw_func_play;        break;
         case Transport.step     : vg.drawStep;              break;
@@ -759,6 +726,7 @@ void draw( ref VDrive_Gui_State vg ) {
     }
     // call function pointer
     //vg.draw_func;
+    */
 }
 
 
@@ -1145,14 +1113,14 @@ void drawGui( ref VDrive_Gui_State vg ) {
         ImGui.SetNextWindowSize( main_win_size, ImGuiCond_Always );
         ImGui.Begin( "Main Window", null, window_flags );
 
-        // create transport controls at top of window
-        if( vg.isPlaying ) { if( ImGui.Button( "Pause", button_size_3 )) simPause( vg ); }
-        else               { if( ImGui.Button( "Play",  button_size_3 )) simPlay(  vg ); }
-        ImGui.SameLine;      if( ImGui.Button( "Step",  button_size_3 )) simStep(  vg );
-        ImGui.SameLine;      if( ImGui.Button( "Reset", button_size_3 )) simReset( vg );
+        // create vg.transport controls at top of window
+        if( vg.isPlaying ) { if( ImGui.Button( "Pause", button_size_3 )) vg.simPause; }
+        else               { if( ImGui.Button( "Play",  button_size_3 )) vg.simPlay;  }
+        ImGui.SameLine;      if( ImGui.Button( "Step",  button_size_3 )) vg.simStep;
+        ImGui.SameLine;      if( ImGui.Button( "Reset", button_size_3 )) vg.simReset;
         ImGui.Separator;
 
-        // create transport controls at top of window
+        // create vg.transport controls at top of window
         //if( vg.sim_play ) { if( ImGui.Button( "Pause", button_size_3 )) { draw_func = & drawSim; vg.drawCmdBufferCount = 2; }
         //else              { if( ImGui.Button( "Play",  button_size_3 )) { draw_func = & draw;    vg.drawCmdBufferCount = 1; }
         //ImGui.SameLine;     if( ImGui.Button( "Step",  button_size_3 ) && !sim_play ) { vg.drawCmdBufferCount = 2; vg.drawSim; vg.drawCmdBufferCount = 1; }
@@ -1216,10 +1184,10 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 vg.setDefaultSimFuncs;
                 vg.sim_use_cpu = false;
                 vg.sim_use_double &= vg.feature_shader_double;
-                if( play_mode == Transport.play ) {     // in profile mode this must stay 1 (switches with play/pause )
-                    vg.sim_play_cmd_buffer_count = 2;   // as we submitted compute and draw command buffers separately
-                    if( transport == Transport.play ) { // if we are in play mode
-                        vg.drawCmdBufferCount = 2;      // we must set this value immediately
+                if( vg.play_mode == Transport.play ) {      // in profile mode this must stay 1 (switches with play/pause )
+                    vg.sim_play_cmd_buffer_count = 2;       // as we submitted compute and draw command buffers separately
+                    if( vg.transport == Transport.play ) {  // if we are in play mode
+                        vg.drawCmdBufferCount = 2;          // we must set this value immediately
                     }
                 }
             }
@@ -1622,10 +1590,10 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
 
         //
-        // Store Every Nth Step
+        // Display Every Nth Step
         //
         int step_size = cast( int )vg.sim_step_size;
-        if( ImGui.DragInt( "Store Every Nth Step", & step_size, 0.1, 1, int.max )) {
+        if( ImGui.DragInt( "Display Every Nth Step", & step_size, 0.1, 1, int.max )) {
             vg.sim_step_size = step_size < 1 ? 1 : step_size;
         }
 
@@ -1663,9 +1631,10 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 vg.compute_ubo.collision_frequency = vg.sim_relaxation_rate = 1; vg.updateViscosity;
             }
             if( ImGui.Selectable( "Looow Viscosity" )) {
-                vg.sim_wall_velocity = 0.001; vg.updateWallVelocity;
-                vg.compute_ubo.collision_frequency = 2;
+                vg.sim_wall_velocity = 0.001;
+                vg.updateWallVelocity;
                 vg.sim_relaxation_rate = 0.5001;
+                vg.compute_ubo.collision_frequency = 1 / vg.sim_relaxation_rate;
                 vg.updateViscosity;
                 if( vg.sim_algorithm != 4 ) {
                     vg.sim_algorithm  = 4;
@@ -2077,10 +2046,10 @@ void drawGui( ref VDrive_Gui_State vg ) {
             vg.simPause;    // currently sim is crashing we don't enter pause mode
 
             if( vg.sim_profile_mode ) {
-                transport = play_mode = Transport.profile;
+                vg.transport = vg.play_mode = Transport.profile;
                 vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count = 1;
             } else {
-                transport = play_mode = Transport.play;
+                vg.transport = vg.play_mode = Transport.play;
                 if( !vg.sim_use_cpu ) {
                     vg.drawCmdBufferCount = vg.sim_play_cmd_buffer_count = 2;
                 }
@@ -2196,8 +2165,8 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 vg.createExportResources;
 
                 // set the play mode to play, might have been set to profile before, and start the sim
-                play_mode = Transport.play;
-                transport = Transport.play;
+                vg.play_mode = Transport.play;
+                vg.transport = Transport.play;
 
             }
         } collapsingTerminator;
@@ -2753,36 +2722,13 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
             vg.vd.createResizedCommands;   // create draw loop runtime commands, only used without gui
         } break;
 
-        case GLFW_KEY_F2 :
-        show_imgui_examples ^= 1;
-        break;
-
-        case GLFW_KEY_F5 :
-        if( isPlaying( *vg )) simPause( *vg );
-        else                  simPlay(  *vg );
-        break;
-
-        case GLFW_KEY_F6 :
-        simStep( *vg );
-        break;
-
-        case GLFW_KEY_F7 :
-        simReset( *vg );
-        break;
-
-        case GLFW_KEY_P :
-        try {
-            vg.vd.createLinePSO;
-        } catch( Exception ) {}
-        break;
-
-        case GLFW_KEY_D :
-        try {
-            vg.vd.createGraphicsPSO;
-        } catch( Exception ) {}
-        break;
-
-        default : break;
+        case GLFW_KEY_F2    : show_imgui_examples ^= 1;                                 break;
+        //case GLFW_KEY_F5    : if( vg.isPlaying ) vg.simPause; else vg.simPlay;          break;
+        //case GLFW_KEY_F6    : vg.simStep;                                               break;
+        //case GLFW_KEY_F7    : vg.simReset;                                              break;
+        case GLFW_KEY_P     : try { vg.vd.createLinePSO;     } catch( Exception ) {}    break;
+        case GLFW_KEY_D     : try { vg.vd.createGraphicsPSO; } catch( Exception ) {}    break;
+        default             :                                                           break;
     }
 }
 
@@ -2803,8 +2749,8 @@ void guiWindowSizeCallback( GLFWwindow * window, int w, int h ) {
     vg.recip_window_size[1] = 2.0f / h;
 
     // the extent might change at swapchain creation when the specified extent is not usable
-    swapchainExtent( &vg.vd, w, h );
-    vg.vd.window_resized = true;
+    vg.swapchainExtent( w, h );
+    vg.window_resized = true;
 }
 
 
