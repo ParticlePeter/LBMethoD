@@ -8,14 +8,13 @@ layout( push_constant ) uniform Push_Constant {
     float   line_offset;
     float   repl_spread;
     float   point_size;
+    int     point_count;
 } pc;
-
 
 // uniform buffer
 layout( std140, binding = 0 ) uniform uboViewer {
     mat4 WVPM;                                  // World View Projection Matrix
 };
-
 
 // uniform buffer
 layout( std140, binding = 5 ) uniform Compute_UBO {
@@ -23,7 +22,6 @@ layout( std140, binding = 5 ) uniform Compute_UBO {
     float   wall_velocity;
     int     comp_index;
 };
-
 
 // uniform buffer
 layout( std140, binding = 6 ) uniform Display_UBO {
@@ -33,6 +31,8 @@ layout( std140, binding = 6 ) uniform Display_UBO {
     uint    z_layer;
 };
 
+// populations 1 single buffered rest velocity, 8 double buffered link velocities
+layout( binding = 2, r32f  ) uniform restrict readonly imageBuffer popul_buffer;
 
 // sampler and image
 layout( binding = 4 ) uniform sampler2DArray vel_rho_tex;      // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
@@ -56,6 +56,7 @@ layout( location = 0 ) out vec4 vs_color;
 #define DISPLAY_BOUNDS      4
 #define DISPLAY_GHIA        5
 #define DISPLAY_POISEUILLE  6
+#define DISPLAY_POP_3D      7
 
 
 const float[2][17] ghia_idx = {
@@ -80,7 +81,7 @@ const float[2][7][17] ghia_uv = {
     },
 
     {
-        
+
         { 0, -0.05906, -0.07391, -0.08864, -0.10313, -0.16914, -0.22445, -0.24533,  0.05454,  0.17527,  0.17507,  0.16077,  0.12317,  0.10890,  0.10091,  0.09233, 0 },
         { 0, -0.12146, -0.15663, -0.19254, -0.22847, -0.23827, -0.44993, -0.38598,  0.05188,  0.30174,  0.30203,  0.28124,  0.22965,  0.20920,  0.19713,  0.18360, 0 },
         { 0, -0.21388, -0.27669, -0.33714, -0.39188, -0.51550, -0.42665, -0.31966,  0.02526,  0.32235,  0.33075,  0.37095,  0.32627,  0.30353,  0.29012,  0.27485, 0 },
@@ -128,7 +129,7 @@ void main() {
         pos[ LA ] += 0.5 + VI;
     //  pos[ LA ] += 0.5 + vel_idx[ LA ][ min( VI, 16 ) ];
         pos[ RA ] += 0.5 + II * pc.repl_spread + pc.line_offset;
-        pos[ VA ] += texture( vel_rho_tex, pos.xyz )[ VA ] * pc.sim_domain[ LA ] * vec3( 1, -1, 1 )[ VA ];  // latter param is fixing 
+        pos[ VA ] += texture( vel_rho_tex, pos.xyz )[ VA ] * pc.sim_domain[ LA ] * vec3( 1, -1, 1 )[ VA ];  // latter param is fixing
         break;
 
 
@@ -136,7 +137,7 @@ void main() {
         vs_color = vec4( 0.375 );
         pos[ LA ] += 0.5 + VI;
         pos[ RA ] += 0.5 + II * pc.repl_spread + pc.line_offset;
-        //pos[ VA ] += texture( vel_rho_tex, pos.xyz )[ VA ] * pc.sim_domain[ VA ] * vec3( 1, -1, 1 )[ VA ];  // latter param is fixing 
+        //pos[ VA ] += texture( vel_rho_tex, pos.xyz )[ VA ] * pc.sim_domain[ VA ] * vec3( 1, -1, 1 )[ VA ];  // latter param is fixing
         break;
 
 
@@ -150,8 +151,9 @@ void main() {
     case DISPLAY_GRID :
         vs_color = vec4( 0.25 );
         //vs_color = vec3( 1, 0, 0 );
-        pos[ LA ] = float( II );
-        pos[ 1 - LA ] = float( VI * SD[ 1 - LA ] );
+        pos[ RA ] = float( II % ( SD[ RA ] ));
+        pos[ LA ] = float( VI * SD[ LA ] );
+        pos[ VA ] = float( II / ( SD[ RA ] ));
         break;
 
 
@@ -170,6 +172,37 @@ void main() {
         float Y_1 = VI - 0.5 * ( pc.sim_domain[ LA ] - 1 );
         float H_2 = 0.25 * pc.sim_domain[ LA ] * pc.sim_domain[ LA ];
         pos[ VA ] -= 1.5 * wall_velocity / H_2 * ( Y_1 * Y_1 - H_2 ) * pc.sim_domain[ LA ] / 3; // 2.84;
+        break;
+
+
+    case DISPLAY_POP_3D :
+        vs_color = vec4( 0, 0, 0, 1 );  
+        #define POP(p) ((( comp_index % 2 ) * 14 + p ) * pc.point_count + VI )
+        //vs_color.r  = amplify_property * imageLoad( popul_buffer, ( 1      ) * pc.point_count + VI ).r;     // 0 - Rest
+        //vs_color.r += amplify_property * imageLoad( popul_buffer, ( 1 + 14 ) * pc.point_count + VI ).r;     // 0 - Rest
+        //vs_color.g  = amplify_property * imageLoad( popul_buffer, ( 2      ) * pc.point_count + VI ).r;     // 0 - Rest
+        //vs_color.g += amplify_property * imageLoad( popul_buffer, ( 2 + 14 ) * pc.point_count + VI ).r;     // 0 - Rest
+
+    //  vs_color.r += amplify_property * imageLoad( popul_buffer, POP( 1)).r;     // 0 - Rest
+    //  vs_color.g += amplify_property * imageLoad( popul_buffer, POP( 2)).r;     // 0 - Rest
+    //  vs_color.r += amplify_property * imageLoad( popul_buffer, POP( 3)).r;     // 0 - Rest
+    //  vs_color.g += amplify_property * imageLoad( popul_buffer, POP( 4)).r;     // 0 - Rest
+    //  vs_color.r += amplify_property * imageLoad( popul_buffer, POP( 5)).r;     // 0 - Rest
+    //  vs_color.g += amplify_property * imageLoad( popul_buffer, POP( 6)).r;     // 0 - Rest
+    //  vs_color.r += amplify_property * imageLoad( popul_buffer, POP( 7)).r * 10;     // 0 - Rest
+    //  vs_color.g += amplify_property * imageLoad( popul_buffer, POP( 8)).r * 10;     // 0 - Rest
+    //  vs_color.r += amplify_property * imageLoad( popul_buffer, POP( 9)).r * 10;     // 0 - Rest
+    //  vs_color.g += amplify_property * imageLoad( popul_buffer, POP(10)).r * 10;     // 0 - Rest
+    //  vs_color.r += amplify_property * imageLoad( popul_buffer, POP(11)).r * 10;     // 0 - Rest
+    //  vs_color.g += amplify_property * imageLoad( popul_buffer, POP(12)).r * 10;     // 0 - Rest
+    //  vs_color.r += amplify_property * imageLoad( popul_buffer, POP(13)).r * 10;     // 0 - Rest
+    //  vs_color.g += amplify_property * imageLoad( popul_buffer, POP(14)).r * 10;     // 0 - Rest
+
+
+
+        //vs_color = vec4( 1, 1, 1, 1 );
+        pos = 0.5 + vec4( VI % SD[0], ( VI / SD[0] ) % SD[1], VI / ( SD[0] * SD[1] ), 0.5 );
+        vs_color = texture( vel_rho_tex, pos.xyz );
         break;
     }
 

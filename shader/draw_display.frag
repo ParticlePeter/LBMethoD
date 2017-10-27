@@ -93,7 +93,7 @@ vec3 colorRamp( float t ) {
     t *= ( ramp.length() - 1 );
     ivec2 i = ivec2( floor( min( vec2( t, t + 1 ), vec2( ramp.length() - 1 ))));
     float f = fract( t );
-    return mix( ramp[ i.x ], ramp[ i.y], f );
+    return mix( ramp[ i.x ], ramp[ i.y ], f );
 /*/
     return 5 * vec3(
         clamp( t,                                0.6,      0.8 )      - 0.6,
@@ -110,7 +110,7 @@ vec3 colorRamp( float t ) {
 #define D textureSize( vel_rho_tex[0], 0 )
 
 void main() {
-
+    //*
     if( vs_tex_coord.z > 0 ) {
         fs_color = vec4( colorRamp( vs_tex_coord.y ), 1 );
     }
@@ -198,9 +198,10 @@ void main() {
             } break;
         }
     }
+    /*/
 
 
-
-    //fs_color = texture( vel_rho_tex[1], vec3( vs_tex_coord.xy, 0 ));
+    fs_color = texture( vel_rho_tex[1], vec3( vs_tex_coord.xy, z_layer ));
+    //*/
     //fs_color.x = z_layer / 24.0;
 }
