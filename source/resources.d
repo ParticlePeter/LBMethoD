@@ -139,7 +139,7 @@ void createMemoryObjects( ref VDrive_State vd ) {
     vd.display_ubo = cast( VDrive_State.Display_UBO* )( mapped_memory + vd.display_ubo_buffer.memOffset );
     vd.display_ubo_flush = vd.display_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the display ubo
     vd.display_ubo.display_property = 3;
-    vd.display_ubo.amplify_property = 1;
+    vd.display_ubo.amplify_property = 10;
     vd.display_ubo.color_layers = 0;
     vd.display_ubo.z_layer = 0;
     vd.updateDisplayUBO;
@@ -301,7 +301,7 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         .addBufferInfo( vd.xform_ubo_buffer.buffer )
 
         // Main Compute Buffer for populations
-        .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
+        .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT )
         .addTexelBufferView( vd.sim_buffer_view )
 
         // Image to store macroscopic variables ( velocity, density ) from simulation compute shader
@@ -465,7 +465,7 @@ void createLinePSO( ref VDrive_State vd ) {
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
         .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )              // describe pipeline layout
-        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 32 )                  // specify push constant range
+        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 36 )                  // specify push constant range
         .renderPass( vd.render_pass.render_pass )                                   // describe compatible render pass
         .construct( vd.graphics_cache )                                             // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
         .extractCore;                                                               // extract core data into Core_Pipeline struct
@@ -656,7 +656,8 @@ void resizeRenderResources( ref VDrive_State vd ) {
     if( vd.framebuffers.clear_values.empty )
         vd.framebuffers
             .addClearValue( 1.0f )                      // add depth clear value
-            .addClearValue( 0.3f, 0.3f, 0.3f, 1.0f );   // add color clear value
+            .addClearValue( 0.1f, 0.1f, 0.1f, 1.0f );   // add color clear value
+            //.addClearValue( 0, 0, 0, 1 );   // add color clear value
 
     // attach one of the framebuffers, the render area and clear values to the render pass begin info
     // Note: attaching the framebuffer also sets the clear values and render area extent into the render pass begin info
