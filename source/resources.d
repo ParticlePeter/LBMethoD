@@ -129,8 +129,10 @@ void createMemoryObjects( ref VDrive_State vd ) {
     // cast the mapped memory pointer with its offset into the backing memory to our compute ubo struct and init_pso the memory
     vd.compute_ubo = cast( VDrive_State.Compute_UBO* )( mapped_memory + vd.compute_ubo_buffer.memOffset );
     vd.compute_ubo_flush = vd.compute_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the compute ubo
-    vd.compute_ubo.collision_frequency = 1; //1.25; //2;
-    vd.compute_ubo.wall_velocity = 0.1 * 3; //0.25 * 3;// / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
+    //vd.compute_ubo.collision_frequency = 1; //1.25; //2;
+    //vd.compute_ubo.wall_velocity = 0.1 * 3; //0.25 * 3;// / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
+    vd.compute_ubo.collision_frequency = 1 / 0.504;
+    vd.compute_ubo.wall_velocity = 0.005 * 3; //0.25 * 3;// / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
     vd.compute_ubo.comp_index = 0;
     vd.updateComputeUBO;
 
