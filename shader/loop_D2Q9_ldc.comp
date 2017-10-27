@@ -73,9 +73,6 @@ const float[9] pw = {   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 
 // with this we reach the population of any node
 // the 2D output image is accessed simply with ivec2( X, Y )
 
-// define global equivalent for gl_LocalInvocationIndex
-#define UI gl_GlobalInvocationID.x
-
 // U and I are also the index velocity population index
 #define NWG gl_NumWorkGroups
 #define WGI gl_WorkGroupID
@@ -85,16 +82,17 @@ const float[9] pw = {   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 
 #define LI gl_LocalInvocationIndex
 #define I int(( NWG.x * NWG.y * WGI.z + NWG.x * WGI.y + WGI.x ) * WGS.x * WGS.y * WGS.z + LI )
 
-#define X ( I % D.x )
-#define Y ( I / D.x )
-#define Z ( I / ( D.x * D.y ))
+// in th 3D case we must modulate Y with with D.y
+//#define X (  I % D.x )
+//#define Y (( I / D.x ) % D.y  )
+//#define Z (  I / ( D.x * D.y ))
 
 // We cannot use these as they do not correspond to the X, Y, Z algorithm above and do not work correctly
 // when a multi dimensional work group size is setup. In that case all one work group is consecutive in memory
 // but we require first the whole domain in X laying consecutively
-//#define X gl_GlobalInvocationID.x
-//#define Y gl_GlobalInvocationID.y
-//#define Z gl_GlobalInvocationID.z
+#define X gl_GlobalInvocationID.x
+#define Y gl_GlobalInvocationID.y
+#define Z gl_GlobalInvocationID.z
 
 // derived total count of nodes
 int cell_count = int( NWG.x * NWG.y * NWG.z * WGS.x * WGS.y * WGS.z );
@@ -201,11 +199,11 @@ void main( void ) {
     vec2  vel = ( vec2(f[1],f[2]) - vec2(f[3],f[4]) + vec2(f[5]) - vec2(f[7]) + vec2(f[8],f[6]) - vec2(f[6],f[8])) / rho;
 
     // store properties in image
-    if(( ALGORITHM >> 8 ) > 1 ) {
-        if(( ALGORITHM >> 8 ) == pc.ping + 1 ) {
+    if(( ALGORITHM >> 8 ) > 1 ) {   // in this case we use multiple sim steps before we store macroscopic properties
+        if(( ALGORITHM >> 8 ) == pc.ping + 1 ) {    // store the propertires when on the last sim step, e.g.: store each 5th step, ping is [0..5), hence store on 4 + 1 == 1
             imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vel, 0, rho ));
         }
-    } else {
+    } else {    // in this case we use one sim step and store immediatelly
         imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vel, 0, rho ));
     }
 
