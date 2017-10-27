@@ -24,7 +24,6 @@ int main() {
         import gui;
         VDrive_Gui_State vd;    // VDrive state struct
         vd.initImgui;           // initialize imgui first, we raster additional fonts but currently don't install its glfw callbacks, they should be treated
-        import resources : drawInit;
     } else {
         import resources;
         VDrive_State vd;
@@ -39,7 +38,7 @@ int main() {
     vd.createDescriptorSet;                         // create descriptor set
     vd.createRenderResources;                       // configure swapchain, create renderpass and pipeline state object
     vd.resizeRenderResources;                       // construct swapchain, create depth buffer and frambuffers
-    //vd.initTrackball( vd.projection_fovy, vd.windowHeight, 0, 0, 4 );   // initialize the navigation trackball
+    vd.setDefaultSimFuncs;                          // set default sim funcs, these can be overridden with gui commands
 
     static if( IMGUI )  vd.resetGlfwCallbacks;      // override callbacks set in module input when initTrackball was called
     else                vd.createResizedCommands;   // create draw loop runtime commands, only used without gui

@@ -248,12 +248,6 @@ void initImgui( ref VDrive_Gui_State vg ) {
     style.Colors[ ImGuiCol_TextSelectedBg ]         = ImVec4( 0.27f, 0.43f, 0.63f, 1.00f ); //ImVec4( 0.00f, 0.50f, 1.00f, 1.00f );
     style.Colors[ ImGuiCol_ModalWindowDarkening ]   = ImVec4( 0.20f, 0.20f, 0.20f, 0.35f ); //ImVec4( 0.20f, 0.20f, 0.20f, 0.35f );
 
-
-
-    // as this is the first func called, without requiring any VDrive state
-    // we use the opportunity to setup all the drawFunc function pointers
-    vg.setDefaultSimFuncs;
-
 }
 
 
