@@ -62,6 +62,7 @@ struct VDrive_Gui_State {
         bounds,
         ghia,
         poiseuille,
+        pop_3D,
         count,
     };
 
@@ -86,6 +87,7 @@ struct VDrive_Gui_State {
         float       line_offset     = 0;
         float       repl_spread     = 1;
         float       point_size      = 1;
+        uint        point_count     = 0;
     }
 
     Sim_Display sim_display;
@@ -96,15 +98,15 @@ struct VDrive_Gui_State {
     uint32_t[3] sim_work_group_size;
     uint32_t    sim_step_size;
     float[2]    recip_window_size = [ 2.0f / 1600, 2.0f / 900 ];
-    float[3]    point_size_line_width = [ 9, 3, 1 ];
+    float[3]    point_size_line_width = [ 9, 5, 1 ];
     float       sim_typical_length;
 
     // count of command buffers to be drawn when in play mode
     uint32_t    sim_play_cmd_buffer_count;
 
     // ldc (0,1), taylor_green (2,4),
-    int         init_shader_index   = 0;  // 0-based default init shader index, from all shaders in shader dir starting with init
-    int         loop_shader_index   = 1;  // 0-based default loop shader index, from all shaders in shader dir starting with loop   
+    int         init_shader_index   = 4;  // 0-based default init shader index, from all shaders in shader dir starting with init
+    int         loop_shader_index   = 7;  // 0-based default loop shader index, from all shaders in shader dir starting with loop
     Ghia_Type   sim_ghia_type       = Ghia_Type.re___100;
 
     bool        sim_use_double;
@@ -115,12 +117,14 @@ struct VDrive_Gui_State {
     bool        draw_velocity_lines_as_points = false;
     bool        sim_profile_mode = false;   // Todo(pp): this is redundant as we can use play_mode bellow as well, remove this one
 
+    bool        sim_draw_plane = false;
     bool        sim_draw_lines = true;
     bool        sim_draw_vel_base = true;
-    bool        sim_draw_axis;
+    bool        sim_draw_axis = true;
     bool        sim_draw_grid;
     bool        sim_draw_scale = true;
     bool        sim_draw_bounds;
+    bool        sim_draw_populations = true;
     bool        sim_validate_ghia;
     bool        sim_validate_poiseuille_flow;
     bool        sim_validate_taylor_green;
@@ -314,11 +318,12 @@ void createMemoryObjects( ref VDrive_Gui_State vg ) {
     vg.sim_wall_velocity        = vg.compute_ubo.wall_velocity * vg.sim_speed_of_sound * vg.sim_speed_of_sound;
     vg.sim_relaxation_rate      = 1 / vg.compute_ubo.collision_frequency;
     vg.sim_display.sim_domain   = vg.vd.sim_domain;
+    vg.sim_display.point_count  = vg.vd.sim_domain[0] * vg.vd.sim_domain[1] * vg.vd.sim_domain[2];
 
     vg.updateViscosity;
 
-    vg.sim_viscosity = 0.001 * vg.sim_typical_length;
-    vg.updateTauOmega;
+    //vg.sim_viscosity = 0.001 * vg.sim_typical_length;
+    //vg.updateTauOmega;
     /*
     import dlsl.vector;
     import std.stdio;
@@ -1351,7 +1356,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
         int dimensions = vg.sim_use_3_dim;
         if( ImGui.RadioButton( "2D", & dimensions, 0 )) {
             vg.sim_use_3_dim = false;
-            vg.sim_domain[2] = 1;
+            vg.sim_domain[2] = vg.sim_work_group_size[2] = 1;
             vg.checkComputeParams;
         }
 
@@ -1465,6 +1470,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
                 if( vg.vd.sim_domain != vg.sim_domain ) {
                     // recreate sim image, update trackball and sim_display push constant data
                     vg.vd.sim_domain = vg.sim_display.sim_domain = vg.sim_domain;
+                    vg.sim_display.point_count = vg.vd.sim_domain[0] * vg.vd.sim_domain[1] * vg.vd.sim_domain[2];
                     vg.createSimImage;
                     import input : initTrackball;
                     vg.initTrackball;
@@ -1472,6 +1478,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
 
                 vg.sim_compute_dirty        = vg.sim_work_group_dirty = false;
                 vg.vd.sim_work_group_size   = vg.sim_work_group_size;
+                vg.vd.sim_use_3_dim         = vg.sim_use_3_dim;
                 vg.vd.sim_step_size         = vg.sim_step_size;
                 vg.vd.sim_use_double        = vg.sim_use_double;
                 vg.vd.sim_layers            = vg.sim_layers;
@@ -1496,6 +1503,7 @@ void drawGui( ref VDrive_Gui_State vg ) {
             if( ImGui.Button( "Apply", button_size_2 )) {
                 vg.sim_work_group_dirty     = false;
                 vg.vd.sim_work_group_size   = vg.sim_work_group_size;
+                vg.vd.sim_use_3_dim         = vg.sim_use_3_dim;
                 vg.vd.sim_step_size         = vg.sim_step_size;
                 vg.createBoltzmannPSO( true, true, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
             }
@@ -1939,11 +1947,15 @@ void drawGui( ref VDrive_Gui_State vg ) {
             // set width of items and their label - aligned visually with 8 pixels
             ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
             ImGui.SetCursorPosX( 160 );
+            ImGui.Checkbox( "Draw Plane", & vg.sim_draw_plane );
+            ImGui.SetCursorPosX( 160 );
             ImGui.Checkbox( "Draw Axis", & vg.sim_draw_axis );
             ImGui.SetCursorPosX( 160 );
             ImGui.Checkbox( "Draw Grid", & vg.sim_draw_grid );
             ImGui.SetCursorPosX( 160 );
             ImGui.Checkbox( "Draw Scale", & vg.sim_draw_scale );
+            ImGui.SetCursorPosX( 160 );
+            ImGui.Checkbox( "Population 3D", & vg.sim_draw_populations );
 
             ImGui.PopItemWidth;
             ImGui.TreePop;
@@ -2384,22 +2396,25 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     // bind lbmd graphics pso
     //
-    cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.graphics_pso.pipeline );
+    if( vg.sim_draw_plane ) {
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.graphics_pso.pipeline );
 
-    // push constant the sim display scale
-    float[4] sim_domain = [ vg.vd.sim_domain[0], vg.vd.sim_domain[1], vg.recip_window_size[0], vg.recip_window_size[1] ];
-    cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * float.sizeof, sim_domain.ptr ); //sim_display.scale.ptr );
+        // push constant the sim display scale
+        float[4] sim_domain = [ vg.vd.sim_domain[0], vg.vd.sim_domain[1], vg.recip_window_size[0], vg.recip_window_size[1] ];
+        cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * float.sizeof, sim_domain.ptr ); //sim_display.scale.ptr );
 
-    // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
-    cmd_buffer.vkCmdDraw( 4, 1 + vg.sim_draw_scale, 0, 0 ); // vertex count, instance count, first vertex, first instance
-
+        // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
+        cmd_buffer.vkCmdDraw( 4, 1 + vg.sim_draw_scale, 0, 0 ); // vertex count, instance count, first vertex, first instance
+    }
 
 
     //
     // bind lines pipeline
     //
-    if( vg.sim_draw_lines )
+    if( vg.sim_draw_lines ) {   // TODO: this is allways true, but it should represent if the lines pipeline must be bound or not
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ 0 ].pipeline );
+        cmd_buffer.vkCmdSetLineWidth( 1 );
+    }
 
 
     //
@@ -2417,15 +2432,43 @@ void drawGuiData( ImDrawData* draw_data ) {
     if( vg.sim_draw_grid ) {
         vg.sim_display.line_type = vg.Line_Type.grid;
 
-        // draw lines repeating in X direction
-        vg.sim_display.line_axis = vg.Line_Axis.X;
-        cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * uint32_t.sizeof, & vg.sim_display );
-        cmd_buffer.vkCmdDraw( 2, vg.sim_domain[0] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        if( vg.sim_use_3_dim ) {
+            // draw lines repeating in X direction
+            vg.sim_display.repl_axis = vg.Line_Axis.X;
+            vg.sim_display.line_axis = vg.Line_Axis.Y;
+            vg.sim_display.velocity_axis = vg.Line_Axis.Z;
+            cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * uint32_t.sizeof, & vg.sim_display );
+            cmd_buffer.vkCmdDraw( 2, ( vg.sim_domain[0] + 1 ) * ( vg.sim_domain[2] + 1 ), 0, 0 ); // vertex count, instance count, first vertex, first instance
 
-        // draw lines repeating in Y direction
-        vg.sim_display.line_axis = vg.Line_Axis.Y;
-        cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
-        cmd_buffer.vkCmdDraw( 2, vg.sim_domain[1] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+            // draw lines repeating in Y direction
+            vg.sim_display.repl_axis = vg.Line_Axis.Y;
+            vg.sim_display.line_axis = vg.Line_Axis.Z;
+            vg.sim_display.velocity_axis = vg.Line_Axis.X;
+            cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
+            cmd_buffer.vkCmdDraw( 2, ( vg.sim_domain[0] + 1 ) * ( vg.sim_domain[1] + 1 ), 0, 0 ); // vertex count, instance count, first vertex, first instance
+
+            // draw lines repeating in Y direction
+            vg.sim_display.repl_axis = vg.Line_Axis.Z;
+            vg.sim_display.line_axis = vg.Line_Axis.X;
+            vg.sim_display.velocity_axis = vg.Line_Axis.Y;
+            cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
+            cmd_buffer.vkCmdDraw( 2, ( vg.sim_domain[1] + 1 ) * ( vg.sim_domain[2] + 1 ), 0, 0 ); // vertex count, instance count, first vertex, first instance
+
+        } else {
+            // draw lines repeating in X direction
+            vg.sim_display.repl_axis = vg.Line_Axis.X;
+            vg.sim_display.line_axis = vg.Line_Axis.Y;
+            //vg.sim_display.velocity_axis = vg.Line_Axis.Z;
+            cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * uint32_t.sizeof, & vg.sim_display );
+            cmd_buffer.vkCmdDraw( 2, vg.sim_domain[0] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+
+            // draw lines repeating in Y direction
+            vg.sim_display.repl_axis = vg.Line_Axis.Y;
+            vg.sim_display.line_axis = vg.Line_Axis.X;
+            //vg.sim_display.velocity_axis = vg.Line_Axis.Z;
+            cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
+            cmd_buffer.vkCmdDraw( 2, vg.sim_domain[1] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        }
     }
 
     void setPointSizeLineWidth( size_t index ) {
@@ -2596,6 +2639,22 @@ void drawGuiData( ImDrawData* draw_data ) {
         */
 
     }
+
+    if( vg.sim_draw_populations ) {
+
+        // setup pipeline points drawing
+        uint draw_as_points = 1;
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ draw_as_points ].pipeline );
+        auto pipeline_layout = vg.draw_line_pso[ draw_as_points ].pipeline_layout;
+
+        // push constant the whole sim_display struct and draw
+        vg.sim_display.point_size = vg.point_size_line_width[ 1 ];
+        vg.sim_display.line_type = vg.Line_Type.pop_3D;
+        cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
+        cmd_buffer.vkCmdDraw( vg.sim_display.point_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+    }
+
+
 
 
 
