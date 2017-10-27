@@ -90,12 +90,17 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
 
 
     // determine dispatch work group count from simulation domain vd.sim_domain and compute work group size vd.sim_work_group_size
-    uint32_t[3] work_group_count = [
+    uint32_t[3] num_work_groups = [
         vd.sim_domain[0] / vd.sim_work_group_size[0],
         vd.sim_domain[1] / vd.sim_work_group_size[1],
         vd.sim_use_3_dim ? vd.sim_domain[2] / vd.sim_work_group_size[2] : 1,
     ];
 
+    //import std.stdio;
+    //printf( "Sim_Domaine    : [ %d, %d, %d ]\n", vd.sim_domain[0], vd.sim_domain[1], vd.sim_domain[2] );
+    //printf( "Work_Group_Size: [ %d, %d, %d ]\n", vd.sim_work_group_size[0], vd.sim_work_group_size[1], vd.sim_work_group_size[2] );
+    //printf( "Num_Work_Groups: [ %d, %d, %d ]\n", num_work_groups[0], num_work_groups[1], num_work_groups[2] );
+    //printf( "\n" );
 
     // possibly initialize the populations with initialization compute shader
     if( init_pso ) {
@@ -126,7 +131,7 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
             null                                // const( uint32_t )*           pDynamicOffsets
         );
 
-        init_cmd_buffer.vdCmdDispatch( work_group_count );      // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+        init_cmd_buffer.vdCmdDispatch( num_work_groups );      // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
 
         // add memory barrier after populations were initialized
         VkMemoryBarrier memory_barrier = {
@@ -183,12 +188,17 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
     auto sim_cmd_buffers_bi = createCmdBufferBI;
 
     // determine dispatch work group count from simulation domain vd.sim_domain and compute work group size vd.sim_work_group_size
-    uint32_t[3] work_group_count = [
+    uint32_t[3] num_work_groups = [
         vd.sim_domain[0] / vd.sim_work_group_size[0],
         vd.sim_domain[1] / vd.sim_work_group_size[1],
         vd.sim_use_3_dim ? vd.sim_domain[2] / vd.sim_work_group_size[2] : 1,
     ];
 
+    //import std.stdio;
+    //printf( "Sim_Domaine    : [ %d, %d, %d ]\n", vd.sim_domain[0], vd.sim_domain[1], vd.sim_domain[2] );
+    //printf( "Work_Group_Size: [ %d, %d, %d ]\n", vd.sim_work_group_size[0], vd.sim_work_group_size[1], vd.sim_work_group_size[2] );
+    //printf( "Num_Work_Groups: [ %d, %d, %d ]\n", num_work_groups[0], num_work_groups[1], num_work_groups[2] );
+    //printf( "\n\n" );
 
 
     //
@@ -209,7 +219,23 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
                 null                                // const( uint32_t )*           pDynamicOffsets
             );
             cmd_buffer.vkCmdPushConstants( vd.comp_loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
-            cmd_buffer.vdCmdDispatch( work_group_count );       // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+            cmd_buffer.vdCmdDispatch( num_work_groups );        // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+
+            // we need a memory barrier if we want to access the populations in graphics commands of the same scommand submission
+            VkMemoryBarrier memory_barrier = {
+                srcAccessMask : VK_ACCESS_SHADER_WRITE_BIT,
+                dstAccessMask : VK_ACCESS_SHADER_READ_BIT
+            };
+
+            cmd_buffer.vkCmdPipelineBarrier(
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,           // VkPipelineStageFlags                 srcStageMask,
+                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,            // VkPipelineStageFlags                 dstStageMask,
+                0,                                              // VkDependencyFlags                    dependencyFlags,
+                1, & memory_barrier,                            // uint32_t memoryBarrierCount,         const VkMemoryBarrier* pMemoryBarriers,
+                0, null,                                        // uint32_t bufferMemoryBarrierCount,   const VkBufferMemoryBarrier* pBufferMemoryBarriers,
+                0, null,                                        // uint32_t imageMemoryBarrierCount,    const VkImageMemoryBarrier*  pImageMemoryBarriers,
+            );
+
             cmd_buffer.vkEndCommandBuffer;                      // finish recording and submit the command
         }
         return;
@@ -253,7 +279,7 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
         foreach( s; 0 .. vd.sim_step_size ) {
             uint32_t[2] push_constant = [ s.toUint, vd.sim_layers ];    // push constant to specify dispatch invocation counter and pass in the sim layer count
             cmd_buffer.vkCmdPushConstants( vd.comp_loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
-            cmd_buffer.vdCmdDispatch( work_group_count );   // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+            cmd_buffer.vdCmdDispatch( num_work_groups );   // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
 
             // buffer barrier to wait for all populations being written to memory
             cmd_buffer.vkCmdPipelineBarrier(
