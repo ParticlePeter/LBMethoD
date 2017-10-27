@@ -131,9 +131,9 @@ struct VDrive_State {
     /////////////////////////////////////////////////
 
     // compute parameters
-    uint32_t[3] sim_domain                  = [ 256, 256, 1 ]; //[ 256, 256, 1 ];   // [ 256, 64, 1 ];
-    uint32_t    sim_layers                  = 17;
-    uint32_t[3] sim_work_group_size         = [ 16, 16, 1 ];
+    uint32_t[3] sim_domain                  = [ 32, 32, 32 ]; //[ 256, 256, 1 ];   // [ 256, 64, 1 ];
+    uint32_t    sim_layers                  = 29;
+    uint32_t[3] sim_work_group_size         = [ 32, 1, 1 ];
     uint32_t    sim_ping_pong               = 1;
     uint32_t    sim_step_size               = 1;
 
@@ -205,7 +205,7 @@ version( LDC ) {
     bool            feature_large_points    = false;
     bool            feature_wide_lines      = false;
     bool            sim_use_double          = false;
-    bool            sim_use_3_dim           = false;
+    bool            sim_use_3_dim           = true;
     bool            sim_use_cpu             = false;
     bool            export_as_vector        = true;
 
@@ -331,7 +331,8 @@ void drawInit( ref VDrive_State vd ) {
 void drawSim( ref VDrive_State vd ) @system {
     vd.sim_ping_pong = vd.sim_index % 2;                            // compute new ping_pong value
     vd.compute_ubo.comp_index += vd.sim_step_size;                  // increase shader compute counter
-    if( vd.sim_step_size > 1 ) vd.updateComputeUBO;                 // we need this value in compute shader if its greater than 1
+    //if( vd.sim_step_size > 1 )
+        vd.updateComputeUBO;                                        // we need this value in compute shader if its greater than 1
     ++vd.sim_index;                                                 // increment the compute buffer submission count
     vd.draw;                                                        // let vulkan dance
 }
