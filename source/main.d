@@ -18,31 +18,38 @@ int main() {
     import core.stdc.stdio : printf;
     printf( "\n" );
 
-    enum IMGUI = true;
+    // define if we want to use a GUI or not
+    enum USE_GUI = true;
 
-    static if( IMGUI ) {
+
+    // compile time branch if gui is used or not 
+    static if( USE_GUI ) {
         import gui;
-        VDrive_Gui_State vd;    // VDrive state struct
-        vd.initImgui;           // initialize imgui first, we raster additional fonts but currently don't install its glfw callbacks, they should be treated
+        VDrive_Gui_State vd;                        // VDrive Gui state struct wrapping VDrive State struct
+        vd.initImgui;                               // initialize imgui first, we raster additional fonts but currently don't install its glfw callbacks, they should be treated
     } else {
         import resources;
-        VDrive_State vd;
+        VDrive_State vd;                            // VDrive state struct
     }
 
+
+    // initialize vulkan
     auto vkResult = vd.initVulkan( 1600, 900 );     // initialize instance and (physical) device
     if( vkResult ) return vkResult;                 // exit if initialization failed, VK_SUCCESS = 0
-    vd.initTrackball;
-    vd.registerCallbacks;
+
+    vd.initTrackball;                               // initialize trackball with window size and default perspective projection data in VDrive State
+    vd.registerCallbacks;                           // register glfw callback functions 
     vd.createCommandObjects;                        // create command pool and sync primitives
-    vd.createMemoryObjects;                         // create memory objects once used through out programm lifetime
+    vd.createMemoryObjects;                         // create memory objects once used through out program lifetime
     vd.createDescriptorSet;                         // create descriptor set
     vd.createRenderResources;                       // configure swapchain, create renderpass and pipeline state object
     vd.resizeRenderResources;                       // construct swapchain, create depth buffer and frambuffers
     vd.setDefaultSimFuncs;                          // set default sim funcs, these can be overridden with gui commands
 
-    static if( IMGUI )  vd.resetGlfwCallbacks;      // override callbacks set in module input when initTrackball was called
-    else                vd.createResizedCommands;   // create draw loop runtime commands, only used without gui
-
+    // branch once more dependent on gui usage
+    static if( !USE_GUI ) {
+        vd.createResizedCommands;                   // create draw loop runtime commands, only used without gui
+    }
 
     // initial draw
     vd.drawInit;

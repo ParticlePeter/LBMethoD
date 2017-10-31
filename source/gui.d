@@ -1923,14 +1923,18 @@ void createRenderResources( ref VDrive_Gui_State vg ) {
 
 
 
-void resetGlfwCallbacks( ref VDrive_Gui_State vg ) {
-    // set glfw callbacks, these here wrap the callbacks in module input
+void registerCallbacks( ref VDrive_Gui_State vg ) {
+
+    // first forward to input.registerCallbacks
+    import input : input_registerCallbacks = registerCallbacks;
+    input_registerCallbacks( vg.vd );   // here we use vg.vd to ensure that only the wrapped VDrive State struct becomes the user pointer
+
+    // now overwrite some of the input callbacks with these here (some of them also forward to input callbacks)
     glfwSetWindowSizeCallback(      vg.window, & guiWindowSizeCallback );
     glfwSetMouseButtonCallback(     vg.window, & guiMouseButtonCallback );
     glfwSetScrollCallback(          vg.window, & guiScrollCallback );
     glfwSetCharCallback(            vg.window, & guiCharCallback );
     glfwSetKeyCallback(             vg.window, & guiKeyCallback );
-
 }
 
 
