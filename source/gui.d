@@ -75,7 +75,9 @@ struct VDrive_Gui_State {
         re_10000,
     }
 
-    struct Sim_Display {                // std140 conform
+    // Sim Display Struct is used to configure the lines display ueber shader 
+    // it is applied as push constant the struct must be std140 conform
+    struct Sim_Display {
       align( 1 ):
         uint[3]     sim_domain;
         Line_Type   line_type       = Line_Type.velocity;
