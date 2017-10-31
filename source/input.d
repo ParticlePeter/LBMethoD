@@ -6,10 +6,9 @@ import derelict.glfw3.glfw3;
 
 import appstate;
 
-//private VDrive_State* vd;
+
 
 void registerCallbacks( ref VDrive_State vd ) {
-    //.vd = &vd;
     glfwSetWindowUserPointer(   vd.window, & vd );
     glfwSetWindowSizeCallback(  vd.window, & windowSizeCallback );
     glfwSetMouseButtonCallback( vd.window, & mouseButtonCallback );
