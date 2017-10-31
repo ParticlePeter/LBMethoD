@@ -370,13 +370,16 @@ struct VDrive_State {
             updateWVPM;  // this happens anyway in recreateSwapchain
         }
 
+        
         // acquire next swapchain image
         vk.device.vkAcquireNextImageKHR( swapchain.swapchain, uint64_t.max, acquired_semaphore, VK_NULL_HANDLE, &next_image_index );
 
         // wait for finished drawing
         vk.device.vkWaitForFences( 1, &submit_fence[ next_image_index ], VK_TRUE, uint64_t.max );
         vk.device.vkResetFences( 1, &submit_fence[ next_image_index ] ).vkAssert;
+        
     }
+
 
     void drawStep() @system {
         drawCmdBufferCount = sim_play_cmd_buffer_count;
@@ -384,6 +387,7 @@ struct VDrive_State {
         drawCmdBufferCount = 1;
         transport = Transport.pause;
     }
+
 
     void drawProfile() @system {
         sim_profile_step_index += sim_profile_step_size;
@@ -393,6 +397,7 @@ struct VDrive_State {
             simPause;
         }
     }
+
 
     void drawDisplay() @system {
 
@@ -429,6 +434,7 @@ struct VDrive_State {
         vk.device.vkWaitForFences( 1, &submit_fence[ next_image_index ], VK_TRUE, uint64_t.max );
         vk.device.vkResetFences( 1, &submit_fence[ next_image_index ] ).vkAssert;
     }
+
 
     void draw() {
 
