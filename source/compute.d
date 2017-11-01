@@ -58,56 +58,41 @@ void createComputeResources( ref VDrive_State vd ) {
 //////////////////////////////////////////////////////////////////
 // create LBM init and loop PSOs as well as sim command buffers //
 //////////////////////////////////////////////////////////////////
+private void createBoltzmannPSO( ref VDrive_State vd, ref Core_Pipeline pso, string shader_path ) {
 
-void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim ) {
-
-    // create Meta_Specialization struct with static data array
+    // create meta_Specialization struct to specify shader local work group size and algorithm
     Meta_SC!( 4 ) meta_sc;
     meta_sc
-        .addMapEntry( MapEntry32( vd.sim_work_group_size[0] ))  // default constantID is 0, next would be 1
-        .addMapEntry( MapEntry32( vd.sim_work_group_size[1] ))  // default constantID is 1, next would be 2
-        .addMapEntry( MapEntry32( vd.sim_work_group_size[2] ))  // default constantID is 2, next would be 3
+        .addMapEntry( MapEntry32(  vd.sim_work_group_size[0] ))                     // default constantID is 0, next would be 1
+        .addMapEntry( MapEntry32(  vd.sim_work_group_size[1] ))                     // default constantID is 1, next would be 2
+        .addMapEntry( MapEntry32(  vd.sim_work_group_size[2] ))                     // default constantID is 2, next would be 3
         .addMapEntry( MapEntry32(( vd.sim_step_size << 8 ) + vd.sim_algorithm ))    // upper 24 bits is the step_size, lower 8 bits the algorithm
         .construct;
 
-    void createComputePSO( Core_Pipeline* pso, string shader_path ) {
-        vd.graphics_queue.vkQueueWaitIdle;  // wait for queue idle as we need to destroy the pipeline
-        Meta_Compute meta_compute;          // use temporary Meta_Compute struct to specify and create the pso
-        auto old_pso = *pso;                // store old pipeline to destroy after new pipeline is created
-        *pso = meta_compute( vd )           // extracting the core items after construction with reset call
-            //.basePipeline( old_pso.pipeline )
-            .shaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_COMPUTE_BIT, shader_path, & meta_sc.specialization_info ))
-            .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
-            .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 8 )
-            .construct( vd.compute_cache )  // construct using pipeline cache
-            .destroyShaderModule
-            .reset;
+    vd.graphics_queue.vkQueueWaitIdle;          // wait for queue idle as we need to destroy the pipeline
+    if( pso.is_constructed )                    // possibly destroy old compute pipeline and layout
+        vd.destroy( pso );
 
-        // destroy old compute pipeline and layout
-        if( old_pso.pipeline != VK_NULL_HANDLE )
-            vd.destroy( old_pso );
-    }
+    Meta_Compute meta_compute;                  // use temporary Meta_Compute struct to specify and create the pso
+    pso = meta_compute( vd )                    // extracting the core items after construction with reset call
+        .shaderStageCreateInfo( vd.createPipelineShaderStage( shader_path, & meta_sc.specialization_info ))
+        .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
+        .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 8 )
+        .construct( vd.compute_cache )          // construct using pipeline cache
+        .destroyShaderModule                    // destroy shader modules             
+        .reset;                                 // reset temporary Meta_Compute struct and extract core pipeline data
+}
 
-    // determine dispatch group X count from simulation domain vd.sim_domain and compute work group size vd.sim_work_group_size[0]
-    uint32_t dispatch_x = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2] / vd.sim_work_group_size[0];
-    /*
-    uint32_t[3] work_group_count = [
-        vd.sim_domain[0] / vd.sim_work_group_size[0],
-        vd.sim_domain[1] / vd.sim_work_group_size[1],
-        vd.sim_use_3_dim ? vd.sim_domain[2] / vd.sim_work_group_size[2] : 1,
-    ];
-    */
 
-    //import std.stdio;
-    //writeln( "sim_domain: ", vd.sim_domain );
-    //writeln( "group_size: ", vd.sim_work_group_size );
-    //writeln( "dispatch_x: ", dispatch_x );
 
-    // possibly initialize the populations with initialization compute shader
+//////////////////////////////////////////////////////////////////
+// create LBM init and loop PSOs as well as sim command buffers //
+//////////////////////////////////////////////////////////////////
+void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim ) {
+
+    // (re)create Boltzmann init PSO if required
     if( init_pso ) {
-        createComputePSO( & vd.comp_init_pso, vd.sim_init_shader ); // putting responsibility to use the right double shader into users hand
-        //  vd.sim_use_double ? "shader/init_D2Q9_double.comp" : "shader/init_D2Q9.comp" );
-        //reset_sim = true;
+        vd.createBoltzmannPSO( vd.comp_init_pso, vd.sim_init_shader );
     }
 
     if( reset_sim ) {
@@ -132,7 +117,8 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
             null                                // const( uint32_t )*           pDynamicOffsets
         );
 
-    //  init_cmd_buffer.vdCmdDispatch( work_group_count );      // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
+        // determine dispatch group X count from simulation domain vd.sim_domain and compute work group size vd.sim_work_group_size[0]
+        uint32_t dispatch_x = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2] / vd.sim_work_group_size[0];
         init_cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );      // dispatch compute command
         init_cmd_buffer.vkEndCommandBuffer;                     // finish recording and submit the command
         auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
@@ -147,10 +133,7 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
     ////////////////////////////////////////////////
 
     if( loop_pso ) {
-        // reuse meta_compute to create loop compute pso with collision algorithm specialization
-        //meta_sc.specialization_data[3] = MapEntry32( vd.sim_algorithm );    // all settings higher 0 are loop algorithms
-        createComputePSO( & vd.comp_loop_pso, vd.sim_loop_shader );         // putting responsibility to use the right double shader into users hand
-        //  vd.sim_use_double ? "shader/loop_D2Q9_ldc_double.comp" : "shader/loop_D2Q9_channel_flow.comp" );
+        vd.createBoltzmannPSO( vd.comp_loop_pso, vd.sim_loop_shader );      // putting responsibility to use the right double shader into users hand
     }
 
     // (re)create command buffers
