@@ -73,7 +73,7 @@ struct VDrive_State {
     Meta_Renderpass             render_pass;
     Core_Pipeline               graphics_pso;
     VkPipelineCache             graphics_cache;
-    Meta_FB!( 4, 2 )            framebuffers;
+    Meta_FB!( MAX_FRAMES, 2 )   framebuffers;
     VkViewport                  viewport;               // dynamic state viewport
     VkRect2D                    scissors;               // dynamic state scissors
 
