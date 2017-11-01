@@ -178,20 +178,20 @@ void main( void ) {
     /*
     else
 
-    if( Y == 0 ) {          // Handle bottom wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+    if( Y <= 2 ) {          // Handle bottom wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
         f[5] += 2 * pw[5] * rho * wall_velocity;
         f[6] -= 2 * pw[6] * rho * wall_velocity;
     }
 
 
-    if(  X == 0 ) {         // Handle left wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+    if(  X <= 2 ) {         // Handle left wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
         f[5] += 2 * pw[5] * rho * wall_velocity;
         f[8] -= 2 * pw[8] * rho * wall_velocity;
     }
-
+    
     else
 
-    if( X == D.x - 1 ) {    // Handle right wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+    if( X >= D.x - 3 ) {    // Handle right wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
         f[6] += 2 * pw[6] * rho * wall_velocity;
         f[7] -= 2 * pw[7] * rho * wall_velocity;
     }
