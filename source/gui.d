@@ -1541,13 +1541,6 @@ struct VDrive_Gui_State {
     size_t  export_shader_start_index;
 
 
-    void parseShaderDirectoryNo( string path_to_dir = "shader" ) {
-        init_shader_start_index     = size_t.max;
-        loop_shader_start_index     = size_t.max;
-        draw_shader_start_index     = size_t.max;
-        export_shader_start_index   = size_t.max;
-    }
-
 
     void parseShaderDirectory( string path_to_dir = "shader" ) {
         import std.file : dirEntries, SpanMode;
@@ -1571,7 +1564,7 @@ struct VDrive_Gui_State {
             .toPtrArray( shader_names_ptr, shader_names_combined, '\0' );
 
 
-        // if shader_names_combined reallocated shader_names_ptr are invalid afterwards
+        // if shader_names_combined reallocates, shader_names_ptr has invalid pointers afterward
         // hence we cast each pointer to the distance to his successor
         // the last appending operation will have valid pointers and we can use the
         // distances to reconstruct the correct pointers
