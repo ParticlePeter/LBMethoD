@@ -1,5 +1,8 @@
 #version 450
 
+// Todo(pp): split into seperate draw_scale shader and draw_taylor_green shader 
+// latter could be selectable in Display Parameter
+
 layout( location = 0 ) in   vec3 vs_tex_coord;  // input from vertex shader
 layout( location = 0 ) out  vec4 fs_color;      // output from fragment shader
 
@@ -31,9 +34,9 @@ layout( std140, binding = 6 ) uniform Display_UBO {
 
 
 
-// Blue : 0.0 - 0.25 - 0.5
-// Green: 0.0 - 0.25 -  -  - 0.75 - 1.0
-// Red  :                    0.5  - 0.75 - 1.0
+// R: 0 0 0 0 1 1
+// G: 0 0 1 1 1 0
+// B: 0 1 1 0 0 0
 
 const vec3[] ramp = {
     vec3( 0, 0, 0 ),
@@ -44,71 +47,22 @@ const vec3[] ramp = {
     vec3( 1, 0, 0 )
 };
 
-/*
-float ramp( float start, float end, float t ) {
-    return clamp( 0, 1, ( t - start ) / ( end - start ));
-}
-*/
-float triangle( float start, float mid, float end, float t ) {
-    return clamp( 0, 1, ( t - start ) / ( mid - start )) - clamp( 0, 1, ( t - mid ) / ( end - mid ));
-}
 
-float hermite( float start, float mid, float end, float t ) {
-    return smoothstep( start, mid, t ) - smoothstep( mid, end, t );
-}
-
-float box( float start, float end, float t ) {
-    return step( start, t ) - step( end, t );
-}
-
-float smoothbox( float start, float end, float s, float t ) {
-    return smoothstep( start - s, start + s, t ) - smoothstep( end - s, end + s, t );
-}
-
-
-/*
-//vec3 colorRamp( float t ) {
-//    return vec3(
-//        ramp( 0.5, 1, t ),
-//        triangle( 0.25, 0.50, 0.75, t ),
-//        triangle( 0.00, 0.25, 0.50, t ));
-//}
-
-
-
-// R: 0 0 0 0 1 1
-// G: 0 0 1 1 1 0
-// B: 0 1 1 0 0 0
-vec3 colorRamp( float t ) {
-    return vec3(
-        ramp(                                   0.6, 0.8, t ),
-        ramp(      0.2,             0.4, t ) - ramp( 0.8, 1.0, t ),
-        ramp( 0.0, 0.2, t ) - ramp( 0.4,        0.6, t )
-    );
-}
-
-/*/
 
 vec3 colorRamp( float t ) {
-//*
     t *= ( ramp.length() - 1 );
     ivec2 i = ivec2( floor( min( vec2( t, t + 1 ), vec2( ramp.length() - 1 ))));
     float f = fract( t );
     return mix( ramp[ i.x ], ramp[ i.y], f );
-/*/
-    return 5 * vec3(
-        clamp( t,                                0.6,      0.8 )      - 0.6,
-        clamp( t,      0.2,              0.4 ) - clamp( t, 0.8, 1.0 ) + 0.6,
-        clamp( t, 0.0, 0.2 ) - clamp( t, 0.4,    0.6 )                + 0.4
-    );
-//*/
 }
-//*/
+
+
 #define PI 3.1415926535897932384626433832795
 #define u_max wall_velocity
 #define t comp_index
 #define rho0 1
 #define D textureSize( vel_rho_tex[0], 0 )
+
 
 void main() {
 
@@ -199,9 +153,4 @@ void main() {
             } break;
         }
     }
-
-
-
-    //fs_color = texture( vel_rho_tex[1], vec3( vs_tex_coord.xy, 0 ));
-    //fs_color.x = z_layer / 24.0;
 }
