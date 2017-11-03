@@ -2242,10 +2242,16 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     // set push constants and record draw commands for axis drawing
     //
+    bool line_width_recorded = false;
     if( vg.sim_draw_axis ) {
         bindPipeline( vg.draw_line_pso[ 0 ] );
         vg.sim_display.line_type = vg.Line_Type.axis;
-        cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
+
+        if( vg.vd.feature_wide_lines ) {
+            cmd_buffer.vkCmdSetLineWidth( 1 );
+            line_width_recorded = true;
+        }
+        cmd_buffer.vkCmdPushConstants( vg.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
         cmd_buffer.vkCmdDraw( 2, 3, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
 
@@ -2255,6 +2261,10 @@ void drawGuiData( ImDrawData* draw_data ) {
     if( vg.sim_draw_grid ) {
         bindPipeline( vg.draw_line_pso[ 0 ] );
         vg.sim_display.line_type = vg.Line_Type.grid;
+
+        if( vg.vd.feature_wide_lines && !line_width_recorded ) {
+            cmd_buffer.vkCmdSetLineWidth( 1 );
+        }
 
         // draw lines repeating in X direction
         vg.sim_display.line_axis = vg.Line_Axis.X;
