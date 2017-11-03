@@ -2536,49 +2536,53 @@ private void setClipboardString( void* user_data, const( char )* text ) {
 
 
 extern( C ) nothrow:
-void guiMouseButtonCallback( GLFWwindow* window, int button, int val, int mod ) {
-    if( val == GLFW_PRESS && button >= 0 && button < 3 )
-        g_MousePressed[ button ] = true;
 
+/// Callback function for capturing mouse button events
+void guiMouseButtonCallback( GLFWwindow* window, int button, int val, int mod ) {
     auto io = & ImGui.GetIO();
-    if( !io.WantCaptureMouse ) {
+    auto vg = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData
+
+    if( io.WantCaptureMouse ) {
+        if( val == GLFW_PRESS && button >= 0 && button < 3 ) {
+            vg.mouse_pressed[ button ] = true;
+        }
+    } else {
         // forward to input.mouseButtonCallback
         import input : mouseButtonCallback;
         mouseButtonCallback( window, button, val, mod );
     }
 }
 
-
+/// Callback function for capturing mouse scroll wheel events
 void guiScrollCallback( GLFWwindow* window, double xoffset, double yoffset ) {
-    g_MouseWheel += cast( float )yoffset; // Use fractional mouse wheel, 1.0 unit 5 lines.
     auto io = & ImGui.GetIO();
-    if( !io.WantCaptureMouse ) {
+    auto vg = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData
+
+    if( io.WantCaptureMouse ) {
+        vg.mouse_wheel += cast( float )yoffset;     // Use fractional mouse wheel, 1.0 unit 5 lines.
+    } else {
         // forward to input.scrollCallback
         import input : scrollCallback;
         scrollCallback( window, xoffset, yoffset );
     }
 }
 
-
+/// Callback function for capturing character input events
 void guiCharCallback( GLFWwindow*, uint c ) {
     auto io = & ImGui.GetIO();
-    if( c > 0 && c < 0x10000 )
+    if( c > 0 && c < 0x10000 ) {
         io.AddInputCharacter( cast( ImWchar )c );
+    }
 }
 
-
+/// Callback function for capturing keyboard events
 void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod ) {
     auto io = & ImGui.GetIO();
     io.KeysDown[ key ] = val > 0;
 
-    // interpret KP Enter as Ky Enter
+    // interpret KP Enter as Key Enter
     if( key == GLFW_KEY_KP_ENTER )
         io.KeysDown[ GLFW_KEY_ENTER ] = val > 0;
-
-    //if( action == GLFW_PRESS )
-        //io.KeysDown[ key ] = true;
-    //if( action == GLFW_RELEASE )
-        //io.KeysDown[ key ] = false;
 
     //( void )mods; // Modifiers are not reliable across systems
     io.KeyCtrl  = io.KeysDown[ GLFW_KEY_LEFT_CONTROL    ] || io.KeysDown[ GLFW_KEY_RIGHT_CONTROL    ];
@@ -2602,7 +2606,6 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
     } else
 
     // turn gui on or off with tab key
-    // Todo(pp): this should work only if not in text edit mode
     switch( key ) {
         case GLFW_KEY_F1 :
         vg.draw_gui ^= 1 ;
@@ -2617,7 +2620,7 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
     }
 }
 
-/// Callback Function for capturing window resize events
+/// Callback function for capturing window resize events
 void guiWindowSizeCallback( GLFWwindow * window, int w, int h ) {
     auto io = & ImGui.GetIO();
     auto vg = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData
