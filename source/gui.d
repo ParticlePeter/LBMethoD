@@ -15,6 +15,7 @@ import appstate;
 import cpustate;
 import exportstate;
 import resources;
+import visualize;
 
 
 
