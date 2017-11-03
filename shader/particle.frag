@@ -1,8 +1,9 @@
 #version 450
 
-layout( location = 0 ) out  vec4 fs_color;      // output from fragment shader
+layout( location = 0 ) in   float   vs_alpha;      // input from vertex shader
+layout( location = 0 ) out  vec4    fs_color;      // output from fragment shader
 
 
 void main() {
-    fs_color = vec4( 1, 0.5, 0, 1 );
+	fs_color = vec4( 1, 0.5, 0, vs_alpha );
 }

@@ -11,8 +11,6 @@ import dlsl.matrix;
 public import compute;
 
 
-enum PARTICLE = false;
-
 
 ////////////////////////////////////////////////////////////////////////
 // create vulkan related command and synchronization objects and data //
@@ -254,8 +252,7 @@ void createSimMemoryObjects( ref VDrive_State vd ) {
 
     vd.createSimBuffer;
     vd.createSimImage;
-    if( PARTICLE )
-        vd.createParticleBuffer;
+    vd.createParticleBuffer;
 
 }
 
@@ -324,15 +321,16 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         .addLayoutBinding( 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT )
         .addBufferInfo( vd.display_ubo_buffer.buffer )
 
+        // Particle Buffer 
+        .addLayoutBinding( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
+        .addTexelBufferView( vd.sim_particle_buffer_view )
+
         // Export Buffer views, these will be set and written when export is activated
         .addLayoutBinding( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 2 );
         //.addTexelBufferView( vd.export_buffer_view[0] );
         //.addTexelBufferView( vd.export_buffer_view[1] );
 
-    if( PARTICLE )  // Particles Buffer, not used yet
-        ( *meta_descriptor_ptr )
-            .addLayoutBinding( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
-            .addTexelBufferView( vd.sim_particle_buffer_view );
+
 
     // The app crashes here in construct sometimes, and it is not clear why
     // In Debug mode we see that some undefined exception is thrown, which cannot be caught here
@@ -353,16 +351,14 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         .addBindingUpdate( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE )
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
 
-        .addBindingUpdate/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ) // immutable does not filter properly, either driver bug or module descriptor bug
+        .addBindingUpdate/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ) // immutable does not filter properly, module descriptor bug
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.sim_image.sampler )
         .addImageInfo( vd.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, vd.nearest_sampler )
 
-        .attachSet( vd.descriptor.descriptor_set );
+        .addBindingUpdate( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
+        .addTexelBufferView( vd.sim_particle_buffer_view )
 
-    if( PARTICLE )  // Particles Buffer, not used yet
-        vd.sim_descriptor_update
-            .addBindingUpdate( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
-            .addTexelBufferView( vd.sim_particle_buffer_view );
+        .attachSet( vd.descriptor.descriptor_set );
 
     // this one is solely for export data purpose to be absolute lazy about resource construction
     // which is only necessary if we export at all, and then just before the export
@@ -389,10 +385,7 @@ void updateDescriptorSet( ref VDrive_State vd ) {
     vd.sim_descriptor_update.image_infos[0].imageView = vd.sim_image.image_view;        // image view for writing from compute shader
     vd.sim_descriptor_update.image_infos[1].imageView = vd.sim_image.image_view;        // image view for reading in display fragment shader with linear  sampling
     vd.sim_descriptor_update.image_infos[2].imageView = vd.sim_image.image_view;        // image view for reading in display fragment shader with nearest sampling
-
-    if( PARTICLE )  // Particles Buffer, not used yet
-        vd.sim_descriptor_update.texel_buffer_views[1]= vd.sim_particle_buffer_view;    // particles to visualize LBM velocity
-
+    vd.sim_descriptor_update.texel_buffer_views[1] = vd.sim_particle_buffer_view;       // particles to visualize LBM velocity
     vd.sim_descriptor_update.update;
 
     // Note(pp):
@@ -511,8 +504,7 @@ void createRenderResources( ref VDrive_State vd ) {
 
     // create all resources for the compute pipeline
     vd.createComputeResources;
-    if( PARTICLE )      // Particles are not used yet
-        vd.createParticleResources;
+    vd.createParticleResources;
 }
 
 
@@ -693,6 +685,13 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
             cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
 
+        // bind particle pipeline and draw
+        if( vd.sim_draw_particles ) {
+            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.draw_part_pso.pipeline );
+            cmd_buffer.vkCmdPushConstants( vd.draw_part_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vd.sim_domain.sizeof, vd.sim_domain.ptr );
+            cmd_buffer.vkCmdDraw( vd.sim_particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        }
+
         // end the render pass
         cmd_buffer.vkCmdEndRenderPass;
 
@@ -719,7 +718,6 @@ void destroyResources( ref VDrive_State vd ) {
 
     vd.device.vkDeviceWaitIdle;
 
-    if( PARTICLE )
     vd.destroyVisualizeResources;
 
     // surface, swapchain and present image views

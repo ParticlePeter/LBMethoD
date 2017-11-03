@@ -691,9 +691,15 @@ struct VDrive_Gui_State {
 
                     // only if the sim domain changed we must ...
                     if( vd.sim_domain != sim_domain ) {
-                        // recreate sim image, update trackball and sim_display push constant data
+                        // recreate sim image and sim_display push constant data
                         vd.sim_domain = sim_display.sim_domain = sim_domain;
                         vd.createSimImage;
+                        
+                        // recreate sim particle buffer
+                        vd.sim_particle_count = sim_domain[0] * sim_domain[1] * sim_domain[2];
+                        vd.createParticleBuffer;
+
+                        // update trackball
                         import input : initTrackball;
                         vd.initTrackball;
                     }
@@ -2480,6 +2486,15 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
+    //
+    // bind particle pipeline and draw
+    //
+    if( vg.sim_draw_particles ) {
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_part_pso.pipeline );
+        cmd_buffer.vkCmdPushConstants( vg.draw_part_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.vd.sim_domain.sizeof, vg.vd.sim_domain.ptr );
+        cmd_buffer.vkCmdDraw( vg.sim_particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+    }
+    
 
 
     VkDeviceSize vertex_offset;
@@ -2542,13 +2557,6 @@ void drawGuiData( ImDrawData* draw_data ) {
 
     // end the render pass
     cmd_buffer.vkCmdEndRenderPass;
-
-    /*
-    // bind comp particle pipeline
-    cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vg.comp_part_pso.pipeline );
-    cmd_buffer.vkCmdPushConstants( vg.comp_part_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 2 * float.sizeof, vg.sim_display.scale.ptr );
-    cmd_buffer.vkCmdDispatch( 16, 1, 1 );   // dispatch compute command
-    */
 
     // finish recording
     cmd_buffer.vkEndCommandBuffer;
