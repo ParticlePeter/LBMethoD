@@ -812,8 +812,23 @@ struct VDrive_Gui_State {
             // preset settings context menu
             if( ImGui.BeginPopupContextItem( "Simulation Parameter Context Menu" )) {
                 if( ImGui.Selectable( "Unit Parameter" )) {
-                    sim_wall_velocity = 0.1; updateWallVelocity;
-                    compute_ubo.collision_frequency = sim_relaxation_rate = 1; updateViscosity;
+                    sim_wall_velocity = 0.1;
+                    updateWallVelocity;
+                    compute_ubo.collision_frequency = sim_relaxation_rate = 1;
+                    updateViscosity;
+                    updateComputeUBO;
+                }
+                if( ImGui.Selectable( "Low Viscosity" )) {
+                    sim_wall_velocity = 0.005;
+                    updateWallVelocity;
+                    sim_relaxation_rate = 0.504;
+                    compute_ubo.collision_frequency = 1 / sim_relaxation_rate;
+                    updateViscosity;
+                    updateComputeUBO;
+                    if( sim_algorithm != 4 ) {
+                        sim_algorithm  = 4;
+                        vd.createBoltzmannPSO( false, true, false );
+                    }
                 }
                 if( ImGui.Selectable( "Looow Viscosity" )) {
                     sim_wall_velocity = 0.001;
@@ -821,16 +836,19 @@ struct VDrive_Gui_State {
                     sim_relaxation_rate = 0.5001;
                     compute_ubo.collision_frequency = 1 / sim_relaxation_rate;
                     updateViscosity;
+                    updateComputeUBO;
                     if( sim_algorithm != 4 ) {
                         sim_algorithm  = 4;
                         vd.createBoltzmannPSO( false, true, false );
                     }
                 }
                 if( ImGui.Selectable( "Crazy Cascades" )) {
-                    sim_wall_velocity = 0.5; updateWallVelocity;
+                    sim_wall_velocity = 0.5;
+                    updateWallVelocity;
                     compute_ubo.collision_frequency = 0.8;
                     sim_relaxation_rate = 1.25;
                     updateViscosity;
+                    updateComputeUBO;
                     if( sim_algorithm != 4 ) {
                         sim_algorithm  = 4;
                         vd.createBoltzmannPSO( false, true, false );
@@ -876,11 +894,13 @@ struct VDrive_Gui_State {
                 if( ImGui.DragFloat2( "Spatial/Temporal Unit", & sim_unit_spatial, 0.001f )) {  // next value in struct is sim_unit_temporal
                     sim_speed_of_sound = sim_unit_speed_of_sound * sim_unit_spatial / sim_unit_temporal;
                     updateTauOmega;
+                    updateComputeUBO;
                 }
 
                 // kinematic viscosity
                 if( ImGui.DragFloat( "Kinematic Viscosity", & sim_viscosity, 0.001f, 0.0f, 1000.0f, "%.9f", 2.0f )) {
                     updateTauOmega;
+                    updateComputeUBO;
                 }
 
                 // Collision Frequency Omega
@@ -937,6 +957,7 @@ struct VDrive_Gui_State {
                 if( ImGui.DragFloat( "Re", & re, 0.001f )) {
                     sim_viscosity = sim_typical_vel * sim_typical_length / re;
                     updateTauOmega;
+                    updateComputeUBO;
                 }
 
                 ImGui.PopItemWidth;
@@ -1224,6 +1245,7 @@ struct VDrive_Gui_State {
                     immutable float[7] re = [ 100, 400, 1000, 3200, 5000, 7500, 10000 ];
                     sim_viscosity = sim_wall_velocity * sim_typical_length / re[ sim_ghia_type ];  // typical_vel * sim_typical_length
                     updateTauOmega;
+                    updateComputeUBO;
                 }
 
                 ImGui.PopItemWidth;
@@ -1484,7 +1506,6 @@ struct VDrive_Gui_State {
         //sim_relaxation_rate = 1 / compute_ubo.collision_frequency;
         sim_relaxation_rate = 3 * sim_viscosity + 0.5;
         compute_ubo.collision_frequency = 1 / sim_relaxation_rate;
-        updateComputeUBO;
     }
 
     void updateWallVelocity() {
