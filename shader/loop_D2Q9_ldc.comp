@@ -38,7 +38,7 @@ layout( constant_id = 3 ) const uint ALGORITHM = 0;
 layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
 
 // velocity and density write target, will be rendered as texture in next pass
-layout( binding = 3, rgba32f ) uniform restrict writeonly image2DArray vel_rho_img;
+layout( binding = 3, rgba32f ) uniform restrict /*writeonly*/ image2DArray vel_rho_img;
 
 
 // population indexes
@@ -214,9 +214,20 @@ void main( void ) {
 
     // store properties in image
     if(( ALGORITHM >> 8 ) > 1 ) {
+        /*
+        // this variant is omitting data calculated in between display frames 
         if(( ALGORITHM >> 8 ) == pc.ping + 1 ) {
             imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vel, 0, rho ));
         }
+        /*/
+        // this variant is accumulating data calculated in between display frames
+        if( pc.ping == 0 ) {
+            imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vel, 0, rho ));
+        } else {
+            vec2 old_vel = imageLoad( vel_rho_img, ivec3( X, Y, Z )).xy;
+            imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( old_vel + vel, 0, rho ));
+        }
+        //*/
     } else {
         imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( vel, 0, rho ));
     }
