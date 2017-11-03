@@ -835,8 +835,8 @@ struct VDrive_Gui_State {
                     compute_ubo.collision_frequency = 1 / sim_relaxation_rate;
                     updateViscosity;
                     updateComputeUBO;
-                    if( sim_algorithm != 4 ) {
-                        sim_algorithm  = 4;
+                    if( sim_collision != Collision.CSC_DRAG ) {
+                        sim_collision  = Collision.CSC_DRAG;
                         vd.createBoltzmannPSO( false, true, false );
                     }
                 }
@@ -848,8 +848,8 @@ struct VDrive_Gui_State {
                     compute_ubo.collision_frequency = 1 / sim_relaxation_rate;
                     updateViscosity;
                     updateComputeUBO;
-                    if( sim_algorithm != 4 ) {
-                        sim_algorithm  = 4;
+                    if( sim_collision != Collision.CSC_DRAG ) {
+                        sim_collision  = Collision.CSC_DRAG;
                         vd.createBoltzmannPSO( false, true, false );
                     }
                 }
@@ -861,8 +861,8 @@ struct VDrive_Gui_State {
                     sim_relaxation_rate = 1.25;
                     updateViscosity;
                     updateComputeUBO;
-                    if( sim_algorithm != 4 ) {
-                        sim_algorithm  = 4;
+                    if( sim_collision != Collision.CSC_DRAG ) {
+                        sim_collision  = Collision.CSC_DRAG;
                         vd.createBoltzmannPSO( false, true, false );
                     }
                     // set resolution to 1024 * 1024
@@ -893,7 +893,7 @@ struct VDrive_Gui_State {
             }
 
             // collision algorithm
-            if( ImGui.Combo( "Collision Algorithm", cast( int* )( & sim_algorithm ), "SRT-LBGK\0TRT\0MRT\0Cascaded\0Cascaded Drag\0\0" )) {
+            if( ImGui.Combo( "Collision Algorithm", cast( int* )( & sim_collision ), "SRT-LBGK\0TRT\0MRT\0Cascaded\0Cascaded Drag\0\0" )) {
                 vd.createBoltzmannPSO( false, true, false );
             }
 

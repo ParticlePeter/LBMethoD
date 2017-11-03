@@ -63,10 +63,10 @@ private void createBoltzmannPSO( ref VDrive_State vd, ref Core_Pipeline pso, str
     // create meta_Specialization struct to specify shader local work group size and algorithm
     Meta_SC!( 4 ) meta_sc;
     meta_sc
-        .addMapEntry( MapEntry32(  vd.sim_work_group_size[0] ))                     // default constantID is 0, next would be 1
-        .addMapEntry( MapEntry32(  vd.sim_work_group_size[1] ))                     // default constantID is 1, next would be 2
-        .addMapEntry( MapEntry32(  vd.sim_work_group_size[2] ))                     // default constantID is 2, next would be 3
-        .addMapEntry( MapEntry32(( vd.sim_step_size << 8 ) + vd.sim_algorithm ))    // upper 24 bits is the step_size, lower 8 bits the algorithm
+        .addMapEntry( MapEntry32(  vd.sim_work_group_size[0] ))                                     // default constantID is 0, next would be 1
+        .addMapEntry( MapEntry32(  vd.sim_work_group_size[1] ))                                     // default constantID is 1, next would be 2
+        .addMapEntry( MapEntry32(  vd.sim_work_group_size[2] ))                                     // default constantID is 2, next would be 3
+        .addMapEntry( MapEntry32(( vd.sim_step_size << 8 ) + cast( uint32_t )vd.sim_collision ))    // upper 24 bits is the step_size, lower 8 bits the algorithm
         .construct;
 
     vd.graphics_queue.vkQueueWaitIdle;          // wait for queue idle as we need to destroy the pipeline

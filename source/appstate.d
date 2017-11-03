@@ -8,6 +8,7 @@ import input;
 
 
 enum Transport : uint32_t { pause, play, step, profile };
+enum Collision : uint32_t { SRT, TRT, MRT, CSC, CSC_DRAG };
 
 
 struct VDrive_State {
@@ -152,7 +153,7 @@ struct VDrive_State {
     float           sim_speed_of_sound      = sim_unit_speed_of_sound;
     float           sim_unit_spatial        = 1;
     float           sim_unit_temporal       = 1;
-    uint32_t        sim_algorithm           = 4; // Cascaded Drag //0;
+    Collision       sim_collision           = Collision.CSC_DRAG;
     uint32_t        sim_index               = 0;
 
     struct Display_UBO {
