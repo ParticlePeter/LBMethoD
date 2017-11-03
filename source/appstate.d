@@ -7,7 +7,7 @@ import input;
 
 
 
-enum Transport { pause, play, step, profile };
+enum Transport : uint32_t { pause, play, step, profile };
 
 
 struct VDrive_State {
@@ -166,7 +166,7 @@ struct VDrive_State {
 
 
     // profile data
-    uint32_t        sim_profile_step_size = 1;
+    uint32_t        sim_profile_step_size  = 1;
     uint32_t        sim_profile_step_count = 1000;
     uint32_t        sim_profile_step_index;
 
@@ -215,7 +215,7 @@ struct VDrive_State {
 
 
 
-    // new mwmbers
+    // new members
     // count of command buffers to be drawn when in play mode
     uint32_t    sim_play_cmd_buffer_count;
     Transport   transport = Transport.pause;
