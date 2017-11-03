@@ -816,6 +816,7 @@ struct VDrive_Gui_State {
                 if( ImGui.Selectable( "Unit Parameter" )) {
                     sim_wall_velocity = 0.1;
                     updateWallVelocity;
+                    compute_ubo.wall_thickness = 1;
                     compute_ubo.collision_frequency = sim_relaxation_rate = 1;
                     updateViscosity;
                     updateComputeUBO;
@@ -823,6 +824,7 @@ struct VDrive_Gui_State {
                 if( ImGui.Selectable( "Low Viscosity" )) {
                     sim_wall_velocity = 0.005;
                     updateWallVelocity;
+                    compute_ubo.wall_thickness = 3;
                     sim_relaxation_rate = 0.504;
                     compute_ubo.collision_frequency = 1 / sim_relaxation_rate;
                     updateViscosity;
@@ -835,6 +837,7 @@ struct VDrive_Gui_State {
                 if( ImGui.Selectable( "Looow Viscosity" )) {
                     sim_wall_velocity = 0.001;
                     updateWallVelocity;
+                    compute_ubo.wall_thickness = 3;
                     sim_relaxation_rate = 0.5001;
                     compute_ubo.collision_frequency = 1 / sim_relaxation_rate;
                     updateViscosity;
@@ -847,6 +850,7 @@ struct VDrive_Gui_State {
                 if( ImGui.Selectable( "Crazy Cascades" )) {
                     sim_wall_velocity = 0.5;
                     updateWallVelocity;
+                    compute_ubo.wall_thickness = 3;
                     compute_ubo.collision_frequency = 0.8;
                     sim_relaxation_rate = 1.25;
                     updateViscosity;
@@ -872,6 +876,13 @@ struct VDrive_Gui_State {
             // wall velocity
             if( ImGui.DragFloat( "Wall Velocity", & sim_wall_velocity, 0.001f )) {
                 updateWallVelocity;
+                updateComputeUBO;
+            }
+
+            // wall thickness
+            int wall_thickness = compute_ubo.wall_thickness;
+            if( ImGui.DragInt( "Wall Thickness", & wall_thickness, 0.1f, 1, 255 )) {
+                compute_ubo.wall_thickness = wall_thickness < 1 ? 1 : wall_thickness > 255 ? 255 : wall_thickness;
                 updateComputeUBO;
             }
 
@@ -1243,6 +1254,7 @@ struct VDrive_Gui_State {
                         sim_typical_length = 127;
                         sim_typical_vel = sim_wall_velocity  = 0.1;
                         updateWallVelocity;
+                        compute_ubo.wall_thickness = 1;
 
                         immutable float[7] re = [ 100, 400, 1000, 3200, 5000, 7500, 10000 ];
                         sim_viscosity = sim_wall_velocity * sim_typical_length / re[ sim_ghia_type ];  // typical_vel * sim_typical_length

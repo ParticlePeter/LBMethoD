@@ -143,6 +143,7 @@ struct VDrive_State {
     struct Compute_UBO {
         float       collision_frequency     = 1;    // sim param omega
         float       wall_velocity           = 0;    // sim param for lid driven cavity
+        uint32_t    wall_thickness          = 1;
         uint32_t    comp_index              = 0;
     }
 

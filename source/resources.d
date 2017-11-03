@@ -133,6 +133,7 @@ void createMemoryObjects( ref VDrive_State vd ) {
     //vd.compute_ubo.wall_velocity = 0.1 * 3; //0.25 * 3;// / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
     vd.compute_ubo.collision_frequency = 1 / 0.504;
     vd.compute_ubo.wall_velocity    = 0.005 * 3; //0.25 * 3;// / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
+    vd.compute_ubo.wall_thickness   = 3;
     vd.compute_ubo.comp_index = 0;
     vd.updateComputeUBO;
 
