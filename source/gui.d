@@ -35,6 +35,7 @@ struct VDrive_Gui_State {
 
     // gui resources
     Core_Pipeline       gui_graphics_pso;
+    Core_Pipeline       current_pso;        // with this we keep track which pso is active to avoid rebinding of the
     Meta_Image          gui_font_tex;
 
     alias                               GUI_QUEUED_FRAMES = vd.MAX_FRAMES;
@@ -2182,16 +2183,20 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
-
-
     // take care of dynamic state
     cmd_buffer.vkCmdSetViewport( 0, 1, &vg.viewport );
     cmd_buffer.vkCmdSetScissor(  0, 1, &vg.scissors );
 
-    // bind descriptor set
+
+
+
+    // set lbmd graphics pso as current pso, use its pipeline layout to bind the descriptor set
+    vg.current_pso = vg.graphics_pso;
+
+    // bind descriptor set - we do not have to rebind this for other pipelines as long as the pipeline layouts are compatible
     cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
         VK_PIPELINE_BIND_POINT_GRAPHICS,    // VkPipelineBindPoint          pipelineBindPoint
-        vg.graphics_pso.pipeline_layout,    // VkPipelineLayout             layout
+        vg.current_pso.pipeline_layout,     // VkPipelineLayout             layout
         0,                                  // uint32_t                     firstSet
         1,                                  // uint32_t                     descriptorSetCount
         &vg.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
@@ -2219,17 +2224,26 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
-    //
-    // bind lines pipeline
-    //
-    if( vg.sim_draw_lines )
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ 0 ].pipeline );
+    
+    // bind pipeline helper, to avoid rebinding the same pipeline
+    void bindPipeline( ref Core_Pipeline pso ) {
+        if( vg.current_pso != pso ) {
+            vg.current_pso  = pso;
+            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.current_pso.pipeline );
+        }
+    }
+
+
+
+    //if( vg.sim_draw_lines )
+    //    cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.current_pso.pipeline );
 
 
     //
     // set push constants and record draw commands for axis drawing
     //
     if( vg.sim_draw_axis ) {
+        bindPipeline( vg.draw_line_pso[ 0 ] );
         vg.sim_display.line_type = vg.Line_Type.axis;
         cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
         cmd_buffer.vkCmdDraw( 2, 3, 0, 0 ); // vertex count, instance count, first vertex, first instance
@@ -2239,19 +2253,23 @@ void drawGuiData( ImDrawData* draw_data ) {
     // set push constants and record draw commands for grid drawing
     //
     if( vg.sim_draw_grid ) {
+        bindPipeline( vg.draw_line_pso[ 0 ] );
         vg.sim_display.line_type = vg.Line_Type.grid;
 
         // draw lines repeating in X direction
         vg.sim_display.line_axis = vg.Line_Axis.X;
-        cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * uint32_t.sizeof, & vg.sim_display );
+        cmd_buffer.vkCmdPushConstants( vg.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * uint32_t.sizeof, & vg.sim_display );
         cmd_buffer.vkCmdDraw( 2, vg.sim_domain[0] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
         // draw lines repeating in Y direction
         vg.sim_display.line_axis = vg.Line_Axis.Y;
-        cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ 0 ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
+        cmd_buffer.vkCmdPushConstants( vg.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, vg.sim_display.line_type.offsetof, uint32_t.sizeof, & vg.sim_display.line_type );
         cmd_buffer.vkCmdDraw( 2, vg.sim_domain[1] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
 
+
+
+    // set point size or line width dependent on the corresponding features exist and weather line or point drawing is active
     void setPointSizeLineWidth( size_t index ) {
         if( vg.draw_velocity_lines_as_points ) {
             if( vg.vd.feature_large_points ) {
@@ -2265,19 +2283,22 @@ void drawGuiData( ImDrawData* draw_data ) {
     }
 
 
+
     //
     // draw ghia validation profiles
     //
+    import vdrive.util.util : toUint;
     if( vg.sim_validate_ghia ) {
 
+        //
         // setup pipeline, either lines or points drawing
-        uint draw_as_points = vg.draw_velocity_lines_as_points ? 1 : 0;
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ draw_as_points ].pipeline );
-        auto pipeline_layout = vg.draw_line_pso[ draw_as_points ].pipeline_layout;
+        //
+        bindPipeline( vg.draw_line_pso[ vg.draw_velocity_lines_as_points.toUint ] );
+        auto pipeline_layout = vg.current_pso.pipeline_layout;
 
 
         //
-        // store UI Values
+        // tempory store UI Values
         //
         int          repl_count     = vg.sim_display.repl_count;
         vg.Line_Axis line_axis      = vg.sim_display.line_axis;
@@ -2348,14 +2369,13 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
         //
-        // reconstruct UI values
+        // restore UI values
         //
         vg.sim_display.repl_count       = repl_count;
         vg.sim_display.line_axis        = line_axis;
         vg.sim_display.repl_axis        = repl_axis;
         vg.sim_display.velocity_axis    = velocity_axis;
         vg.sim_display.line_offset      = line_offset;
-
     }
 
 
@@ -2366,9 +2386,8 @@ void drawGuiData( ImDrawData* draw_data ) {
     if( vg.sim_validate_poiseuille_flow ) {
 
         // setup pipeline, either lines or points drawing
-        uint draw_as_points = vg.draw_velocity_lines_as_points ? 1 : 0;
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ draw_as_points ].pipeline );
-        auto pipeline_layout = vg.draw_line_pso[ draw_as_points ].pipeline_layout;
+        bindPipeline( vg.draw_line_pso[ vg.draw_velocity_lines_as_points.toUint ] );
+        auto pipeline_layout = vg.current_pso.pipeline_layout;
 
         // push constant the whole sim_display struct and draw
         setPointSizeLineWidth( 0 );
@@ -2376,8 +2395,8 @@ void drawGuiData( ImDrawData* draw_data ) {
         cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
         cmd_buffer.vkCmdDraw(
             vg.vd.sim_domain[ vg.sim_display.line_axis ], vg.sim_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
-
     }
+
 
 
     //
@@ -2386,9 +2405,8 @@ void drawGuiData( ImDrawData* draw_data ) {
     if( vg.sim_display.repl_count ) {
 
         // setup pipeline, either lines or points drawing
-        uint draw_as_points = vg.draw_velocity_lines_as_points ? 1 : 0;
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_line_pso[ draw_as_points ].pipeline );
-        auto pipeline_layout = vg.draw_line_pso[ draw_as_points ].pipeline_layout;
+        bindPipeline( vg.draw_line_pso[ vg.draw_velocity_lines_as_points.toUint ] );
+        auto pipeline_layout = vg.current_pso.pipeline_layout;
 
         if( vg.sim_draw_vel_base ) {
             // push constant the whole sim_display struct
@@ -2418,7 +2436,6 @@ void drawGuiData( ImDrawData* draw_data ) {
             cmd_buffer.vkCmdDraw( vg.vd.sim_domain[0] + 1, vg.sim_display.line_count[1], 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
         */
-
     }
 
 
@@ -2444,7 +2461,7 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
-    // bind gui pipeline
+    // bind gui pipeline - we know that this is the last activated pipeline, so we don't need to use bindPipeline any more and bind it directly
     cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.gui_graphics_pso.pipeline );
 
     // bind vertex and index buffer
