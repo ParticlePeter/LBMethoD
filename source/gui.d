@@ -2467,21 +2467,7 @@ void drawGuiData( ImDrawData* draw_data ) {
         setPointSizeLineWidth( 1 );
         vg.sim_display.line_type = vg.Line_Type.velocity;
         cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
-        cmd_buffer.vkCmdDraw(
-            vg.vd.sim_domain[ vg.sim_display.line_axis ], vg.sim_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
-
-        /*
-        if( vg.sim_display.line_count[0] > 0 ) // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
-            // the X lines run from top to bottom and repeat in X direction, hence their vertex count is the Y sim_domain
-            cmd_buffer.vkCmdDraw( vg.vd.sim_domain[1] + 1, vg.sim_display.line_count[0], 0, 0 ); // vertex count, instance count, first vertex, first instance
-
-        if( vg.sim_display.line_count[1] > 0 ) {
-            vg.sim_display.line_axis = 1;
-            // the Y lines run from left to right and repeat in Y direction, hence their vertex count is the X sim_domain
-            cmd_buffer.vkCmdPushConstants( vg.draw_line_pso[ vg.vg.Line_Type.velocity ].pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.sim_display.sizeof, & vg.sim_display );
-            cmd_buffer.vkCmdDraw( vg.vd.sim_domain[0] + 1, vg.sim_display.line_count[1], 0, 0 ); // vertex count, instance count, first vertex, first instance
-        }
-        */
+        cmd_buffer.vkCmdDraw( vg.vd.sim_domain[ vg.sim_display.line_axis ], vg.sim_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
 
 
@@ -2497,29 +2483,13 @@ void drawGuiData( ImDrawData* draw_data ) {
     
 
 
-    VkDeviceSize vertex_offset;
-    /*    // bind draw particle pipeline
-    cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_part_pso.pipeline );
-    cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer           // bind descriptor set
-        VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
-        vg.draw_part_pso.pipeline_layout,   // VkPipelineLayout             layout
-        0,                                  // uint32_t                     firstSet
-        1,                                  // uint32_t                     descriptorSetCount
-        &vg.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
-        0,                                  // uint32_t                     dynamicOffsetCount
-        null                                // const( uint32_t )*           pDynamicOffsets
-    );
-
-    cmd_buffer.vkCmdBindVertexBuffers( 0, 1, & vg.sim_particle_buffer.buffer, & vertex_offset );
-    cmd_buffer.vkCmdDraw( 2 * vg.vd.sim_particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
-    */
-
-
-
+    //
     // bind gui pipeline - we know that this is the last activated pipeline, so we don't need to use bindPipeline any more and bind it directly
+    //
     cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.gui_graphics_pso.pipeline );
 
     // bind vertex and index buffer
+    VkDeviceSize vertex_offset = 0;
     cmd_buffer.vkCmdBindVertexBuffers( 0, 1, & vg.gui_vtx_buffers[ vg.next_image_index ].buffer, & vertex_offset );
     cmd_buffer.vkCmdBindIndexBuffer( vg.gui_idx_buffers[ vg.next_image_index ].buffer, 0, VK_INDEX_TYPE_UINT16 );
 
