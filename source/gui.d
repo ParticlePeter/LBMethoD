@@ -1108,6 +1108,21 @@ struct VDrive_Gui_State {
                 // set width of items and their label - aligned visually with 8 pixels
                 ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
 
+                // little hacky, but works - as we know the corresponding clear value index
+                ImGui.ColorEdit3( "Clear Color", cast( float* )( & framebuffers.clear_values[ 1 ] ));
+                
+                ImGui.SetCursorPosX( 160 );
+                ImGui.Checkbox( "Draw Plane", & sim_draw_plane );
+                
+                ImGui.SetCursorPosX( 160 );
+                ImGui.Checkbox( "Draw Particles", & sim_draw_particles );
+                // parse particle draw shader through context menu
+                if( ImGui.BeginPopupContextItem( "Parricle Shader Context Menu" )) {
+                    if( ImGui.Selectable( "Parse Shader" )) {
+                        vd.createParticleDrawPSO;
+                    } ImGui.EndPopup();
+                }
+
                 ImGui.SetCursorPosX( 160 );
                 ImGui.Checkbox( "Draw Axis", & sim_draw_axis );
 
