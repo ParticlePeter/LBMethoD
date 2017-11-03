@@ -132,7 +132,7 @@ void createMemoryObjects( ref VDrive_State vd ) {
     //vd.compute_ubo.collision_frequency = 1; //1.25; //2;
     //vd.compute_ubo.wall_velocity = 0.1 * 3; //0.25 * 3;// / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
     vd.compute_ubo.collision_frequency = 1 / 0.504;
-    vd.compute_ubo.wall_velocity = 0.005 * 3; //0.25 * 3;// / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
+    vd.compute_ubo.wall_velocity    = 0.005 * 3; //0.25 * 3;// / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
     vd.compute_ubo.comp_index = 0;
     vd.updateComputeUBO;
 
@@ -428,7 +428,7 @@ void createGraphicsPSO( ref VDrive_State vd ) {
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
         .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )              // describe pipeline layout
-        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 16 )                  // specify push constant range
+        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 8 )                   // specify push constant range
         .renderPass( vd.render_pass.render_pass )                                   // describe compatible render pass
         .construct( vd.graphics_cache )                                             // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
@@ -719,7 +719,7 @@ void destroyResources( ref VDrive_State vd ) {
     vd.device.vkDeviceWaitIdle;
 
     if( PARTICLE )
-        vd.destroyParticles;
+    vd.destroyVisualizeResources;
 
     // surface, swapchain and present image views
     vd.swapchain.destroyResources;
@@ -747,10 +747,6 @@ void destroyResources( ref VDrive_State vd ) {
     vd.destroy( vd.graphics_pso );
     vd.destroy( vd.comp_init_pso );
     vd.destroy( vd.comp_loop_pso );
-
-    foreach( ref pso; vd.draw_line_pso )
-        if( pso.is_constructed )
-            vd.destroy( pso );
 
     vd.destroy( vd.graphics_cache );
     vd.destroy( vd.compute_cache );
