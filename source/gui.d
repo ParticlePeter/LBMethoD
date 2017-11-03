@@ -569,7 +569,10 @@ struct VDrive_Gui_State {
             //
             // Radio 2D or 3D
             //
+            
             int dimensions = sim_use_3_dim;
+            // 3D simulation not implemented correctly yet
+            /*
             if( ImGui.RadioButton( "2D", & dimensions, 0 )) {
                 sim_use_3_dim = false;
                 sim_domain[2] = 1;
@@ -584,7 +587,7 @@ struct VDrive_Gui_State {
             ImGui.SetCursorPosX( main_win_size.x * 0.5 + 8 );
             ImGui.Text( "Simulation Type" );
             ImGui.Separator;
-
+            */
 
             //
             // Grid Resolution
