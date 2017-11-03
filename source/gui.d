@@ -97,6 +97,7 @@ struct VDrive_Gui_State {
     float[2]    recip_window_size = [ 2.0f / 1600, 2.0f / 900 ];
     float[3]    point_size_line_width = [ 9, 3, 1 ];
     float       sim_typical_length;
+    float       sim_typical_vel;
 
     // count of command buffers to be drawn when in play mode
     //uint32_t    sim_play_cmd_buffer_count;
@@ -269,6 +270,7 @@ struct VDrive_Gui_State {
         // initialize VDrive_Gui_State member from VDrive_State member
         sim_domain              = vd.sim_domain;
         sim_typical_length      = vd.sim_domain[0];
+        sim_typical_vel         = vd.compute_ubo.wall_velocity;
         sim_layers              = vd.sim_layers;
         sim_work_group_size     = vd.sim_work_group_size;
         sim_step_size           = vd.sim_step_size;
@@ -902,10 +904,9 @@ struct VDrive_Gui_State {
                 // set width of items and their label - aligned visually with 8 pixels
                 ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
 
-                static float typical_vel = 0.1;
-                ImGui.DragFloat( "Typical Velocity U", & typical_vel, 0.001f );
+                ImGui.DragFloat( "Typical Velocity U", & sim_typical_vel, 0.001f );
                 if( ImGui.BeginPopupContextItem( "Typical Velocity Context Menu" )) {
-                    if( ImGui.Selectable( "Wall Velocity" )) { typical_vel = sim_wall_velocity; }
+                    if( ImGui.Selectable( "Wall Velocity" )) { sim_typical_vel = sim_wall_velocity; }
                     ImGui.EndPopup();
                 }
 
@@ -932,9 +933,9 @@ struct VDrive_Gui_State {
                     ImGui.EndPopup;
                 }
 
-                float re = typical_vel * sim_typical_length / sim_viscosity;
+                float re = sim_typical_vel * sim_typical_length / sim_viscosity;
                 if( ImGui.DragFloat( "Re", & re, 0.001f )) {
-                    sim_viscosity = typical_vel * sim_typical_length / re;
+                    sim_viscosity = sim_typical_vel * sim_typical_length / re;
                     updateTauOmega;
                 }
 
@@ -1142,6 +1143,7 @@ struct VDrive_Gui_State {
                     }
                 }
 
+
                 ImGui.SetCursorPosX( 160 );
                 ImGui.Checkbox( "Draw Velocity Profile", & sim_validate_velocity );
 
@@ -1150,7 +1152,7 @@ struct VDrive_Gui_State {
 
                 if( ImGui.Combo( "Re Number", cast( int* )( & sim_ghia_type ), "   100\0   400\0  1000\0  3200\0  5000\0  7500\0 10000\0\0" )) {
                     immutable float[7] re = [ 100, 400, 1000, 3200, 5000, 7500, 10000 ];
-                    sim_viscosity = 0.1 * sim_typical_length / re[ sim_ghia_type ];  // typical_vel * sim_typical_length
+                    sim_viscosity = sim_wall_velocity * sim_typical_length / re[ sim_ghia_type ];  // typical_vel * sim_typical_length
                     updateTauOmega;
                 }
 
