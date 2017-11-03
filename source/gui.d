@@ -16,13 +16,7 @@ import cpustate;
 import exportstate;
 import resources;
 
-private {
 
-    // GLFW Data
-    float           g_Time = 0.0f;
-    bool[ 3 ]       g_MousePressed = [ false, false, false ];
-    float           g_MouseWheel = 0.0f;
-}
 
 
 ////////////////////////////////
@@ -32,13 +26,16 @@ private {
 struct VDrive_Gui_State {
     alias               vd this;
     VDrive_State        vd;
-    //VDrive_Export_State ve;
-    //VDrive_Cpu_State    vc;
 
+
+    // GLFW data
+    float               time = 0.0f;
+    bool[ 3 ]           mouse_pressed = [ false, false, false ];
+    float               mouse_wheel = 0.0f;
 
     // gui resources
-    Core_Pipeline               gui_graphics_pso;
-    Meta_Image                  gui_font_tex;
+    Core_Pipeline       gui_graphics_pso;
+    Meta_Image          gui_font_tex;
 
     alias                               GUI_QUEUED_FRAMES = vd.MAX_FRAMES;
     Meta_Buffer[ GUI_QUEUED_FRAMES ]    gui_vtx_buffers;
@@ -117,17 +114,17 @@ struct VDrive_Gui_State {
     bool        draw_velocity_lines_as_points = false;
     bool        sim_profile_mode = false;   // Todo(pp): this is redundant as we can use vg.play_mode bellow as well, remove this one
 
-    bool        sim_draw_lines = true;
-    bool        sim_draw_vel_base = true;
+    bool        sim_draw_lines          = true;
+    bool        sim_draw_vel_base       = true;
     bool        sim_draw_axis;
     bool        sim_draw_grid;
-    bool        sim_draw_scale = true;
+    bool        sim_draw_scale          = false;
     bool        sim_draw_bounds;
     bool        sim_validate_ghia;
     bool        sim_validate_poiseuille_flow;
     bool        sim_validate_taylor_green;
-    bool        sim_validate_velocity = true;
-    bool        sim_validate_vel_base = false;
+    bool        sim_validate_velocity   = true;
+    bool        sim_validate_vel_base   = false;
 
 
 
@@ -282,9 +279,6 @@ struct VDrive_Gui_State {
         sim_display.sim_domain  = vd.sim_domain;
 
         updateViscosity;
-
-        //sim_viscosity = 0.001 * sim_typical_length;
-        //updateTauOmega;
     }
 
 
@@ -331,9 +325,9 @@ struct VDrive_Gui_State {
         {
             // Setup time step
             auto current_time = cast( float )glfwGetTime();
-            io.DeltaTime = g_Time > 0.0f ? ( current_time - g_Time ) : ( 1.0f / 60.0f );
+            io.DeltaTime = time > 0.0f ? ( current_time - time ) : ( 1.0f / 60.0f );
             xform_ubo.time_step = io.DeltaTime;
-            g_Time = current_time;
+            time = current_time;
 
             // Setup inputs
             // (we already got mouse wheel, keyboard keys & characters from glfw callbacks polled in glfwPollEvents())
@@ -345,28 +339,22 @@ struct VDrive_Gui_State {
                 io.MousePos = ImVec2( -1, -1 );
             }
 
-            // Todo(pp): move this into guiMouseButtonCallback
+            // Handle mouse button data from callback
             for( int i = 0; i < 3; i++ ) {
                 // If a mouse press event came, always pass it as "mouse held this frame", so we don't miss click-release events that are shorter than 1 frame.
-                io.MouseDown[ i ] = g_MousePressed[ i ] || glfwGetMouseButton( vd.window, i ) != 0;
-                g_MousePressed[ i ] = false;
+                io.MouseDown[ i ] = mouse_pressed[ i ] || glfwGetMouseButton( vd.window, i ) != 0;
+                mouse_pressed[ i ] = false;
             }
 
-            // Todo(pp): move this into guiScrollCallback
-            io.MouseWheel = g_MouseWheel;
-            g_MouseWheel = 0.0f;
+            // Handle mouse scroll data from callback
+            io.MouseWheel = mouse_wheel;
+            mouse_wheel = 0.0f;
 
             // Hide OS mouse cursor if ImGui is drawing it
             glfwSetInputMode( vd.window, GLFW_CURSOR, io.MouseDrawCursor ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL );
 
             // Start the frame
             ImGui.NewFrame;
-
-            // 1. Show a simple window
-            // Tip: if we don't call ImGui.Begin()/ImGui.End() the widgets appears in a window automatically called "Debug"
-
-            //auto scale_win_pos  = ImVec2( 500, 500 );
-            //auto scale_win_size = ImVec2( 50, 20 );
 
             ImGui.SetNextWindowPos(  scale_win_pos,  ImGuiCond_Always );
             ImGui.SetNextWindowSize( scale_win_size, ImGuiCond_Always );
@@ -415,7 +403,7 @@ struct VDrive_Gui_State {
             ImGui.SliderFloat( "Gui Alpha", &style.Colors[ ImGuiCol_WindowBg ].w, 0.0f, 1.0f );
 
             // little hacky, but works - as we know that the corresponding clear value index
-            ImGui.ColorEdit3( "clear color", cast( float* )( & framebuffers.clear_values[ 1 ] ));
+            ImGui.ColorEdit3( "Clear Color", cast( float* )( & framebuffers.clear_values[ 1 ] ));
 
             //ImGui.ColorEdit3( "clear color", clear_color );
             if( ImGui.Button( "Test Window", button_size_3 )) show_test_window ^= 1;
@@ -850,7 +838,7 @@ struct VDrive_Gui_State {
             ImGui.Separator;
 
             // Relaxation Rate Tau
-            if( ImGui.DragFloat( "Relaxation Rate Tau",& sim_relaxation_rate, 0.001f, 0.5f, 2.0f, "%.4f" )) {
+            if( ImGui.DragFloat( "Relaxation Rate Tau", & sim_relaxation_rate, 0.001f, 0.5f, 2.0f, "%.4f" )) {
                 compute_ubo.collision_frequency = 1 / sim_relaxation_rate;
                 updateViscosity;
                 updateComputeUBO;
@@ -1093,10 +1081,13 @@ struct VDrive_Gui_State {
 
                 // set width of items and their label - aligned visually with 8 pixels
                 ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
+
                 ImGui.SetCursorPosX( 160 );
                 ImGui.Checkbox( "Draw Axis", & sim_draw_axis );
+
                 ImGui.SetCursorPosX( 160 );
                 ImGui.Checkbox( "Draw Grid", & sim_draw_grid );
+
                 ImGui.SetCursorPosX( 160 );
                 ImGui.Checkbox( "Draw Scale", & sim_draw_scale );
 
@@ -1460,7 +1451,7 @@ struct VDrive_Gui_State {
     }
 
 
-        bool show_test_window           = false;
+    bool show_test_window           = false;
     bool show_style_editor          = false;
     bool show_another_window        = false;
     bool show_imgui_examples        = false;
@@ -1789,7 +1780,6 @@ void createDescriptorSet( ref VDrive_Gui_State vg ) {
 // create appstate and gui related render resources //
 //////////////////////////////////////////////////////
 
-
 void createRenderResources( ref VDrive_Gui_State vg ) {
 
     // first forward to resources.createRenderResources
@@ -1911,7 +1901,6 @@ void createRenderResources( ref VDrive_Gui_State vg ) {
 
     // command pool will be reset in resources.resizeRenderResources
     //vg.device.vkResetCommandPool( vg.cmd_pool, 0 ); // second argument is VkCommandPoolResetFlags
-
 }
 
 
@@ -1947,7 +1936,6 @@ void resizeRenderResources( ref VDrive_Gui_State vg ) {
     // gui io display size from swapchain extent
     auto io = & ImGui.GetIO();
     io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
-
 }
 
 
@@ -1977,9 +1965,7 @@ void destroyResources( ref VDrive_Gui_State vg ) {
     free( vg.device_names );
 
     ImGui.Shutdown;
-
 }
-
 
 
 
