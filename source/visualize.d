@@ -7,34 +7,6 @@ import appstate;
 
 
 
-/*  // Todo(pp): Is this usefull ??
-/// create general texel buffer
-void createTexelBuffer(
-    ref Meta_Buffer         buffer,
-    ref VkBufferView        buffer_view,
-    VkBufferUsageFlags      buffer_usage_flags,
-    VkMemoryPropertyFlags   buffer_memory_flags,
-    VkDeviceSize            buffer_mem_size,
-    VkFormat                buffer_format
-    ) {
-
-    // (re)create buffer and buffer view
-    if( buffer.buffer   != VK_NULL_HANDLE )
-        buffer.destroyResources;          // destroy old buffer
-
-    if( buffer_view     != VK_NULL_HANDLE )
-        vd.destroy( buffer_view );        // destroy old buffer view
-
-    buffer_view = buffer
-        .create( buffer_usage_flags, buffer_mem_size )
-        .createMemory( buffer_memory_flags );
-        .createBufferView( buffer.buffer, buffer_format );
-
-}
-*/
-
-
-
 /// create particle buffer
 void createParticleBuffer( ref VDrive_State vd ) {
 
@@ -51,19 +23,25 @@ void createParticleBuffer( ref VDrive_State vd ) {
     uint32_t buffer_mem_size = vd.sim_particle_count * ( 4 * float.sizeof ).toUint;
 
     vd.sim_particle_buffer( vd )
-        .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_mem_size )
-        .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT/*VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT*/ );
+        .create( VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_mem_size )
+        .createMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 
     vd.sim_particle_buffer_view =
         vd.createBufferView( vd.sim_particle_buffer.buffer, VK_FORMAT_R32G32B32A32_SFLOAT );
 
-    
-    auto data = cast( float* )vd.sim_particle_buffer.mapMemory;
-    auto data_slice = data[ 0 .. 4 * vd.sim_particle_count ];
-    data_slice[] = -1.0f;
-    vd.sim_particle_buffer.flushMappedMemoryRange.unmapMemory;
+    // initialize buffer
+    auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
+    auto init_cmd_buffer_bi = createCmdBufferBI( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
+    init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
+
+    init_cmd_buffer.vkCmdFillBuffer( vd.sim_particle_buffer.buffer, 0, VK_WHOLE_SIZE, 0 );
+    init_cmd_buffer.vkEndCommandBuffer;                     // finish recording and submit the command
+    auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
+    vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
     
 }
+
+
 
 
 
@@ -94,8 +72,6 @@ void createParticleDrawPSO( ref VDrive_State vd ) {
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/particle.vert" ))
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/particle.frag" ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_POINT_LIST )                          // set the inputAssembly
-    //  .addBindingDescription( 0, 4 * float.sizeof, VK_VERTEX_INPUT_RATE_VERTEX )  // add vertex binding and attribute descriptions
-    //  .addAttributeDescription( 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0 )          // interleaved attributes of ImDrawVert ...
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
     //  .depthState                                                                 // set depth state - enable depth test with default attributes
@@ -118,7 +94,6 @@ void createParticleDrawPSO( ref VDrive_State vd ) {
 /////////////////////////////////////////////
 
 void createLinePSO( ref VDrive_State vd ) {
-
 
     // if we are recreating an old pipeline exists already, destroy it first
     foreach( ref pso; vd.draw_line_pso ) {

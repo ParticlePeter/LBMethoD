@@ -128,6 +128,7 @@ struct VDrive_Gui_State {
     bool        sim_validate_taylor_green;
     bool        sim_validate_velocity   = true;
     bool        sim_validate_vel_base   = false;
+    bool        sim_reset_particles     = false;
 
 
 
@@ -1105,10 +1106,27 @@ struct VDrive_Gui_State {
             // particles tree node
             //
             if( ImGui.TreeNode( "Particles" )) {
+                ImGui.Separator;
+
+
+                // Todo(pp): extend gui and functionality of particle drawing
 
                 // set width of items and their label - aligned visually with 8 pixels
                 ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
 
+                ImGui.SetCursorPosX( 160 );
+                ImGui.Checkbox( "Draw Particles", & sim_draw_particles );
+                // parse particle draw shader through context menu
+                if( ImGui.BeginPopupContextItem( "Parricle Shader Context Menu" )) {
+                    if( ImGui.Selectable( "Parse Shader" )) {
+                        vd.createParticleDrawPSO;
+                    } ImGui.EndPopup();
+                }
+
+                auto button_sub_size_1 = ImVec2( 324, 20 );
+                if( ImGui.Button( "Reset Particles", button_sub_size_1 )) {
+                    sim_reset_particles = true;
+                }
 
                 ImGui.PopItemWidth;
                 ImGui.TreePop;
@@ -1132,15 +1150,6 @@ struct VDrive_Gui_State {
                 ImGui.SetCursorPosX( 160 );
                 ImGui.Checkbox( "Draw Plane", & sim_draw_plane );
                 
-                ImGui.SetCursorPosX( 160 );
-                ImGui.Checkbox( "Draw Particles", & sim_draw_particles );
-                // parse particle draw shader through context menu
-                if( ImGui.BeginPopupContextItem( "Parricle Shader Context Menu" )) {
-                    if( ImGui.Selectable( "Parse Shader" )) {
-                        vd.createParticleDrawPSO;
-                    } ImGui.EndPopup();
-                }
-
                 ImGui.SetCursorPosX( 160 );
                 ImGui.Checkbox( "Draw Axis", & sim_draw_axis );
 
@@ -2212,6 +2221,15 @@ void drawGuiData( ImDrawData* draw_data ) {
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
         );
+    }
+
+
+    //
+    // reset particles
+    //
+    if( vg.sim_reset_particles ) {
+        vg.sim_reset_particles = false;
+        cmd_buffer.vkCmdFillBuffer( vg.vd.sim_particle_buffer.buffer, 0, VK_WHOLE_SIZE, 0 );
     }
 
 
