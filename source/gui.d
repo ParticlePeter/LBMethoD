@@ -2226,16 +2226,18 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
     //
-    // bind lbmd graphics pso
+    // bind lbmd graphics pso which was assigned to current pso before
     //
-    cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.graphics_pso.pipeline );
+    if( vg.sim_draw_plane ) {
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.current_pso.pipeline );
 
-    // push constant the sim display scale
-    float[4] sim_domain = [ vg.vd.sim_domain[0], vg.vd.sim_domain[1], vg.recip_window_size[0], vg.recip_window_size[1] ];
-    cmd_buffer.vkCmdPushConstants( vg.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * float.sizeof, sim_domain.ptr ); //sim_display.scale.ptr );
+        // push constant the sim display scale
+        float[2] sim_domain = [ vg.vd.sim_domain[0], vg.vd.sim_domain[1] ];
+        cmd_buffer.vkCmdPushConstants( vg.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sim_domain.sizeof, sim_domain.ptr ); //sim_display.scale.ptr );
 
-    // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
-    cmd_buffer.vkCmdDraw( 4, 1 + vg.sim_draw_scale, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
+        cmd_buffer.vkCmdDraw( 4, 1 + vg.sim_draw_scale, 0, 0 ); // vertex count, instance count, first vertex, first instance
+    }
 
 
 

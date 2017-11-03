@@ -203,6 +203,7 @@ struct VDrive_State {
     bool            feature_shader_double   = false;
     bool            feature_large_points    = false;
     bool            feature_wide_lines      = false;
+    bool            sim_draw_plane          = true;
     bool            sim_use_double          = false;
     bool            sim_use_3_dim           = false;
     bool            sim_use_cpu             = false;
