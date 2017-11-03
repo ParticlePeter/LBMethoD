@@ -587,6 +587,30 @@ struct VDrive_Gui_State {
             ImGui.Separator;
             */
 
+
+            //
+            // Values per node and their precision
+            //
+            ImGui.PushItemWidth( 86 );
+            if( ImGui.DragInt( "##Values per Cell", cast( int* )( & sim_layers ), 0.1f, 1, 1024 ))
+                checkComputeParams;
+
+
+            // Specify precision
+            int precision = sim_use_double;
+            ImGui.SameLine;
+            if( ImGui.Combo( "Per Cell Values", & precision, feature_shader_double || vd.sim_use_cpu ? "Float\0Double\0\0" : "Float\0\0" )) {
+                sim_use_double = precision > 0;
+                checkComputeParams;
+            }
+
+            // inform if double precision is not available or CPU mode is deactivated
+            if( !( feature_shader_double || vd.sim_use_cpu ))
+                showTooltip( "Shader double precision is not available on the selected device." );
+
+            ImGui.PopItemWidth;
+
+            
             //
             // Grid Resolution
             //
@@ -649,29 +673,6 @@ struct VDrive_Gui_State {
                     }
                 } ImGui.EndPopup();
             }
-
-
-            //
-            // Values per Cell and their precision
-            //
-            ImGui.PushItemWidth( 86 );
-            if( ImGui.DragInt( "##Values per Cell", cast( int* )( & sim_layers ), 0.1f, 1, 1024 ))
-                checkComputeParams;
-
-
-            // Specify precision
-            int precision = sim_use_double;
-            ImGui.SameLine;
-            if( ImGui.Combo( "Per Cell Values", & precision, feature_shader_double || vd.sim_use_cpu ? "Float\0Double\0\0" : "Float\0\0" )) {
-                sim_use_double = precision > 0;
-                checkComputeParams;
-            }
-
-            // inform if double precision is not available or CPU mode is deactivated
-            if( !( feature_shader_double || vd.sim_use_cpu ))
-                showTooltip( "Shader double precision is not available on the selected device." );
-
-            ImGui.PopItemWidth;
 
 
             // Apply button for all the settings within Compute Parameter
@@ -798,7 +799,11 @@ struct VDrive_Gui_State {
                 ImGui.EndPopup();
             }
 
-            ImGui.DragInt( "Compute Index", cast( int* )( & compute_ubo.comp_index ), 0.1, 1, int.max );
+            ImGui.Separator;
+            int index = cast( int )compute_ubo.comp_index;
+            ImGui.PushStyleColor( ImGuiCol_Text, disabled_text );
+            ImGui.DragInt( "Compute Index", & index );
+            ImGui.PopStyleColor( 1 );
 
             collapsingTerminator;
         }
@@ -1372,12 +1377,10 @@ struct VDrive_Gui_State {
 
             ImGui.DragInt( "Profile Step Count", cast( int* )( & sim_profile_step_count ));
 
-            int sim_index = cast( int )compute_ubo.comp_index;
-            //ImGui.PushStyleColor( ImGuiCol_Text, disabled_text );
-            ImGui.DragInt( "Profile Step Index", & sim_index );
-            //ImGui.DragInt( "Duration", & duration );
-            //ImGui.DragFloat( "Average Per Step", & avg_per_step, 0.001f );
-            //ImGui.PopStyleColor( 1 );
+            int index = cast( int )compute_ubo.comp_index;
+            ImGui.PushStyleColor( ImGuiCol_Text, disabled_text );
+            ImGui.DragInt( "Profile Step Index", & index );
+            ImGui.PopStyleColor( 1 );
 
             import core.stdc.stdio : sprintf;
             char[24] buffer;
