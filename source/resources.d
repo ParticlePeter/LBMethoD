@@ -15,8 +15,6 @@ public import compute;
 ////////////////////////////////////////////////////////////////////////
 // create vulkan related command and synchronization objects and data //
 ////////////////////////////////////////////////////////////////////////
-
-/// create resources and vulkan objects for rendering
 void createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags command_pool_create_flags = 0 ) {
 
     //////////////////////////
@@ -71,14 +69,13 @@ void createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags command
     //  pImageIndices           = &next_image_index;            // set before presentation, using the acquired next_image_index
     //  pResults                = null;                         // per swapchain prsentation results, redundant when using only one swapchain
     }
-
 }
+
 
 
 //////////////////////////////////////////////
 // create simulation related memory objects //
 //////////////////////////////////////////////
-
 void createMemoryObjects( ref VDrive_State vd ) {
 
     // create static memory resources which will be referenced in descriptor set
@@ -159,7 +156,6 @@ void createMemoryObjects( ref VDrive_State vd ) {
 ///////////////////////////////////////////
 /// create or recreate simulation images //
 ///////////////////////////////////////////
-
 void createSimImage( ref VDrive_State vd ) {
 
     // 1) (re)create Image
@@ -240,7 +236,6 @@ void createSimImage( ref VDrive_State vd ) {
 //////////////////////////////////////////////////////////////
 // create or recreate simulation memory, buffers and images //
 //////////////////////////////////////////////////////////////
-
 void createSimMemoryObjects( ref VDrive_State vd ) {
 
     // 1.) (re)create Image, Buffer (and the buffer view) without memory backing
@@ -261,7 +256,6 @@ void createSimMemoryObjects( ref VDrive_State vd ) {
 ///////////////////////////
 // create descriptor set //
 ///////////////////////////
-
 void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_ptr = null ) {
 
     // configure descriptor set with required descriptors
@@ -375,7 +369,6 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
 //////////////////////////////////
 // create descriptor set update //
 //////////////////////////////////
-
 void updateDescriptorSet( ref VDrive_State vd ) {
 
     //vd.graphics_queue.vkQueueWaitIdle;
@@ -392,7 +385,6 @@ void updateDescriptorSet( ref VDrive_State vd ) {
     // it would be more efficient to create another descriptor update for the sim_buffer_particle_view
     // it will most likely not be updated with the other resources and vice versa
     // but ... what the heck ... for now ... we won't update both of them often enough
-
 }
 
 
@@ -400,7 +392,6 @@ void updateDescriptorSet( ref VDrive_State vd ) {
 /////////////////////////////////
 // create default graphics PSO //
 /////////////////////////////////
-
 void createGraphicsPSO( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
@@ -435,7 +426,6 @@ void createGraphicsPSO( ref VDrive_State vd ) {
 /////////////////////////////
 // create render resources //
 /////////////////////////////
-
 void createRenderResources( ref VDrive_State vd ) {
 
     /////////////////////////////////////////////////////////
@@ -512,13 +502,11 @@ void createRenderResources( ref VDrive_State vd ) {
 ////////////////////////////////////////////////
 // (re)create window size dependent resources //
 ////////////////////////////////////////////////
-
 void resizeRenderResources( ref VDrive_State vd ) {
 
     //
     // (re)construct the already parametrized swapchain
     //
-
     vd.swapchain.construct;
 
     // set the corresponding present info member to the (re)constructed swapchain
@@ -582,11 +570,9 @@ void resizeRenderResources( ref VDrive_State vd ) {
 
 
 
-
     //
     // create framebuffers
     //
-
     VkImageView[1] render_targets = [ vd.depth_image.image_view ];  // compose render targets into an array
     vd.framebuffers( vd )
         .initFramebuffers!(
@@ -618,7 +604,6 @@ void resizeRenderResources( ref VDrive_State vd ) {
     //
     // update dynamic viewport and scissor state
     //
-
     vd.viewport = VkViewport( 0, 0, vd.swapchain.imageExtent.width, vd.swapchain.imageExtent.height, 0, 1 );
     vd.scissors = VkRect2D( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent );
 
@@ -629,7 +614,6 @@ void resizeRenderResources( ref VDrive_State vd ) {
 ///////////////////////////////////
 // (re)create draw loop commands //
 ///////////////////////////////////
-
 void createResizedCommands( ref VDrive_State vd ) nothrow {
 
     // reset the command pool to start recording drawing commands
@@ -698,20 +682,13 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
         // end command buffer recording
         cmd_buffer.vkEndCommandBuffer;
     }
-
 }
 
 
 
-
-
-
-
-
-
-
-
-
+//////////////////////////////
+// destroy vulkan resources //
+//////////////////////////////
 void destroyResources( ref VDrive_State vd ) {
 
     import erupted, vdrive;
@@ -765,8 +742,5 @@ void destroyResources( ref VDrive_State vd ) {
     //if( vd.comp_export_pso.is_constructed ) vd.destroy( vd.comp_export_pso );
     //if( vd.export_buffer[0].is_constructed ) vd.export_buffer[0].destroyResources;
     //if( vd.export_buffer_view[0] != VK_NULL_HANDLE ) vd.destroy( vd.export_buffer_view[0] );
-
-
-
 }
 

@@ -231,7 +231,6 @@ struct VDrive_State {
     //
     // transport control funcs
     //
-
     bool isPlaying() @system {
         return transport != Transport.pause;
     }
