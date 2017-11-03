@@ -1138,8 +1138,78 @@ struct VDrive_Gui_State {
                 ImGui.SetCursorPosX( 160 );
                 if( ImGui.Checkbox( "Draw Ghia Profile", & sim_validate_ghia )) {
                     if( sim_validate_ghia ) {
-                        sim_wall_velocity = 0.1;
+
+                        bool update_descriptor = false;
+
+                        sim_domain[0] = 127;
+                        sim_domain[1] = 127;
+                        sim_domain[2] = 1;
+
+                        // only if the sim domain changed we must ...
+                        if( vd.sim_domain != sim_domain ) {
+                            // recreate sim image, update trackball and sim_display push constant data
+                            vd.sim_domain = sim_display.sim_domain = sim_domain;
+                            vd.createSimImage;
+                            update_descriptor = true;
+                            import input : initTrackball;
+                            vd.initTrackball;
+                        }
+
+                        sim_work_group_size[0] = 127;
+                        sim_use_double         = false;
+                        sim_layers             = 17;
+
+                        // only if work group size or sim layers don't correspond to shader requirement
+                        if( vd.sim_work_group_size[0] != 127 || vd.sim_layers  != 17 ) {
+                            vd.sim_work_group_size[0]  = sim_work_group_size[0] = 127;
+                            vd.sim_layers              = sim_layers             = 17;
+
+                            // this must be after sim_domain_changed edits
+                            vd.createSimBuffer;
+                            update_descriptor = true;
+
+                        }
+
+                        // update descriptor if necessary
+                        if( update_descriptor )
+                            vd.updateDescriptorSet;
+
+                        bool update_pso = false;
+
+                        if( vd.sim_use_double ) {
+                            if( sim_init_shader != "shader\\init_D2Q9_double.comp" ) {
+                                sim_init_shader  = "shader\\init_D2Q9_double.comp";
+                                update_pso = true;
+                            }
+                            if( sim_loop_shader != "shader\\loop_D2Q9_ldc_double.comp" ) {
+                                sim_loop_shader  = "shader\\loop_D2Q9_ldc_double.comp";
+                                update_pso = true;
+                            }
+                        } else {
+                            if( sim_init_shader != "shader\\init_D2Q9.comp" ) {
+                                sim_init_shader  = "shader\\init_D2Q9.comp";
+                                update_pso = true;
+                            }
+                            if( sim_loop_shader != "shader\\loop_D2Q9_ldc.comp" ) {
+                                sim_loop_shader  = "shader\\loop_D2Q9_ldc.comp";
+                                update_pso = true;
+                            }
+                        }
+
+                        // possibly recreate lattice boltzmann pipeline
+                        if( update_pso || update_descriptor ) {
+                            vd.createBoltzmannPSO( true, true, true );
+                        }
+
+                        // set additional gui data like velocity and reynolds number
+                        sim_typical_length = 127;
+                        sim_typical_vel = sim_wall_velocity  = 0.1;
                         updateWallVelocity;
+
+                        immutable float[7] re = [ 100, 400, 1000, 3200, 5000, 7500, 10000 ];
+                        sim_viscosity = sim_wall_velocity * sim_typical_length / re[ sim_ghia_type ];  // typical_vel * sim_typical_length
+                        updateTauOmega;
+                        updateComputeUBO;
                     }
                 }
 
