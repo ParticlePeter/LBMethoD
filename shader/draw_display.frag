@@ -7,9 +7,10 @@ layout( binding = 4 ) uniform sampler2DArray vel_rho_tex[2];      // VK_DESCRIPT
 
 // uniform buffer
 layout( std140, binding = 5 ) uniform Compute_UBO {
-    float omega;            // collision frequency
-    float wall_velocity;
-    uint  sim_index;
+    float   omega;            // collision frequency
+    float   wall_velocity;
+    int     wall_thickness;
+    int     comp_index;
 };
 
 // uniform buffer
@@ -105,7 +106,7 @@ vec3 colorRamp( float t ) {
 //*/
 #define PI 3.1415926535897932384626433832795
 #define u_max wall_velocity
-#define t sim_index
+#define t comp_index
 #define rho0 1
 #define D textureSize( vel_rho_tex[0], 0 )
 

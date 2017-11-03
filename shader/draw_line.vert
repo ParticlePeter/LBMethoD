@@ -21,6 +21,7 @@ layout( std140, binding = 0 ) uniform uboViewer {
 layout( std140, binding = 5 ) uniform Compute_UBO {
     float   omega;            // collision frequency
     float   wall_velocity;
+    int     wall_thickness;
     int     comp_index;
 };
 

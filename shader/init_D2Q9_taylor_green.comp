@@ -5,6 +5,7 @@
 layout( std140, binding = 5 ) uniform Compute_UBO {
     float   omega;            // collision frequency
     float   wall_velocity;
+    int     wall_thickness;
     int     comp_index;
 };
 
@@ -61,7 +62,7 @@ int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
 #define PI 3.1415926535897932384626433832795
 #define u_max wall_velocity
 #define t 0
-#define rho0 1
+#define rho_0 1
 // main simulation function
 void main( void ) {
     // tau = relaxation_rate, omega = 1 / tau = collision_frequency
@@ -73,10 +74,10 @@ void main( void ) {
     float yy  = Y + 0.5;
     float ux  = - u_max * sqrt( ky / kx ) * cos( kx * xx ) * sin( ky * yy ) * exp( -1.0 * t * td ); // / td );
     float uy  =   u_max * sqrt( kx / ky ) * sin( kx * xx ) * cos( ky * yy ) * exp( -1.0 * t * td ); // / td );
-    float pp  = - 0.25  * rho0 * u_max * u_max
+    float pp  = - 0.25  * rho_0 * u_max * u_max
               * (( ky / kx ) * cos( 2.0 * kx * xx ) + ( kx / ky ) * cos( 2.0 * ky * yy ))
-              * exp( - 2.0 * t * td ); // / td );
-    float rho = rho0 + 3.0 * pp;
+              * exp(  - 2.0 * t * td ); // / td );
+    float rho = rho_0 + 3.0 * pp;
 
 
     // init velocities and densities
@@ -105,10 +106,10 @@ void taylor_green( uint t, uint x, uint y, double *r, double *u, double *v ) {
     float yy  = Y + 0.5;
     float ux  = - u_max * sqrt( ky / kx ) * cos( kx * xx ) * sin( ky * yy ) * exp( -1.0 * t / td );
     float uy  =   u_max * sqrt( kx / ky ) * sin( kx * xx ) * cos( ky * yy ) * exp( -1.0 * t / td );
-    float pp  = -0.25 * rho0 * u_max * u_max
+    float pp  = -0.25 * rho_0 * u_max * u_max
               * (( ky / kx ) * cos( 2.0 * kx * xx ) + ( kx / ky ) * cos( 2.0 * ky * yy ))
               * exp( - 2.0 * t / td );
-    float rho = rho0 + 3.0 * pp;
+    float rho = rho_0 + 3.0 * pp;
     *r = rho;
     *u = ux;
     *v = uy;

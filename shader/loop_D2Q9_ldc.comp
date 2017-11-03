@@ -11,6 +11,7 @@ layout( push_constant ) uniform Push_Constant {
 layout( std140, binding = 5 ) uniform Compute_UBO {
     float   omega;            // collision frequency
     float   wall_velocity;
+    int     wall_thickness;
     int     comp_index;
 };
 
@@ -167,35 +168,46 @@ void main( void ) {
     // 3-0-1 //
     //  /|\  //
     // 7 4 8 //
-
+    //*
     // Ladd's momentum correction for moving walls, applied to reflected populations not perpendicular to wall velocity
-    if( Y >= D.y - 3 ) {    // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
-        //f[7] -= 2 * pw[7] * rho * wall_velocity;
-        //f[8] += 2 * pw[8] * rho * wall_velocity;
+    if( Y >= D.y - wall_thickness ) {   // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
         f[5] += 2 * pw[5] * rho * wall_velocity;
         f[6] -= 2 * pw[6] * rho * wall_velocity;
     }
     /*
     else
 
-    if( Y <= 2 ) {          // Handle bottom wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+    if( Y < wall_thickness ) {          // Handle bottom wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
         f[5] += 2 * pw[5] * rho * wall_velocity;
         f[6] -= 2 * pw[6] * rho * wall_velocity;
     }
 
 
-    if(  X <= 2 ) {         // Handle left wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+    if( X < wall_thickness ) {          // Handle left wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
         f[5] += 2 * pw[5] * rho * wall_velocity;
         f[8] -= 2 * pw[8] * rho * wall_velocity;
     }
     
     else
 
-    if( X >= D.x - 3 ) {    // Handle right wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+    if( X >= D.x - wall_thickness ) {   // Handle right wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
         f[6] += 2 * pw[6] * rho * wall_velocity;
         f[7] -= 2 * pw[7] * rho * wall_velocity;
     }
-    */
+    //*/
+
+    /*
+    // Left half of top Wall moves to the right and right half moves to the left
+    if( Y >= D.y - wall_thickness ) {   // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+        if( X < ( D.x >> 1 )) {         // D.x / 2
+            f[5] += 2 * pw[5] * rho * wall_velocity;
+            f[6] -= 2 * pw[6] * rho * wall_velocity;
+        } else {
+            f[5] -= 2 * pw[5] * rho * wall_velocity;
+            f[6] += 2 * pw[6] * rho * wall_velocity;
+        }
+    }
+    //*/
 
     // compute macroscopic velocity after applying wall velocity
     vec2  vel = ( vec2(f[1],f[2]) - vec2(f[3],f[4]) + vec2(f[5]) - vec2(f[7]) + vec2(f[8],f[6]) - vec2(f[6],f[8])) / rho;

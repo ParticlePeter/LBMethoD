@@ -11,6 +11,7 @@ layout( push_constant ) uniform Push_Constant {
 layout( std140, binding = 5 ) uniform Compute_UBO {
     float   omega;            // collision frequency
     float   wall_velocity;
+    int     wall_thickness;
     int     comp_index;
 };
 
@@ -158,7 +159,7 @@ void main( void ) {
     // 7 4 8 //
 
     // Ladd's momentum correction for moving walls, applied to reflected populations not perpendicular to wall velocity
-    if( Y == D.y - 1 ) {    // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+    if( Y >= D.y - wall_thickness ) {   // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
         f[5] += 2 * pw[5] * rho * wall_velocity;
         f[6] -= 2 * pw[6] * rho * wall_velocity;
     }

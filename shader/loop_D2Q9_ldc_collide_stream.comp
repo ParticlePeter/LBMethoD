@@ -11,6 +11,7 @@ layout( push_constant ) uniform Push_Constant {
 layout( std140, binding = 5 ) uniform Compute_UBO {
     float   omega;            // collision frequency
     float   wall_velocity;
+    int     wall_thickness;
     int     comp_index;
 };
 
@@ -341,11 +342,9 @@ void main( void ) {
     // 3-0-1 //
     //  /|\  //
     // 7 4 8 //
-    if( Y == D.y - 1 ) {    // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
-        f[7] += 2 * pw[6] * rho * wall_velocity;
-        f[8] -= 2 * pw[5] * rho * wall_velocity;
-        //f[5] += 2 * pw[5] * rho * wall_velocity;
-        //f[6] -= 2 * pw[6] * rho * wall_velocity;
+    if( Y >= D.y - wall_thickness ) {    // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
+        f[7] -= 2 * pw[6] * rho * wall_velocity;
+        f[8] += 2 * pw[5] * rho * wall_velocity;
     }
 
     // write to the pong population p of the current cell index, while the cell index can still be offset
