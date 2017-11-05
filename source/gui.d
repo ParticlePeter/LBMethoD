@@ -1119,6 +1119,11 @@ struct VDrive_Gui_State {
                     } ImGui.EndPopup();
                 }
 
+                // blend particles normally or additive
+                if( ImGui.Checkbox( "Additive Blend", & additive_particle_blend )) {
+                    vd.createParticlePSO;
+                }
+
                 // particle color and alpha
                 ImGui.ColorEdit4( "Particle Color", particle_pc.point_rgba.ptr );
 
