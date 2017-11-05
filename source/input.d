@@ -131,14 +131,18 @@ extern( C ) void keyCallback( GLFWwindow * window, int key, int scancode, int va
     // use key press results only
     if( val != GLFW_PRESS ) return;
     import visualize : resetParticleBuffer;
+    import resources : createResizedCommands; 
     switch( key ) {
         case GLFW_KEY_ESCAPE    : glfwSetWindowShouldClose( window, GLFW_TRUE );        break;
         case GLFW_KEY_HOME      : vd.tb.camHome;                                        break;
         case GLFW_KEY_KP_ENTER  : if( mod == GLFW_MOD_ALT ) window.toggleFullscreen;    break;
+        case GLFW_KEY_F1        : vd.draw_gui ^= 1 ; (*vd).createResizedCommands;       break;
         case GLFW_KEY_F5        : if( vd.isPlaying ) vd.simPause; else vd.simPlay;      break;
         case GLFW_KEY_F6        : vd.simStep;                                           break;
         case GLFW_KEY_F7        : vd.simReset;                                          break;
         case GLFW_KEY_F8        : (*vd).resetParticleBuffer;                            break;
+        case GLFW_KEY_F9        : vd.draw_particles ^= 1; (*vd).createResizedCommands;  break;
+        case GLFW_KEY_F12       : vd.draw_display ^= 1; (*vd).createResizedCommands;    break;
         default                 :                                                       break;
     }
 }

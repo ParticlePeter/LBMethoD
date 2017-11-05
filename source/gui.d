@@ -993,18 +993,22 @@ struct VDrive_Gui_State {
         //
         if( ImGui.CollapsingHeader( "Display Parameter" )) {
             ImGui.Separator;
+
+            // show / hide the display plane
+            ImGui.SetCursorPosX( 160 );
+                ImGui.Checkbox( "Draw Display Plane", & draw_display );
+
+            if( ImGui.BeginPopupContextItem( "Display Property Context Menu" )) {
+                if( ImGui.Selectable( "Parse Display Shader" )) {
+                    vd.createGraphicsPSO;
+                } ImGui.EndPopup();
+            }
+
             // specify display parameter
             if( ImGui.Combo(
                 "Display Property", cast( int* )( & display_ubo.display_property ),
                 "Density\0Velocity X\0Velocity Y\0Velocity Magnitude\0Velocity Gradient\0Velocity Curl\0\0"
             ))  updateDisplayUBO;
-
-            if( ImGui.BeginPopupContextItem( "Display Property Context Menu" )) {
-                if( ImGui.Selectable( "Parse Display Shader" )) {
-                    vd.createGraphicsPSO;
-                    vd.createLinePSO;
-                } ImGui.EndPopup();
-            }
 
             if( ImGui.DragFloat( "Amp Display Property", & display_ubo.amplify_property, 0.001f, 0, 255 )) updateDisplayUBO;
 
@@ -1113,7 +1117,8 @@ struct VDrive_Gui_State {
                 ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
 
                 ImGui.SetCursorPosX( 160 );
-                ImGui.Checkbox( "Draw Particles", & sim_draw_particles );
+                ImGui.Checkbox( "Draw Particles", & draw_particles );
+
                 // parse particle draw shader through context menu
                 ImGui.SetCursorPosX( 160 );
                 if( ImGui.BeginPopupContextItem( "Particle Shader Context Menu" )) {
@@ -1157,10 +1162,7 @@ struct VDrive_Gui_State {
 
                 // little hacky, but works - as we know the corresponding clear value index
                 ImGui.ColorEdit3( "Clear Color", cast( float* )( & framebuffers.clear_values[ 1 ] ));
-                
-                ImGui.SetCursorPosX( 160 );
-                ImGui.Checkbox( "Draw Plane", & sim_draw_plane );
-                
+
                 ImGui.SetCursorPosX( 160 );
                 ImGui.Checkbox( "Draw Axis", & sim_draw_axis );
 
@@ -2270,7 +2272,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     // bind lbmd graphics pso which was assigned to current pso before
     //
-    if( vg.sim_draw_plane ) {
+    if( vg.draw_display ) {
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.current_pso.pipeline );
 
         // push constant the sim display scale
@@ -2498,7 +2500,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     // bind particle pipeline and draw
     //
-    if( vg.sim_draw_particles ) {
+    if( vg.draw_particles ) {
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_part_pso.pipeline );
         cmd_buffer.vkCmdPushConstants( vg.draw_part_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.particle_pc.sizeof, & vg.particle_pc );
         cmd_buffer.vkCmdDraw( vg.sim_particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
@@ -2651,16 +2653,10 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
 
     // turn gui on or off with tab key
     switch( key ) {
-        case GLFW_KEY_F1 :
-        vg.draw_gui ^= 1 ;
-        if( !vg.draw_gui ) {
-            vg.vd.createResizedCommands;   // create draw loop runtime commands, only used without gui
-        } break;
-
-        case GLFW_KEY_F2    : vg.show_imgui_examples ^= 1;                              break;
-        case GLFW_KEY_P     : try { vg.vd.createLinePSO;     } catch( Exception ) {}    break;
-        case GLFW_KEY_D     : try { vg.vd.createGraphicsPSO; } catch( Exception ) {}    break;
-        default             :                                                           break;
+        case GLFW_KEY_F2    : vg.show_imgui_examples ^= 1;                                                      break;
+        case GLFW_KEY_P     : try { vg.vd.createLinePSO;     } catch( Exception ) {}                            break;
+        case GLFW_KEY_D     : try { vg.vd.createGraphicsPSO; } catch( Exception ) {}                            break;
+        default             :                                                                                   break;
     }
 }
 

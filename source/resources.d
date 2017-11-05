@@ -601,6 +601,9 @@ void resizeRenderResources( ref VDrive_State vd ) {
 ///////////////////////////////////
 void createResizedCommands( ref VDrive_State vd ) nothrow {
 
+    // we need to do this only if the gui is not displayed
+    if( vd.draw_gui ) return;
+
     // reset the command pool to start recording drawing commands
     vd.graphics_queue.vkQueueWaitIdle;   // equivalent using a fence per Spec v1.0.48
     vd.device.vkResetCommandPool( vd.cmd_pool, 0 ); // second argument is VkCommandPoolResetFlags
@@ -642,7 +645,7 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
         cmd_buffer.vkCmdBeginRenderPass( &vd.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
 
         // bind lbmd display plane pipeline and draw
-        if( vd.sim_draw_plane ) {
+        if( vd.draw_display ) {
             
             cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.graphics_pso.pipeline );
 
@@ -655,7 +658,7 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
         }
 
         // bind particle pipeline and draw
-        if( vd.sim_draw_particles ) {
+        if( vd.draw_particles ) {
             cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.draw_part_pso.pipeline );
             cmd_buffer.vkCmdPushConstants( vd.draw_part_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vd.particle_pc.sizeof, & vd.particle_pc );
             cmd_buffer.vkCmdDraw( vd.sim_particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
