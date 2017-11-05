@@ -1631,6 +1631,10 @@ struct VDrive_Gui_State {
 
     void getAvailableDevices() {
 
+        // This code here is a stub, as we have no opportunity to test on systems with multiple devices
+        // Only the device which was selected in module initialize will be listed here
+        // Selection is based on ability to present a swapchain while a discrete gpu is prioritized
+
         // get available devices, store their names concatenated in private devices pointer
         // with this we can list them in an ImGui.Combo and make them selectable
         import vdrive.util.info;
@@ -1640,20 +1644,32 @@ struct VDrive_Gui_State {
         //devices_char_count += device_count * size_t.sizeof;  // sizeof( some_pointer );
 
         import core.stdc.string : strlen;
+        
+        /*  // Use this loop to list all available vulkan devices
         foreach( ref gpu; gpus ) {
             devices_char_count += strlen( gpu.listProperties.deviceName.ptr ) + 1;
         }
+        /*/ // Use this code to append the selected device in module initialize
+        devices_char_count += strlen( vd.gpu.listProperties.deviceName.ptr ) + 1;
+        //*/
 
         import core.stdc.stdlib : malloc;
         device_names = cast( char* )malloc( devices_char_count + 1 );   // + 1 for second terminating zero
         device_names[ 0 .. 4 ] = "CPU\0";
 
-        char* device_name_target = device_names + 4;
+        char* device_name_target = device_names + 4;    // offset and store the device names pointer with 4 chars for CPU\0
         import core.stdc.string : strcpy;
+
+        /*  // Use this loop to append all device names to the device_names char pointer
         foreach( ref gpu; gpus ) {
             strcpy( device_name_target, gpu.listProperties.deviceName.ptr );
             device_name_target += strlen( gpu.listProperties.deviceName.ptr ) + 1;
         }
+        /*/ // Use this code to append the device name of the selected device in module initialize
+        strcpy( device_name_target, vd.gpu.listProperties.deviceName.ptr );
+        device_name_target += strlen( vd.gpu.listProperties.deviceName.ptr ) + 1;
+        //*/
+
 
         // even though the allocated memory range seems to be \0 initialized we set the last char to \0 to be sure
         device_names[ devices_char_count ] = '\0';  // we allocated devices_char_count + 1, hence no -1 required
