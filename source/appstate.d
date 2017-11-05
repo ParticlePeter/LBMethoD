@@ -235,6 +235,7 @@ struct VDrive_State {
     bool            feature_wide_lines      = false;
     bool            sim_draw_particles      = false;
     bool            sim_draw_plane          = true;
+    bool            draw_gui                = false;    // hidden by default in case we compile without gui
     bool            additive_particle_blend = true;
     bool            sim_use_double          = false;
     bool            sim_use_3_dim           = false;

@@ -116,7 +116,6 @@ struct VDrive_Gui_State {
     bool        sim_use_3_dim;
     bool        sim_compute_dirty;
     bool        sim_work_group_dirty;
-    bool        draw_gui = true;
     bool        draw_velocity_lines_as_points = false;
     bool        sim_profile_mode = false;   // Todo(pp): this is redundant as we can use vg.play_mode bellow as well, remove this one
 
@@ -139,6 +138,9 @@ struct VDrive_Gui_State {
     // initialize imgui
     //
     void initImgui() {
+
+        // display the gui
+        draw_gui = true;
 
         // Get static ImGuiIO struct and set the address of our VDrive_Gui_State as user pointer
         auto io = & ImGui.GetIO();
