@@ -111,10 +111,9 @@ void createParticlePSO( ref VDrive_State vd ) {
 
 
 
-/////////////////////////////////////////////
-// create velocity, axis or grid lines PSO //
-/////////////////////////////////////////////
-
+//////////////////////////////////////////////////////////////////////////
+// create line/point PSOs for velocity, axis, grid and validation lines //
+//////////////////////////////////////////////////////////////////////////
 void createLinePSO( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
@@ -157,17 +156,17 @@ void createLinePSO( ref VDrive_State vd ) {
 
 
 
+//////////////////////////////
+// destroy vulkan resources //
+//////////////////////////////
 void destroyVisualizeResources( ref VDrive_State vd ) {
 
     // particle resources
-    vd.destroy( vd.comp_part_pso );
     vd.destroy( vd.draw_part_pso );
     vd.destroy( vd.sim_particle_buffer_view );
     vd.sim_particle_buffer.destroyResources;
 
     // line resources
-    foreach( ref pso; vd.draw_line_pso )
-        if( pso.is_constructed )
-            vd.destroy( pso );
-
+    if( vd.draw_line_pso[0].is_constructed ) vd.destroy( vd.draw_line_pso[0] );
+    if( vd.draw_line_pso[1].is_constructed ) vd.destroy( vd.draw_line_pso[1] );
 }

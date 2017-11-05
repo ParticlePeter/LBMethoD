@@ -117,7 +117,7 @@ struct VDrive_Gui_State {
     bool        sim_compute_dirty;
     bool        sim_work_group_dirty;
     bool        draw_velocity_lines_as_points = false;
-    bool        sim_profile_mode = false;   // Todo(pp): this is redundant as we can use vg.play_mode bellow as well, remove this one
+    bool        sim_profile_mode = false;
 
     bool        sim_draw_lines          = true;
     bool        sim_draw_vel_base       = true;
@@ -377,18 +377,11 @@ struct VDrive_Gui_State {
             ImGui.Begin( "Main Window", null, window_flags );
 
             // create transport controls at top of window
-            if( isPlaying ) { if( ImGui.Button( "Pause", button_size_3 )) simPause; }
-            else               { if( ImGui.Button( "Play",  button_size_3 )) simPlay;  }
-            ImGui.SameLine;      if( ImGui.Button( "Step",  button_size_3 )) simStep;
-            ImGui.SameLine;      if( ImGui.Button( "Reset", button_size_3 )) simReset;
+            if( isPlaying )   { if( ImGui.Button( "Pause", button_size_3 )) simPause; }
+            else              { if( ImGui.Button( "Play",  button_size_3 )) simPlay;  }
+            ImGui.SameLine;     if( ImGui.Button( "Step",  button_size_3 )) simStep;
+            ImGui.SameLine;     if( ImGui.Button( "Reset", button_size_3 )) simReset;
             ImGui.Separator;
-
-            // create transport controls at top of window
-            //if( sim_play ) { if( ImGui.Button( "Pause", button_size_3 )) { draw_func = & drawSim; vd.drawCmdBufferCount = 2; }
-            //else              { if( ImGui.Button( "Play",  button_size_3 )) { draw_func = & draw;    vd.drawCmdBufferCount = 1; }
-            //ImGui.SameLine;     if( ImGui.Button( "Step",  button_size_3 ) && !sim_play ) { vd.drawCmdBufferCount = 2; drawSim; vd.drawCmdBufferCount = 1; }
-            //ImGui.SameLine;     if( ImGui.Button( "Reset", button_size_3 )) simReset;
-            //ImGui.Separator;
 
             // set width of items and their label
             ImGui.PushItemWidth( main_win_size.x / 2 );
@@ -782,7 +775,7 @@ struct VDrive_Gui_State {
             // Display Every Nth Step
             //
             int step_size = cast( int )sim_step_size;
-            if( ImGui.DragInt( "Display Every Nth Step", & step_size, 0.1, 1, int.max )) {
+            if( ImGui.DragInt( "Steps per Cmd Buffer", & step_size, 0.1, 1, int.max )) {
                 sim_step_size = step_size < 1 ? 1 : step_size;
             }
 
@@ -1050,7 +1043,7 @@ struct VDrive_Gui_State {
                 if( ImGui.DragInt( "Velocity Line Count", & sim_line_display.repl_count, 0.1, 0, int.max ))
                     sim_line_display.repl_count = sim_line_display.repl_count < 0 ? 0 : sim_line_display.repl_count;
 
-                ImGui.DragFloat2( "Line Offset/Spread", & sim_line_display.line_offset, 1.0f );  // next value in struct is repl_spread
+                ImGui.DragFloat2( "Line Offset / Spread", & sim_line_display.line_offset, 1.0f );  // next value in struct is repl_spread
 
                 ImGui.BeginGroup(); // Want to use popup on the following three items
                 {
@@ -1212,7 +1205,6 @@ struct VDrive_Gui_State {
 
             ImGui.DragInt( "Profile Step Count", cast( int* )( & sim_profile_step_count ));
 
-            // Todo(pp): sim_profile_step_index should be only incremented if in profile mode!
             int index = cast( int )sim_profile_step_index;
             ImGui.PushStyleColor( ImGuiCol_Text, disabled_text );
             ImGui.DragInt( "Profile Step Index", & index );
@@ -1938,25 +1930,24 @@ void createRenderResources( ref VDrive_Gui_State vg ) {
     import vdrive.shader, vdrive.swapchain, vdrive.pipeline;
     Meta_Graphics meta_graphics;   // temporary construction struct
     vg.gui_graphics_pso = meta_graphics( vg )
-        .addShaderStageCreateInfo( vg.createPipelineShaderStage( VK_SHADER_STAGE_VERTEX_BIT,   "shader/imgui.vert" ))
-        .addShaderStageCreateInfo( vg.createPipelineShaderStage( VK_SHADER_STAGE_FRAGMENT_BIT, "shader/imgui.frag" ))
-        .addBindingDescription( 0, ImDrawVert.sizeof, VK_VERTEX_INPUT_RATE_VERTEX ) // add vertex binding and attribute descriptions
-        .addAttributeDescription( 0, 0, VK_FORMAT_R32G32_SFLOAT,  0 ) // interleaved attributes of ImDrawVert ...
+        .addShaderStageCreateInfo( vg.createPipelineShaderStage( "shader/imgui.vert" )) // auto-detect shader stage through file extension
+        .addShaderStageCreateInfo( vg.createPipelineShaderStage( "shader/imgui.frag" )) // auto-detect shader stage through file extension
+        .addBindingDescription( 0, ImDrawVert.sizeof, VK_VERTEX_INPUT_RATE_VERTEX )     // add vertex binding and attribute descriptions
+        .addAttributeDescription( 0, 0, VK_FORMAT_R32G32_SFLOAT,  0 )                   // interleaved attributes of ImDrawVert ...
         .addAttributeDescription( 1, 0, VK_FORMAT_R32G32_SFLOAT,  ImDrawVert.uv.offsetof  )
         .addAttributeDescription( 2, 0, VK_FORMAT_R8G8B8A8_UNORM, ImDrawVert.col.offsetof )
-        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST )                   // set the inputAssembly
-        .addViewportAndScissors( VkOffset2D( 0, 0 ), vg.swapchain.imageExtent ) // add viewport and scissor state, necessary even if we use dynamic state
-        .cullMode( VK_CULL_MODE_NONE )                                          // set rasterization state
-        .frontFace( VK_FRONT_FACE_COUNTER_CLOCKWISE )                           // create deafult depth state
-        .depthState                                                             // set depth state - enable depth test with default attributes
-        .addColorBlendState( VK_TRUE )                                          // color blend state - append common (default) color blend attachment state
-        .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                           // add dynamic states viewport
-        .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                            // add dynamic states scissor
-        .addDescriptorSetLayout( vg.descriptor.descriptor_set_layout )          // describe pipeline layout
-        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 16 )              // specify push constant range
-        .renderPass( vg.render_pass.render_pass )                               // describe compatible render pass
-        .construct                                                              // construct the PSO
-        .destroyShaderModules                                                   // shader modules compiled into pipeline, not shared, can be deleted now
+        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST )                           // set the input assembly
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), vg.swapchain.imageExtent )         // add viewport and scissor state, necessary even if we use dynamic state
+        .cullMode( VK_CULL_MODE_NONE )                                                  // set rasterization state cull mode 
+        .depthState                                                                     // set depth state - enable depth test with default attributes
+        .addColorBlendState( VK_TRUE )                                                  // color blend state - append common (default) color blend attachment state
+        .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                                   // add dynamic states viewport
+        .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                    // add dynamic states scissor
+        .addDescriptorSetLayout( vg.descriptor.descriptor_set_layout )                  // describe pipeline layout
+        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 16 )                      // specify push constant range
+        .renderPass( vg.render_pass.render_pass )                                       // describe compatible render pass
+        .construct                                                                      // construct the PSO
+        .destroyShaderModules                                                           // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;
 
 
@@ -2294,10 +2285,6 @@ void drawGuiData( ImDrawData* draw_data ) {
         }
     }
 
-
-
-    //if( vg.sim_draw_lines )
-    //    cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.current_pso.pipeline );
 
 
     //
