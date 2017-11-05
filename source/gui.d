@@ -1165,6 +1165,64 @@ struct VDrive_Gui_State {
 
 
         //
+        // Profile Simulation
+        //
+        if( ImGui.CollapsingHeader( "Profile Simulation" )) {
+            ImGui.Separator;
+
+            //static int checkbox_offset = 160;
+            //ImGui.DragInt( "Checkbox Offset", & checkbox_offset );
+            ImGui.SetCursorPosX( 160 );
+
+            if( ImGui.Checkbox( "Enable Profiling", & sim_profile_mode )) {
+
+                auto playing = isPlaying;
+                simPause;    // currently sim is crashing we don't enter pause mode
+
+                if( sim_profile_mode ) {
+                    play_mode = Transport.profile;
+                    sim_play_cmd_buffer_count = 1;
+                } else {
+                    play_mode = Transport.play;
+                    if( !vd.sim_use_cpu ) {
+                        sim_play_cmd_buffer_count = 2;
+                    }
+                }
+
+                if( playing ) simPlay;
+            }
+
+
+            ImGui.DragInt( "Profile Step Count", cast( int* )( & sim_profile_step_count ));
+
+            // Todo(pp): sim_profile_step_index should be only incremented if in profile mode!
+            int index = cast( int )sim_profile_step_index;
+            ImGui.PushStyleColor( ImGuiCol_Text, disabled_text );
+            ImGui.DragInt( "Profile Step Index", & index );
+            ImGui.PopStyleColor( 1 );
+
+            import core.stdc.stdio : sprintf;
+            char[24] buffer;
+
+            long duration = getStopWatch_hnsecs;
+            sprintf( buffer.ptr, "%d", duration );
+            ImGui.InputText( "Duration (hnsecs)", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
+
+            double avg_per_step = duration / cast( double )sim_profile_step_index;
+            sprintf( buffer.ptr, "%f", avg_per_step );
+            ImGui.InputText( "Dur. / Step (hnsecs)", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
+
+            ulong  node_count = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2];
+            double mlups = 10.0 * node_count * sim_profile_step_index / duration;
+            sprintf( buffer.ptr, "%f", mlups );
+            ImGui.InputText( "Average MLups", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
+
+            collapsingTerminator;
+        }
+
+
+
+        //
         // Validate Simulation
         //
         if( ImGui.CollapsingHeader( "Validate Simulation" )) {
@@ -1344,61 +1402,6 @@ struct VDrive_Gui_State {
 
             collapsingTerminator;
             */
-
-        }
-
-
-
-        //
-        // Profile Simulation
-        //
-        if( ImGui.CollapsingHeader( "Profile Simulation" )) {
-            ImGui.Separator;
-
-            //static int checkbox_offset = 160;
-            //ImGui.DragInt( "Checkbox Offset", & checkbox_offset );
-            ImGui.SetCursorPosX( 160 );
-
-            if( ImGui.Checkbox( "Enable Profiling", & sim_profile_mode )) {
-
-                simPause;    // currently sim is crashing we don't enter pause mode
-
-                if( sim_profile_mode ) {
-                    transport = play_mode = Transport.profile;
-                    vd.drawCmdBufferCount = sim_play_cmd_buffer_count = 1;
-                } else {
-                    transport = play_mode = Transport.play;
-                    if( !vd.sim_use_cpu ) {
-                        vd.drawCmdBufferCount = sim_play_cmd_buffer_count = 2;
-                    }
-                }
-            }
-
-
-            ImGui.DragInt( "Profile Step Count", cast( int* )( & sim_profile_step_count ));
-
-            int index = cast( int )compute_ubo.comp_index;
-            ImGui.PushStyleColor( ImGuiCol_Text, disabled_text );
-            ImGui.DragInt( "Profile Step Index", & index );
-            ImGui.PopStyleColor( 1 );
-
-            import core.stdc.stdio : sprintf;
-            char[24] buffer;
-
-            long duration = getStopWatch_hnsecs;
-            sprintf( buffer.ptr, "%d", duration );
-            ImGui.InputText( "Duration (hnsecs)", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
-
-            double avg_per_step = duration / cast( double )sim_index;
-            sprintf( buffer.ptr, "%f", avg_per_step );
-            ImGui.InputText( "A / Step (hnsecs)", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
-
-            ulong  node_count = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2];
-            double mlups = 10.0 * node_count * sim_index / duration;
-            sprintf( buffer.ptr, "%f", mlups );
-            ImGui.InputText( "A MLups", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
-
-            collapsingTerminator;
         }
 
 

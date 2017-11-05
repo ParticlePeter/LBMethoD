@@ -168,8 +168,8 @@ struct VDrive_State {
 
 
     // profile data
-    uint32_t        sim_profile_step_size  = 1;
-    uint32_t        sim_profile_step_count = 1000;
+    uint32_t        sim_profile_step_limit = 0;
+    uint32_t        sim_profile_step_count = 0;
     uint32_t        sim_profile_step_index;
 
 
@@ -241,9 +241,8 @@ struct VDrive_State {
     }
 
     void simPlay() @system {
-        if( transport == Transport.profile && sim_profile_step_count <= sim_profile_step_index ) {
-            sim_profile_step_index = 0;
-            resetStopWatch;
+        if( play_mode == Transport.profile && sim_profile_step_limit <= sim_profile_step_index ) {
+            sim_profile_step_limit += sim_profile_step_count;
         }
         transport = play_mode; // Transport.play or Transport.profile;
         drawCmdBufferCount = sim_play_cmd_buffer_count;
@@ -257,10 +256,10 @@ struct VDrive_State {
 
 
     void simReset() @system {
-        if( transport == Transport.profile ) {
-            sim_profile_step_index = 0;
-            resetStopWatch;
+        if( play_mode == Transport.profile ) {
+            sim_profile_step_index = sim_profile_step_limit = 0;
         }
+        resetStopWatch;
         sim_index = compute_ubo.comp_index = 0;
         try {
             if( sim_use_cpu ) {
@@ -386,17 +385,21 @@ struct VDrive_State {
 
     void drawStep() @system {
         drawCmdBufferCount = sim_play_cmd_buffer_count;
-        this.draw_func_play;
+        if( play_mode == Transport.play )
+            this.draw_func_play;
+        else
+            drawProfile;
+
         drawCmdBufferCount = 1;
         transport = Transport.pause;
     }
 
 
     void drawProfile() @system {
-        sim_profile_step_index += sim_profile_step_size;
+        sim_profile_step_index += sim_step_size;
         this.draw_func_profile;
 
-        if( 0 < sim_profile_step_count && sim_profile_step_index >= sim_profile_step_count ) {
+        if( 0 < sim_profile_step_count && sim_profile_step_limit <= sim_profile_step_index ) {
             simPause;
         }
     }
@@ -407,11 +410,6 @@ struct VDrive_State {
         VkCommandBuffer[2] cmd_buffers = [ cmd_buffers[ next_image_index ], sim_cmd_buffers[ sim_ping_pong ]];
         submit_info.pCommandBuffers = cmd_buffers.ptr;
         graphics_queue.vkQueueSubmit( 1, &submit_info, submit_fence[ next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-
-        // exclude the compute buffer for the next sim step
-        // module gui.draw might reenable it
-        //submit_info.commandBufferCount = 1;
-
 
         // present rendered image
         present_info.pImageIndices = &next_image_index;
