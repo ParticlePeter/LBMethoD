@@ -574,7 +574,7 @@ void resizeRenderResources( ref VDrive_State vd ) {
     if( vd.framebuffers.clear_values.empty )
         vd.framebuffers
             .addClearValue( 1.0f )                      // add depth clear value
-            .addClearValue( 0.3f, 0.3f, 0.3f, 1.0f );   // add color clear value
+            .addClearValue( 0.0f, 0.0f, 0.0f, 1.0f );   // add color clear value
 
     // attach one of the framebuffers, the render area and clear values to the render pass begin info
     // Note: attaching the framebuffer also sets the clear values and render area extent into the render pass begin info
