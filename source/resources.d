@@ -672,7 +672,7 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
         // bind particle pipeline and draw
         if( vd.sim_draw_particles ) {
             cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.draw_part_pso.pipeline );
-            cmd_buffer.vkCmdPushConstants( vd.draw_part_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vd.sim_domain.sizeof, vd.sim_domain.ptr );
+            cmd_buffer.vkCmdPushConstants( vd.draw_part_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vd.particle_pc.sizeof, & vd.particle_pc );
             cmd_buffer.vkCmdDraw( vd.sim_particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
 

@@ -166,6 +166,8 @@ struct VDrive_State {
     Compute_UBO*    compute_ubo;
     Display_UBO*    display_ubo;
 
+    import visualize : Particle_PC;
+    Particle_PC     particle_pc;
 
     // profile data
     uint32_t        sim_profile_step_limit = 0;

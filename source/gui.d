@@ -1119,6 +1119,13 @@ struct VDrive_Gui_State {
                     } ImGui.EndPopup();
                 }
 
+                // particle color and alpha
+                ImGui.ColorEdit4( "Particle Color", particle_pc.point_rgba.ptr );
+
+                // particle size and (added) velocity scale
+                ImGui.DragFloat2( "Size / Speed Scale", & particle_pc.point_size, 0.25f );  // next value in struct is speed_scale
+
+                // reset particle button, same as hotkey F8
                 auto button_sub_size_1 = ImVec2( 324, 20 );
                 if( ImGui.Button( "Reset Particles", button_sub_size_1 )) {
                     sim_reset_particles = true;
@@ -2492,7 +2499,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     if( vg.sim_draw_particles ) {
         cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_part_pso.pipeline );
-        cmd_buffer.vkCmdPushConstants( vg.draw_part_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.vd.sim_domain.sizeof, vg.vd.sim_domain.ptr );
+        cmd_buffer.vkCmdPushConstants( vg.draw_part_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.particle_pc.sizeof, & vg.particle_pc );
         cmd_buffer.vkCmdDraw( vg.sim_particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
     

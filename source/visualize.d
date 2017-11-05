@@ -5,6 +5,15 @@ import vdrive;
 import appstate;
 
 
+///////////////////////////////////////////////
+// push constant struct for particle drawing //
+///////////////////////////////////////////////
+struct Particle_PC {
+    float[4]    point_rgba = [ 1, 0.5, 0, 0.375 ];
+    float       point_size  = 2.0f;
+    float       speed_scale = 2.0f;
+}
+
 
 
 /// create particle buffer
