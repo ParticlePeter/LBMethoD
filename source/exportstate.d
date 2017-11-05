@@ -1,6 +1,3 @@
-
-// enum for the storage format of ensight geo and ensight variable format
-
 import erupted;
 import vdrive;
 import gui;
@@ -9,6 +6,10 @@ import resources;
 import ensight;
 
 
+
+/////////////////////////
+// export state struct //
+/////////////////////////
 struct VDrive_Export_State {
     int             start_index     = 0;
     int             step_count      = 21;

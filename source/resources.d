@@ -17,9 +17,9 @@ public import compute;
 ////////////////////////////////////////////////////////////////////////
 void createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags command_pool_create_flags = 0 ) {
 
-    //////////////////////////
-    // create command pools //
-    //////////////////////////
+    //
+    // create command pools
+    //
 
     // one to process and display graphics, this one is rest on window resize events
     vd.cmd_pool = vd.createCommandPool( vd.graphics_queue_family_index, command_pool_create_flags );
@@ -29,9 +29,9 @@ void createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags command
 
 
 
-    /////////////////////////////////
-    // create fence and semaphores //
-    /////////////////////////////////
+    //
+    // create fence and semaphores
+    //
 
     // must create all fences as we don't know the swapchain image count yet
     // but we also don't want to recreate fences in window resize events and keep track how many exist
@@ -45,9 +45,9 @@ void createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags command
 
 
 
-    /////////////////////////////////////
+    //
     // configure submit and present infos
-    /////////////////////////////////////
+    //
 
     // draw submit info for vkQueueSubmit
     with( vd.submit_info ) {
@@ -81,9 +81,9 @@ void createMemoryObjects( ref VDrive_State vd ) {
     // create static memory resources which will be referenced in descriptor set
     // the corresponding createDescriptorSet function might be overwritten somewhere else
 
-    //////////////////////////////////////////
-    // create uniform buffers - called once //
-    //////////////////////////////////////////
+    //
+    // create uniform buffers - called once
+    //
 
     // create transformation ubo buffer withour memory backing
     import dlsl.matrix;
@@ -144,10 +144,9 @@ void createMemoryObjects( ref VDrive_State vd ) {
 
 
 
-    /////////////////////////////////////////////////////////////
-    // create simulation memory objects - called several times //
-    /////////////////////////////////////////////////////////////
-
+    //
+    // create simulation memory objects - called several times
+    //
     return vd.createSimMemoryObjects;
 }
 
@@ -195,7 +194,7 @@ void createSimImage( ref VDrive_State vd ) {
         .createView( subresource_range, VK_IMAGE_VIEW_TYPE_2D_ARRAY, image_format );
 
 
-    // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
+    // transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
     auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
     auto init_cmd_buffer_bi = createCmdBufferBI( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
     init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
@@ -237,18 +236,9 @@ void createSimImage( ref VDrive_State vd ) {
 // create or recreate simulation memory, buffers and images //
 //////////////////////////////////////////////////////////////
 void createSimMemoryObjects( ref VDrive_State vd ) {
-
-    // 1.) (re)create Image, Buffer (and the buffer view) without memory backing
-    // 2.) check if the memory requirement for the objects above has increased, if not goto 4.) - this does not work currently ...
-    // 3.) if it has recreate the memory object - ... as memory can be bound only once, skipping step 2.) but delete memory if it exist
-    // 4.) (re)register resources
-    // 5.) (re)create VkImageView and VkBufferView(s)
-    // 6.) transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
-
     vd.createSimBuffer;
     vd.createSimImage;
     vd.createParticleBuffer;
-
 }
 
 
@@ -319,7 +309,7 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         .addLayoutBinding( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
         .addTexelBufferView( vd.sim_particle_buffer_view )
 
-        // Export Buffer views, these will be set and written when export is activated
+        // Export Buffer views will be set and written when export is activated
         .addLayoutBinding( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 2 );
         //.addTexelBufferView( vd.export_buffer_view[0] );
         //.addTexelBufferView( vd.export_buffer_view[1] );
@@ -355,7 +345,7 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         .attachSet( vd.descriptor.descriptor_set );
 
     // this one is solely for export data purpose to be absolute lazy about resource construction
-    // which is only necessary if we export at all, and then just before the export
+    // which is only necessary if we export at all
     vd.export_descriptor_update( vd )
     //  .addBindingUpdate( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 2 )  // Todo(pp): This variant should work, but it doesn't, see exportstate line 221
         .addBindingUpdate( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
@@ -370,8 +360,6 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
 // create descriptor set update //
 //////////////////////////////////
 void updateDescriptorSet( ref VDrive_State vd ) {
-
-    //vd.graphics_queue.vkQueueWaitIdle;
 
     // update the descriptor
     vd.sim_descriptor_update.texel_buffer_views[0]    = vd.sim_buffer_view;             // populations buffer and optionally other data like temperature
@@ -428,9 +416,9 @@ void createGraphicsPSO( ref VDrive_State vd ) {
 /////////////////////////////
 void createRenderResources( ref VDrive_State vd ) {
 
-    /////////////////////////////////////////////////////////
-    // select swapchain image format and presentation mode //
-    /////////////////////////////////////////////////////////
+    //
+    // select swapchain image format and presentation mode
+    //
 
     // Note: to get GPU swapchain capabilities to check for possible image usages
     //VkSurfaceCapabilitiesKHR surface_capabilities;
@@ -460,10 +448,9 @@ void createRenderResources( ref VDrive_State vd ) {
 
 
 
-    ////////////////////////
-    // create render pass //
-    ////////////////////////
-
+    //
+    // create render pass
+    //
     vd.render_pass( vd )
         .renderPassAttachment_Clear_None(  vd.depth_image_format,  vd.sample_count, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ).subpassRefDepthStencil
         .renderPassAttachment_Clear_Store( vd.swapchain.imageFormat, vd.sample_count, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ).subpassRefColor( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL )
