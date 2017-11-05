@@ -177,6 +177,7 @@ struct VDrive_State {
 
     import visualize : Particle_PC;
     Particle_PC     particle_pc;
+    VkCommandBuffer particle_reset_cmd_buffer;
 
 
 

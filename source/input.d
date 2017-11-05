@@ -130,6 +130,7 @@ extern( C ) void keyCallback( GLFWwindow * window, int key, int scancode, int va
     auto vd = cast( VDrive_State* )window.glfwGetWindowUserPointer;
     // use key press results only
     if( val != GLFW_PRESS ) return;
+    import visualize : resetParticleBuffer;
     switch( key ) {
         case GLFW_KEY_ESCAPE    : glfwSetWindowShouldClose( window, GLFW_TRUE );        break;
         case GLFW_KEY_HOME      : vd.tb.camHome;                                        break;
@@ -137,6 +138,7 @@ extern( C ) void keyCallback( GLFWwindow * window, int key, int scancode, int va
         case GLFW_KEY_F5        : if( vd.isPlaying ) vd.simPause; else vd.simPlay;      break;
         case GLFW_KEY_F6        : vd.simStep;                                           break;
         case GLFW_KEY_F7        : vd.simReset;                                          break;
+        case GLFW_KEY_F8        : (*vd).resetParticleBuffer;                            break;
         default                 :                                                       break;
     }
 }

@@ -39,27 +39,30 @@ void createParticleBuffer( ref VDrive_State vd ) {
         vd.createBufferView( vd.sim_particle_buffer.buffer, VK_FORMAT_R32G32B32A32_SFLOAT );
 
     // initialize buffer
-    auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
-    auto init_cmd_buffer_bi = createCmdBufferBI( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
-    init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
-
-    init_cmd_buffer.vkCmdFillBuffer( vd.sim_particle_buffer.buffer, 0, VK_WHOLE_SIZE, 0 );
-    init_cmd_buffer.vkEndCommandBuffer;                     // finish recording and submit the command
-    auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
-    vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
-    
+    vd.createParticleResetCmdBuffer;
+    vd.resetParticleBuffer;
 }
 
 
 
+/////////////////////////////////////////////////
+// create particle buffer reset command buffer //
+/////////////////////////////////////////////////
+void createParticleResetCmdBuffer( ref VDrive_State vd ) nothrow {
+    vd.particle_reset_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
+    vd.particle_reset_cmd_buffer.vdBeginCommandBuffer;
+    vd.particle_reset_cmd_buffer.vkCmdFillBuffer( vd.sim_particle_buffer.buffer, 0, VK_WHOLE_SIZE, 0 );
+    vd.particle_reset_cmd_buffer.vkEndCommandBuffer;
+}
 
 
 
-/// create particle resources
-void createParticleResources( ref VDrive_State vd ) {
-
-    vd.createParticleDrawPSO;
-    //vd.createParticleCompPSO( true, true );
+//////////////////////////////////////////
+// submit particle reset command buffer //
+//////////////////////////////////////////
+void resetParticleBuffer( ref VDrive_State vd ) nothrow {
+    auto submit_info = vd.particle_reset_cmd_buffer.queueSubmitInfo;
+    vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
 }
 
 

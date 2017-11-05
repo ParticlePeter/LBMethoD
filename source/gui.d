@@ -130,7 +130,7 @@ struct VDrive_Gui_State {
     bool        sim_validate_taylor_green;
     bool        sim_validate_velocity   = true;
     bool        sim_validate_vel_base   = false;
-    bool        sim_reset_particles     = false;
+
 
 
 
@@ -1136,7 +1136,7 @@ struct VDrive_Gui_State {
                 // reset particle button, same as hotkey F8
                 auto button_sub_size_1 = ImVec2( 324, 20 );
                 if( ImGui.Button( "Reset Particles", button_sub_size_1 )) {
-                    sim_reset_particles = true;
+                    vd.resetParticleBuffer;
                 }
 
                 ImGui.PopItemWidth;
@@ -2083,6 +2083,9 @@ void resizeRenderResources( ref VDrive_Gui_State vg ) {
     import vdrive.command : allocateCommandBuffers;
     vg.allocateCommandBuffers( vg.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vg.cmd_buffers[ 0 .. vg.swapchain.imageCount ] );
 
+    // as we have reset the command pool, we must allocate the particle reset command buffer
+    vg.createParticleResetCmdBuffer;
+
     // gui io display size from swapchain extent
     auto io = & ImGui.GetIO();
     io.DisplaySize = ImVec2( vg.vd.windowWidth, vg.vd.windowHeight );
@@ -2234,16 +2237,6 @@ void drawGuiData( ImDrawData* draw_data ) {
             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
         );
     }
-
-
-    //
-    // reset particles
-    //
-    if( vg.sim_reset_particles ) {
-        vg.sim_reset_particles = false;
-        cmd_buffer.vkCmdFillBuffer( vg.vd.sim_particle_buffer.buffer, 0, VK_WHOLE_SIZE, 0 );
-    }
-
 
 
 

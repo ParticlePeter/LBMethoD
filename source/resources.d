@@ -667,6 +667,11 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
         // end command buffer recording
         cmd_buffer.vkEndCommandBuffer;
     }
+
+
+    // as we have reset the complete command pool, we must also recreate the particle reset command buffer
+    import visualize : createParticleResetCmdBuffer;
+    vd.createParticleResetCmdBuffer;
 }
 
 
