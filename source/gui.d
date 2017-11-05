@@ -2150,7 +2150,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     if( vg.gui_idx_buffers[ vg.next_image_index ].memSize < index_size ) {
         vg.gui_idx_buffers[ vg.next_image_index ].destroyResources;
         vg.gui_idx_buffers[ vg.next_image_index ]
-            .create( VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, vertex_size )
+            .create( VK_BUFFER_USAGE_INDEX_BUFFER_BIT, vertex_size )
             .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
     }
 
