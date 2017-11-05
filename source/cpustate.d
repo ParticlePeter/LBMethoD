@@ -9,6 +9,9 @@ import dlsl.vector;
 
 
 
+//////////////////////
+// cpu state struct //
+//////////////////////
 struct VDrive_Cpu_State {
     // Directions:              R       E       N       W       S       NE      NW      SW      SE
     immutable float[9] pw = [   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 ];
@@ -25,7 +28,7 @@ struct VDrive_Cpu_State {
 
 
 
-
+// initialize data required for simulation
 void cpuInit( ref VDrive_State vd ) {
     vd.vc.ping = 8;
 
@@ -68,7 +71,8 @@ void cpuInit( ref VDrive_State vd ) {
 }
 
 
-
+// reset simulation data, also allocates and frees if required and
+// sets up play function pointer for either float or double prcision
 void cpuReset( ref VDrive_State vd ) {
 
     assert( !( vd.vc.popul_buffer_f !is null && vd.vc.popul_buffer_d !is null ));
@@ -129,7 +133,7 @@ void cpuReset( ref VDrive_State vd ) {
 }
 
 
-
+// free cpu simulation resources
 void cpuFree( ref VDrive_State vd ) {
     import core.stdc.stdlib : free;
     free( cast( void* )vd.vc.popul_buffer_f ); vd.vc.popul_buffer_f = null;
@@ -140,6 +144,7 @@ void cpuFree( ref VDrive_State vd ) {
 }
 
 
+// setup cpu play and profile function pointer 
 void setCpuSimFuncs( ref VDrive_State vd ) nothrow @system {
     if( vd.sim_use_double ) {
         setSimFuncPlay( & cpuSimD_Play );
@@ -151,12 +156,15 @@ void setCpuSimFuncs( ref VDrive_State vd ) nothrow @system {
 }
 
 
+// these aliases are shortcuts to templated function cpuSim
+// they are used as function pointers called in module appstate
 alias cpuSimF_Play      = cpuSim!( float  );
 alias cpuSimD_Play      = cpuSim!( double );
 alias cpuSimF_Profile   = cpuSim!( float,  true );
 alias cpuSimD_Profile   = cpuSim!( double, true );
 
 
+// multi-threaded template function implementing one cpu sim step
 void cpuSim( T, bool PROFILE = false )( ref VDrive_State vd ) nothrow @system {
 
     float    omega = vd.compute_ubo.collision_frequency;
@@ -176,13 +184,11 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State vd ) nothrow @system {
     ubyte pong = vd.vc.ping;
     vd.vc.ping = cast( ubyte )( 8 - vd.vc.ping );
 
-
-    //foreach( I, ref cell; parallel( popul_buffer[ 0 .. vd.vc.cell_count ], vd.sim_work_group_size[0] )) {
-    import std.range : iota;
-    //  try {
+    
+    try {
         static if( PROFILE ) vd.startStopWatch;
-        foreach( I; iota( 0, vd.vc.cell_count, 1 )) {
-        //foreach( I; parallel( iota( 0, vd.vc.cell_count, 1 ), vd.sim_work_group_size[0] )) {
+        import std.range : iota;
+        foreach( I; parallel( iota( 0, vd.vc.cell_count, 1 ), vd.sim_work_group_size[0] )) {
 
             // load populations
             T[9] f = [
@@ -220,16 +226,7 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State vd ) nothrow @system {
             vd.sim_image_ptr[ 4 * I + 2 ] = 0;
             vd.sim_image_ptr[ 4 * I + 3 ] = 1;
 
-
-            //T X_P_Y = v_x + v_y;
-            //T X_M_Y = v_x - v_y;
-            //T V_X_2 = 4.5 * v_x * v_x;
-            //T V_Y_2 = 4.5 * v_y * v_y;
-            //T XPY_2 = 4.5 * X_P_Y * X_P_Y;
-            //T XMY_2 = 4.5 * X_M_Y * X_M_Y;
-            //T V_D_V = 1.5 * ( v_x * v_x + v_y * v_y );
-
-            T[9] f_eq = [                                              // #define SQ(x) ((x) * (x))
+            T[9] f_eq = [
                 vd.vc.pw[0] * rho * (1                                                        - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[0] * rho * ( 1                     - V_D_V ), // 
                 vd.vc.pw[1] * rho * (1 + 3 * ( v_x)       + 4.5 * ( v_x)       * ( v_x)       - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[1] * rho * ( 1 + 3 *  v_x  + V_X_2 - V_D_V ), // 
                 vd.vc.pw[2] * rho * (1 + 3 * ( v_y)       + 4.5 * ( v_y)       * ( v_y)       - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[2] * rho * ( 1 + 3 *  v_y  + V_Y_2 - V_D_V ), // 
@@ -261,8 +258,6 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State vd ) nothrow @system {
             popul_buffer[ X ==       0 ? ( pong + 1 ) * vd.vc.cell_count + I : ( pong + 3 ) * vd.vc.cell_count -   1 + I ] = f[3];
             popul_buffer[ Y == D_y - 1 ? ( pong + 2 ) * vd.vc.cell_count + I : ( pong + 4 ) * vd.vc.cell_count + D_x + I ] = f[4];
 
-            //writefln( "I: %s, X: %s, Y: %s, D_x: %s, D_y: %s, vd.vc.ping: %s, pong: %s, vd.vc.cell_count: %s, B: %s, S: %s, P: %s", I, X, Y, D_x, D_y, vd.vc.ping, pong, vd.vc.cell_count,
-            //    ( pong + 7 ) * vd.vc.cell_count + I, ( pong + 5 ) * vd.vc.cell_count - D_x + 1 + I, popul_buffer.length );
             popul_buffer[ ( X == D_x - 1 || Y ==       0 ) ? ( pong + 7 ) * vd.vc.cell_count + I : ( pong + 5 ) * vd.vc.cell_count - D_x + 1 + I ] = f[5];
             popul_buffer[ ( Y ==       0 || X ==       0 ) ? ( pong + 8 ) * vd.vc.cell_count + I : ( pong + 6 ) * vd.vc.cell_count - D_x - 1 + I ] = f[6];
             popul_buffer[ ( X ==       0 || Y == D_y - 1 ) ? ( pong + 5 ) * vd.vc.cell_count + I : ( pong + 7 ) * vd.vc.cell_count + D_x - 1 + I ] = f[7];
@@ -270,15 +265,14 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State vd ) nothrow @system {
 
         }
         static if( PROFILE ) vd.stopStopWatch;
-    //  } catch( Exception ) {}
+    } catch( Exception ) {}
 
 
 
     import vdrive.memory;
-    //vd.sim_image.flushMappedMemoryRange;
     vd.sim_stage_buffer.flushMappedMemoryRange;
 
-    // sim index is now controled through the draw_step function like this one
+    // increment indexes
     ++vd.sim_index;
     ++vd.compute_ubo.comp_index;
 
