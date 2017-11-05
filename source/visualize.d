@@ -64,7 +64,10 @@ void createParticleResources( ref VDrive_State vd ) {
 
 
 
-void createParticleDrawPSO( ref VDrive_State vd ) {
+/////////////////////////
+// create particle PSO //
+/////////////////////////
+void createParticlePSO( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
     if( vd.draw_part_pso.pipeline != VK_NULL_HANDLE ) {

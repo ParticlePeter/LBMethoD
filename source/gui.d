@@ -1113,9 +1113,10 @@ struct VDrive_Gui_State {
                 ImGui.SetCursorPosX( 160 );
                 ImGui.Checkbox( "Draw Particles", & sim_draw_particles );
                 // parse particle draw shader through context menu
-                if( ImGui.BeginPopupContextItem( "Parricle Shader Context Menu" )) {
+                ImGui.SetCursorPosX( 160 );
+                if( ImGui.BeginPopupContextItem( "Particle Shader Context Menu" )) {
                     if( ImGui.Selectable( "Parse Shader" )) {
-                        vd.createParticleDrawPSO;
+                        vd.createParticlePSO;
                     } ImGui.EndPopup();
                 }
 

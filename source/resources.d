@@ -480,21 +480,19 @@ void createRenderResources( ref VDrive_State vd ) {
 
 
 
-    //////////////////////////////////////////////////////////////////
-    // create pipeline cache for the graphics and compute pipelines //
-    //////////////////////////////////////////////////////////////////
-
+    //
+    // create pipeline cache for the graphics and compute pipelines
+    //
     vd.graphics_cache   = vd.createPipelineCache;   // create once, but will be used several times in createGraphicsPSO
 
 
-
-    // create the graphics pipeline, can be called multiple time to parse shader at runtime
-    vd.createGraphicsPSO;
-    vd.createLinePSO;           // line (and point) PSO to draw velocity lines coordinate axis, grid and 3D bounding box
-
-    // create all resources for the compute pipeline
-    vd.createComputeResources;
-    vd.createParticleResources;
+    //
+    // create pipelines and compute resources
+    //
+    vd.createGraphicsPSO;       // to draw the display plane
+    vd.createParticlePSO;       // particle pso to visualize influnece of velocity field
+    vd.createLinePSO;           // line /  PSO to draw velocity lines coordinate axis, grid and 3D bounding box
+    vd.createComputeResources;  // create all resources for the compute pipeline 
 }
 
 
