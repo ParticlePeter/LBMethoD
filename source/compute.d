@@ -10,7 +10,6 @@ import appstate;
 //////////////////////////////////////////
 // create or recreate simulation buffer //
 //////////////////////////////////////////
-
 void createSimBuffer( ref VDrive_State vd ) {
 
     // (re)create buffer and buffer view
@@ -45,7 +44,6 @@ void createSimBuffer( ref VDrive_State vd ) {
 /////////////////////////////////////////////////////////////////////////////////////////
 // create compute pipelines and compute command buffers to initialize and simulate LBM //
 /////////////////////////////////////////////////////////////////////////////////////////
-
 void createComputeResources( ref VDrive_State vd ) {
 
     vd.compute_cache = vd.createPipelineCache;
@@ -55,9 +53,9 @@ void createComputeResources( ref VDrive_State vd ) {
 
 
 
-//////////////////////////////////////////////////////////////////
-// create LBM init and loop PSOs as well as sim command buffers //
-//////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////
+// create LBM init and loop PSOs helper function //
+///////////////////////////////////////////////////
 private void createBoltzmannPSO( ref VDrive_State vd, ref Core_Pipeline pso, string shader_path ) {
 
     // create meta_Specialization struct to specify shader local work group size and algorithm
@@ -85,9 +83,9 @@ private void createBoltzmannPSO( ref VDrive_State vd, ref Core_Pipeline pso, str
 
 
 
-//////////////////////////////////////////////////////////////////
-// create LBM init and loop PSOs as well as sim command buffers //
-//////////////////////////////////////////////////////////////////
+///////////////////////////////////
+// create LBM init and loop PSOs //
+///////////////////////////////////
 void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim ) {
 
     // (re)create Boltzmann init PSO if required
@@ -127,11 +125,7 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
     }
 
 
-
-    ////////////////////////////////////////////////
-    // recreate compute pipeline for runtime loop //
-    ////////////////////////////////////////////////
-
+    // (re)create compute pipeline for runtime loop
     if( loop_pso ) {
         vd.createBoltzmannPSO( vd.comp_loop_pso, vd.sim_loop_shader );      // putting responsibility to use the right double shader into users hand
     }
@@ -145,7 +139,6 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
 /////////////////////////////////////////////////
 // create two reusable compute command buffers //
 /////////////////////////////////////////////////
-
 void createComputeCommands( ref VDrive_State vd ) nothrow {
 
     // reset the command pool to start recording drawing commands
