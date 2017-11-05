@@ -447,7 +447,8 @@ struct VDrive_State {
     }
 
 
-    void drawDisplay() @system {
+    // draw the simulation display and step ahead in the simulation itself (if in play or profile mode)
+    void drawSim() @system {
 
         VkCommandBuffer[2] cmd_buffers = [ cmd_buffers[ next_image_index ], sim_cmd_buffers[ sim_ping_pong ]];
         submit_info.pCommandBuffers = cmd_buffers.ptr;
@@ -477,10 +478,11 @@ struct VDrive_State {
     }
 
 
+    // dispatch function based on the transport mode
     void draw() {
 
         final switch( transport ) {
-            case Transport.pause    : drawDisplay;          break;
+            case Transport.pause    : drawSim;              break;
             case Transport.play     : this.draw_func_play;  break;
             case Transport.step     : drawStep;             break;
             case Transport.profile  : drawProfile;          break;
@@ -495,23 +497,24 @@ nothrow:
 // Free functions called via function pointer mechanism //
 //////////////////////////////////////////////////////////
 
-void drawSim( ref VDrive_State vd ) @system {
-    vd.sim_ping_pong = vd.sim_index % 2;                            // compute new ping_pong value
-    vd.compute_ubo.comp_index += vd.sim_step_size;                  // increase shader compute counter
-    if( vd.sim_step_size > 1 ) vd.updateComputeUBO;                 // we need this value in compute shader if its greater than 1
-    ++vd.sim_index;                                                 // increment the compute buffer submission count
-    vd.drawDisplay;                                                 // let vulkan dance
+// compute ping pong, increment sim counter and draw the sim result
+void playSim( ref VDrive_State vd ) @system {
+    vd.sim_ping_pong = vd.sim_index % 2;                // compute new ping_pong value
+    vd.compute_ubo.comp_index += vd.sim_step_size;      // increase shader compute counter
+    if( vd.sim_step_size > 1 ) vd.updateComputeUBO;     // we need this value in compute shader if its greater than 1
+    ++vd.sim_index;                                     // increment the compute buffer submission count
+    vd.drawSim;                                         // let vulkan dance
 }
 
+// similar to playSim but with profiling facility for compute work
+void profileSim( ref VDrive_State vd ) @system {
 
-void profileCompute( ref VDrive_State vd ) @system {
+    vd.sim_ping_pong = vd.sim_index % 2;                // compute new ping_pong value
+    vd.compute_ubo.comp_index += vd.sim_step_size;      // increase shader compute counter
+    if( vd.sim_step_size > 1 ) vd.updateComputeUBO;     // we need this value in compute shader if its greater than 1
+    ++vd.sim_index;                                     // increment the compute buffer submission count
 
-    vd.sim_ping_pong = vd.sim_index % 2;                            // compute new ping_pong value
-    vd.compute_ubo.comp_index += vd.sim_step_size;                  // increase shader compute counter
-    if( vd.sim_step_size > 1 ) vd.updateComputeUBO;                 // we need this value in compute shader if its greater than 1
-    ++vd.sim_index;                                                 // increment the compute buffer submission count
-
-    // edit submmit info for compute work
+    // edit submit info for compute work
     with( vd.submit_info ) {
         signalSemaphoreCount    = 0;
         pSignalSemaphores       = null;
@@ -582,10 +585,10 @@ alias   Draw_Func = void function( ref VDrive_State vd ) nothrow @system;
 private Draw_Func draw_func_play;
 private Draw_Func draw_func_profile;
 
-
+// set the functions above as default sim funcs
 void setDefaultSimFuncs( ref VDrive_State vd ) nothrow @system {
-    draw_func_play      = & drawSim;
-    draw_func_profile   = & profileCompute;
+    draw_func_play      = & playSim;
+    draw_func_profile   = & profileSim;
     vd.sim_play_cmd_buffer_count = 2;
 }
 

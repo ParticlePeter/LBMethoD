@@ -276,7 +276,7 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State vd ) nothrow @system {
     ++vd.sim_index;
     ++vd.compute_ubo.comp_index;
 
-    import appstate;
-    vd.draw;                                // let vulkan dance
+    // display the result
+    vd.drawSim;
 
 }

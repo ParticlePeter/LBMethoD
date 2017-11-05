@@ -54,10 +54,8 @@ void drawExport( ref VDrive_State vd ) nothrow @system {
 
     if( vd.ve.export_index < vd.ve.step_count ) {
 
-        // here we must draw explicitely appstate draw func! othervise we would loop, as gui.draw calls drawExport
-        //vd.draw;
         vd.sim_profile_step_index += vd.ve.step_size;
-        vd.profileCompute;
+        vd.profileSim;  // allways use profilSim to observe MLups when mass exporting
 
         // invlidate
         vd.export_buffer[ vd.ve.export_index % 2 ].invalidateMappedMemoryRange;
@@ -75,18 +73,17 @@ void drawExport( ref VDrive_State vd ) nothrow @system {
     } else {
         // recreate original vd.sim_cmd_buffers
         // don't reset or recreate the pipeline
-        // attach set vd.draw as new draw_func
         try {
             vd.createBoltzmannPSO( false, false, false );
         } catch( Exception ) {}
 
-        // set default function pointer for play, step, pause
-        // this also pauses the playback
+        // set default function pointer for play and profile and pause the playback
         vd.setDefaultSimFuncs;
+        vd.simPause;
 
         // draw the graphics display once
         // otherwisethis draw would be omitted, and the gui rebuild immediatelly
-        vd.draw;
+        vd.drawSim;
 
     }
 }
