@@ -11,6 +11,9 @@ enum Transport : uint32_t { pause, play, step, profile };
 enum Collision : uint32_t { SRT, TRT, MRT, CSC, CSC_DRAG };
 
 
+//////////////////////////////
+// application state struct //
+//////////////////////////////
 struct VDrive_State {
 
     enum                        MAX_FRAMES = 2;
@@ -52,8 +55,8 @@ struct VDrive_State {
 
     // command and related
     VkCommandPool               cmd_pool;
-    VkCommandBuffer[MAX_FRAMES] cmd_buffers;    // static array alternative, see usage in module commands
-    VkPipelineStageFlags        submit_wait_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;//VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    VkCommandBuffer[MAX_FRAMES] cmd_buffers;
+    VkPipelineStageFlags        submit_wait_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkPresentInfoKHR            present_info;
     VkSubmitInfo                submit_info;
 
@@ -74,7 +77,7 @@ struct VDrive_State {
     Meta_Renderpass             render_pass;
     Core_Pipeline               graphics_pso;
     VkPipelineCache             graphics_cache;
-    Meta_FB!( MAX_FRAMES, 2 )   framebuffers;
+    Meta_FB!( MAX_FRAMES, 2 )   framebuffers;           // template count of ( VkFramebuffer, VkClearValue )
     VkViewport                  viewport;               // dynamic state viewport
     VkRect2D                    scissors;               // dynamic state scissors
 
@@ -99,10 +102,9 @@ struct VDrive_State {
     // visualization resources
     Meta_Buffer                 display_ubo_buffer;
     VkMappedMemoryRange         display_ubo_flush;
-    uint32_t                    sim_particle_count = 256 * 256;
+    uint32_t                    sim_particle_count = 400 * 225;
     Meta_Buffer                 sim_particle_buffer;
     VkBufferView                sim_particle_buffer_view;
-    Core_Pipeline               comp_part_pso;
     Core_Pipeline               draw_part_pso;
     Core_Pipeline[2]            draw_line_pso;
 
@@ -117,10 +119,9 @@ struct VDrive_State {
     void*[2]                    export_data;
     VkMappedMemoryRange[2]      export_mapped_range;
 
-    import exportstate;
-    VDrive_Export_State         ve;
-
+    //
     // cpu resources
+    //
     import cpustate;
     VDrive_Cpu_State            vc;
     float*                      sim_image_ptr;             // pointer to the mapped image
@@ -130,10 +131,12 @@ struct VDrive_State {
     // simulation configuration and auxiliary data //
     /////////////////////////////////////////////////
 
-    // compute parameters
-    uint32_t[3] sim_domain                  = [ 256, 256, 1 ]; //[ 256, 256, 1 ];   // [ 256, 64, 1 ];
+    //
+    // Compute Parameter
+    //
+    uint32_t[3] sim_domain                  = [ 400, 225, 1 ]; //[ 256, 256, 1 ];   // [ 256, 64, 1 ];
     uint32_t    sim_layers                  = 17;
-    uint32_t[3] sim_work_group_size         = [ 256,  1, 1 ];
+    uint32_t[3] sim_work_group_size         = [ 400,  1, 1 ];
     uint32_t    sim_ping_pong               = 1;
     uint32_t    sim_step_size               = 1;
 
@@ -147,8 +150,12 @@ struct VDrive_State {
         uint32_t    wall_thickness          = 1;
         uint32_t    comp_index              = 0;
     }
+    Compute_UBO*    compute_ubo;
 
-    // simulation parameters
+
+    //
+    // Simulation Parameter
+    //
     immutable float sim_unit_speed_of_sound = 0.5773502691896258; // 1 / sqrt( 3 );
     float           sim_speed_of_sound      = sim_unit_speed_of_sound;
     float           sim_unit_spatial        = 1;
@@ -156,24 +163,29 @@ struct VDrive_State {
     Collision       sim_collision           = Collision.CSC_DRAG;
     uint32_t        sim_index               = 0;
 
+
+    //
+    // Display Parameter
+    //
     struct Display_UBO {
         uint32_t    display_property        = 0;    // display param display
         float       amplify_property        = 1;    // display param amplify param
         uint32_t    color_layers            = 0;
         uint32_t    z_layer                 = 0;
     }
-
-    Compute_UBO*    compute_ubo;
     Display_UBO*    display_ubo;
 
     import visualize : Particle_PC;
     Particle_PC     particle_pc;
 
-    // profile data
+
+
+    //
+    // Profile Simulation
+    //
     uint32_t        sim_profile_step_limit = 0;
     uint32_t        sim_profile_step_count = 0;
     uint32_t        sim_profile_step_index;
-
 
     version( LDC ) {
         import std.datetime; // ldc is behind and datetime is a module and not a package yet
@@ -202,6 +214,20 @@ struct VDrive_State {
     }
 
 
+    //
+    // Export Ensight
+    //
+    import exportstate;
+    VDrive_Export_State ve;
+
+
+    //
+    // transport control data
+    //
+    uint32_t    sim_play_cmd_buffer_count;      // count of command buffers to be drawn when in play mode
+    Transport   transport = Transport.pause;    // current transport mode
+    Transport   play_mode = Transport.play;     // can be either play or profile
+
 
     // flags Todo(pp): create a proper uint32_t flag structure
     bool            feature_shader_double   = false;
@@ -216,33 +242,35 @@ struct VDrive_State {
     bool            export_as_vector        = true;
 
 
+
     // window resize callback result
     bool            window_resized          = false;
 
 
 
-    // new members
-    // count of command buffers to be drawn when in play mode
-    uint32_t    sim_play_cmd_buffer_count;
-    Transport   transport = Transport.pause;
-    Transport   play_mode = Transport.play;
-
     nothrow:
 
+    // return window width and height stored in Meta_Swapchain struct
+    auto windowWidth()  { return swapchain.imageExtent.width;  }
+    auto windowHeight() { return swapchain.imageExtent.height; }
 
 
     //
     // transport control funcs
     //
+
+    // returns whether we are paused or not
     bool isPlaying() @system {
         return transport != Transport.pause;
     }
 
+    // pause simulation
     void simPause() @system {
         transport = Transport.pause;
         drawCmdBufferCount = 1;
     }
 
+    // start or continue simulation
     void simPlay() @system {
         if( play_mode == Transport.profile && sim_profile_step_limit <= sim_profile_step_index ) {
             sim_profile_step_limit += sim_profile_step_count;
@@ -251,13 +279,14 @@ struct VDrive_State {
         drawCmdBufferCount = sim_play_cmd_buffer_count;
     }
 
+    // step with sim_step_size count of sim steps in the following draw loop step
     void simStep() @system {
         if( !isPlaying ) {
             transport = Transport.step;
         }
     }
 
-
+    // reset the simulation
     void simReset() @system {
         if( play_mode == Transport.profile ) {
             sim_profile_step_index = sim_profile_step_limit = 0;
@@ -277,25 +306,24 @@ struct VDrive_State {
     }
 
 
-    // convenience functions for perspective computations in main
-    auto windowWidth()  { return swapchain.imageExtent.width;  }
-    auto windowHeight() { return swapchain.imageExtent.height; }
+    //
+    // UBO update functions
+    //
 
-
+    // update world view projection matrix UBO
     void updateWVPM() {
         xform_ubo.wvpm = projection * tb.matrix;
         xform_ubo.eyep = tb.eye;
         vk.device.vkFlushMappedMemoryRanges( 1, &xform_ubo_flush );
-        //vk.device.vkInvalidateMappedMemoryRanges( 1, &wvpm_ubo_flush );
     }
 
-
+    // update LBM compute UBO
     void updateComputeUBO() {
         // data will be updated elsewhere
         vk.device.vkFlushMappedMemoryRanges( 1, &compute_ubo_flush );
     }
 
-
+    // update display UBO of velocity and density data
     void updateDisplayUBO() {
         // data will be updated elsewhere
         vk.device.vkFlushMappedMemoryRanges( 1, &display_ubo_flush );
@@ -318,6 +346,7 @@ struct VDrive_State {
     }
 
 
+    // recreate swapchain, called initially and if window size changes
     void recreateSwapchain() {
         // swapchain might not have the same extent as the window dimension
         // the data we use for projection computation is the glfw window extent at this place
@@ -354,16 +383,24 @@ struct VDrive_State {
         projection = vkPerspective( projection_fovy, cast( float )windowWidth / windowHeight, projection_near, projection_far );
     }
 
+    //
+    // set the count of command buffers which should be issued in one submission
+    // this number can be 1 (draw compute result) or 2(draw compute result and simulate)
+    //
 
+    // setter
     void drawCmdBufferCount( uint32_t count ) {
        submit_info.commandBufferCount = count;
     }
 
+    // getter
     uint32_t drawCmdBufferCount() {
        return submit_info.commandBufferCount;
     }
 
 
+
+    // initial draw to overlap CPU recording and GPU drawing
     void drawInit() {
         // check if window was resized and handle the case
         if( window_resized ) {
@@ -386,6 +423,7 @@ struct VDrive_State {
     }
 
 
+    // draw one simulation step with sim_step_size count of sim steps in the following draw loop step
     void drawStep() @system {
         drawCmdBufferCount = sim_play_cmd_buffer_count;
         if( play_mode == Transport.play )
@@ -398,6 +436,7 @@ struct VDrive_State {
     }
 
 
+    // increments profile counter and calls draw_func_profile function pointer, which is setable
     void drawProfile() @system {
         sim_profile_step_index += sim_step_size;
         this.draw_func_profile;
@@ -427,8 +466,6 @@ struct VDrive_State {
             this.createResizedCommands;
         } else if( tb.dirty ) {
             updateWVPM;  // this happens anyway in recreateSwapchain
-            //import core.stdc.stdio : printf;
-            //printf( "%d\n", (*( wvpm ))[0].y );
         }
 
         // acquire next swapchain image
@@ -500,8 +537,7 @@ void profileCompute( ref VDrive_State vd ) @system {
     }
 
     vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );  // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-    //vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max ); // wait for finished compute
-    //vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
+
 
     // present rendered image
     vd.present_info.pImageIndices = &vd.next_image_index;
@@ -553,11 +589,12 @@ void setDefaultSimFuncs( ref VDrive_State vd ) nothrow @system {
     vd.sim_play_cmd_buffer_count = 2;
 }
 
-
+// set some other play func
 void setSimFuncPlay( Draw_Func func ) nothrow @system {
     draw_func_play = func;
 }
 
+// set some other profile func
 void setSimFuncProfile( Draw_Func func ) nothrow @system {
     draw_func_profile = func;
 }
