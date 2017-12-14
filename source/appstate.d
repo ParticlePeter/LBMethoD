@@ -16,6 +16,7 @@ enum Collision : uint32_t { SRT, TRT, MRT, CSC, CSC_DRAG };
 //////////////////////////////
 struct VDrive_State {
 
+    // count of maximum per frame resources, might be less dependent on swachain image count
     enum                        MAX_FRAMES = 2;
 
     // initialize
@@ -131,12 +132,13 @@ struct VDrive_State {
     // simulation configuration and auxiliary data //
     /////////////////////////////////////////////////
 
+
     //
     // Compute Parameter
     //
     uint32_t[3] sim_domain                  = [ 400, 225, 1 ]; //[ 256, 256, 1 ];   // [ 256, 64, 1 ];
     uint32_t    sim_layers                  = 17;
-    uint32_t[3] sim_work_group_size         = [ 400,  1, 1 ];
+    uint32_t[3] sim_work_group_size         = [ 400, 1, 1 ];
     uint32_t    sim_ping_pong               = 1;
     uint32_t    sim_step_size               = 1;
 
@@ -178,7 +180,6 @@ struct VDrive_State {
     import visualize : Particle_PC;
     Particle_PC     particle_pc;
     VkCommandBuffer particle_reset_cmd_buffer;
-
 
 
     //
@@ -225,28 +226,28 @@ struct VDrive_State {
     //
     // transport control data
     //
-    uint32_t    sim_play_cmd_buffer_count;      // count of command buffers to be drawn when in play mode
-    Transport   transport = Transport.pause;    // current transport mode
-    Transport   play_mode = Transport.play;     // can be either play or profile
+    uint32_t    sim_play_cmd_buffer_count;          // count of command buffers to be drawn when in play mode
+    Transport   transport = Transport.pause;        // current transport mode
+    Transport   play_mode = Transport.play;         // can be either play or profile
 
 
     // flags Todo(pp): create a proper uint32_t flag structure
-    bool            feature_shader_double   = false;
-    bool            feature_large_points    = false;
-    bool            feature_wide_lines      = false;
-    bool            draw_gui                = false;    // hidden by default in case we compile without gui
-    bool            draw_display            = true;
-    bool            draw_particles          = false;
-    bool            additive_particle_blend = true;
-    bool            sim_use_double          = false;
-    bool            sim_use_3_dim           = false;
-    bool            sim_use_cpu             = false;
-    bool            export_as_vector        = true;
+    bool        feature_shader_double   = false;
+    bool        feature_large_points    = false;
+    bool        feature_wide_lines      = false;
+    bool        draw_gui                = false;    // hidden by default in case we compile without gui
+    bool        draw_display            = true;
+    bool        draw_particles          = false;
+    bool        additive_particle_blend = true;
+    bool        use_double              = false;
+    bool        use_3_dim               = false;
+    bool        use_cpu                 = false;
+    bool        export_as_vector        = true;
 
 
 
     // window resize callback result
-    bool            window_resized          = false;
+    bool        window_resized          = false;
 
 
 
@@ -296,8 +297,8 @@ struct VDrive_State {
         resetStopWatch;
         sim_index = compute_ubo.comp_index = 0;
         try {
-            if( sim_use_cpu ) {
-                import cpustate : cpuInit; 
+            if( use_cpu ) {
+                import cpustate : cpuInit;
                 this.cpuInit;
             } else {
                 import compute : createBoltzmannPSO;
@@ -316,19 +317,19 @@ struct VDrive_State {
     void updateWVPM() {
         xform_ubo.wvpm = projection * tb.matrix;
         xform_ubo.eyep = tb.eye;
-        vk.device.vkFlushMappedMemoryRanges( 1, &xform_ubo_flush );
+        vk.device.vkFlushMappedMemoryRanges( 1, & xform_ubo_flush );
     }
 
     // update LBM compute UBO
     void updateComputeUBO() {
         // data will be updated elsewhere
-        vk.device.vkFlushMappedMemoryRanges( 1, &compute_ubo_flush );
+        vk.device.vkFlushMappedMemoryRanges( 1, & compute_ubo_flush );
     }
 
     // update display UBO of velocity and density data
     void updateDisplayUBO() {
         // data will be updated elsewhere
-        vk.device.vkFlushMappedMemoryRanges( 1, &display_ubo_flush );
+        vk.device.vkFlushMappedMemoryRanges( 1, & display_ubo_flush );
     }
 
 
@@ -404,6 +405,7 @@ struct VDrive_State {
 
     // initial draw to overlap CPU recording and GPU drawing
     void drawInit() {
+
         // check if window was resized and handle the case
         if( window_resized ) {
             window_resized = false;
@@ -450,17 +452,19 @@ struct VDrive_State {
     // draw the simulation display and step ahead in the simulation itself (if in play or profile mode)
     void drawSim() @system {
 
+        // sellect and draw command buffers
         VkCommandBuffer[2] cmd_buffers = [ cmd_buffers[ next_image_index ], sim_cmd_buffers[ sim_ping_pong ]];
         submit_info.pCommandBuffers = cmd_buffers.ptr;
-        graphics_queue.vkQueueSubmit( 1, &submit_info, submit_fence[ next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
+        graphics_queue.vkQueueSubmit( 1, & submit_info, submit_fence[ next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
 
         // present rendered image
-        present_info.pImageIndices = &next_image_index;
-        swapchain.present_queue.vkQueuePresentKHR( &present_info );
+        present_info.pImageIndices = & next_image_index;
+        swapchain.present_queue.vkQueuePresentKHR( & present_info );
+
+        // edit semaphore attachement
         submit_info.pWaitSemaphores     = & acquired_semaphore[ next_image_index ];
         submit_info.pSignalSemaphores   = & rendered_semaphore[ next_image_index ];
         present_info.pWaitSemaphores    = & rendered_semaphore[ next_image_index ];
-
 
         // check if window was resized and handle the case
         if( window_resized ) {
@@ -475,10 +479,9 @@ struct VDrive_State {
         // acquire next swapchain image
         vk.device.vkAcquireNextImageKHR( swapchain.swapchain, uint64_t.max, acquired_semaphore[ next_image_index ], VK_NULL_HANDLE, & next_image_index );
 
-
         // wait for finished drawing
-        vk.device.vkWaitForFences( 1, &submit_fence[ next_image_index ], VK_TRUE, uint64_t.max );
-        vk.device.vkResetFences( 1, &submit_fence[ next_image_index ] ).vkAssert;
+        vk.device.vkWaitForFences( 1, & submit_fence[ next_image_index ], VK_TRUE, uint64_t.max );
+        vk.device.vkResetFences( 1, & submit_fence[ next_image_index ] ).vkAssert;
     }
 
 
@@ -527,11 +530,10 @@ void profileSim( ref VDrive_State vd ) @system {
 
     // profile compute work
     vd.startStopWatch;
-    vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );  // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-    vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max ); // wait for finished compute
+    vd.graphics_queue.vkQueueSubmit( 1, & vd.submit_info, vd.submit_fence[ vd.next_image_index ] );     // or VK_NULL_HANDLE, fence is only required if syncing to CPU
+    vd.device.vkWaitForFences( 1, & vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );    // wait for finished compute
     vd.stopStopWatch;
-    vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
-
+    vd.device.vkResetFences( 1, & vd.submit_fence[ vd.next_image_index ] ).vkAssert;
 
     // edit submmit info for display work
     with( vd.submit_info ) {
@@ -543,13 +545,12 @@ void profileSim( ref VDrive_State vd ) @system {
         pCommandBuffers         = & vd.cmd_buffers[ vd.next_image_index ];
     }
 
-    vd.graphics_queue.vkQueueSubmit( 1, &vd.submit_info, vd.submit_fence[ vd.next_image_index ] );  // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
-
+    // submit graphics work
+    vd.graphics_queue.vkQueueSubmit( 1, & vd.submit_info, vd.submit_fence[ vd.next_image_index ] );  // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
 
     // present rendered image
-    vd.present_info.pImageIndices = &vd.next_image_index;
-    vd.swapchain.present_queue.vkQueuePresentKHR( &vd.present_info );
-
+    vd.present_info.pImageIndices = & vd.next_image_index;
+    vd.swapchain.present_queue.vkQueuePresentKHR( & vd.present_info );
 
     // check if window was resized and handle the case
     if( vd.window_resized ) {
@@ -559,8 +560,6 @@ void profileSim( ref VDrive_State vd ) @system {
         vd.createResizedCommands;
     } else if( vd.tb.dirty ) {
         vd.updateWVPM;  // this happens anyway in recreateSwapchain
-        //import core.stdc.stdio : printf;
-        //printf( "%d\n", (*( vd.wvpm ))[0].y );
     }
 
     // acquire next swapchain image
@@ -577,8 +576,6 @@ void profileSim( ref VDrive_State vd ) @system {
     // wait for finished drawing
     vd.device.vkWaitForFences( 1, & vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );
     vd.device.vkResetFences( 1, & vd.submit_fence[ vd.next_image_index ] ).vkAssert;
-
-
 }
 
 

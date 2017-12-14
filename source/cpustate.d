@@ -32,8 +32,8 @@ struct VDrive_Cpu_State {
 void cpuInit( ref VDrive_State vd ) {
     vd.vc.ping = 8;
 
-    if( vd.sim_use_double ) {
         if( vd.vc.popul_buffer_d is null || vd.sim_image_ptr is null )
+    if( vd.use_double ) {
             vd.cpuReset;
 
         for( int I = 0; I < vd.vc.cell_count; ++I ) {
@@ -81,14 +81,14 @@ void cpuReset( ref VDrive_State vd ) {
     vd.vc.cell_count = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2];
     size_t buffer_size = vd.vc.cell_count * vd.sim_layers;
     size_t old_buffer_mem_size = vd.vc.current_buffer_mem_size;
-    vd.vc.current_buffer_mem_size = buffer_size * ( vd.sim_use_double ? double.sizeof : float.sizeof );
+    vd.vc.current_buffer_mem_size = buffer_size * ( vd.use_double ? double.sizeof : float.sizeof );
     if( vd.vc.current_buffer_mem_size < old_buffer_mem_size )
         vd.vc.current_buffer_mem_size = old_buffer_mem_size;
 
 
     bool must_init;
     import core.stdc.stdlib : malloc, free;
-    if( vd.sim_use_double ) {
+    if( vd.use_double ) {
         setSimFuncPlay( & cpuSimD_Play );
         if( vd.vc.popul_buffer_f !is null ) {
             if( old_buffer_mem_size < vd.vc.current_buffer_mem_size ) { // 2 * float.sizeof = double.sizeof
@@ -107,7 +107,7 @@ void cpuReset( ref VDrive_State vd ) {
             vd.vc.popul_buffer_d = cast( double* )malloc( vd.vc.current_buffer_mem_size );
         }
 
-    } else {    // vd.sim_use_double = false;
+    } else {    // vd.use_double = false;
         setSimFuncPlay( & cpuSimF_Play );
         if( vd.vc.popul_buffer_d !is null ) {
             if( old_cell_count * 2 < vd.vc.cell_count ) { // 2 * float.sizeof = double.sizeof
@@ -144,9 +144,9 @@ void cpuFree( ref VDrive_State vd ) {
 }
 
 
-// setup cpu play and profile function pointer 
+// setup cpu play and profile function pointer
 void setCpuSimFuncs( ref VDrive_State vd ) nothrow @system {
-    if( vd.sim_use_double ) {
+    if( vd.use_double ) {
         setSimFuncPlay( & cpuSimD_Play );
         setSimFuncProfile( & cpuSimD_Profile );
     } else {
@@ -184,7 +184,7 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State vd ) nothrow @system {
     ubyte pong = vd.vc.ping;
     vd.vc.ping = cast( ubyte )( 8 - vd.vc.ping );
 
-    
+
     try {
         static if( PROFILE ) vd.startStopWatch;
         import std.range : iota;
@@ -227,15 +227,15 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State vd ) nothrow @system {
             vd.sim_image_ptr[ 4 * I + 3 ] = 1;
 
             T[9] f_eq = [
-                vd.vc.pw[0] * rho * (1                                                        - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[0] * rho * ( 1                     - V_D_V ), // 
-                vd.vc.pw[1] * rho * (1 + 3 * ( v_x)       + 4.5 * ( v_x)       * ( v_x)       - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[1] * rho * ( 1 + 3 *  v_x  + V_X_2 - V_D_V ), // 
-                vd.vc.pw[2] * rho * (1 + 3 * ( v_y)       + 4.5 * ( v_y)       * ( v_y)       - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[2] * rho * ( 1 + 3 *  v_y  + V_Y_2 - V_D_V ), // 
-                vd.vc.pw[3] * rho * (1 + 3 * (-v_x)       + 4.5 * (-v_x)       * (-v_x)       - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[3] * rho * ( 1 - 3 *  v_x  + V_X_2 - V_D_V ), // 
-                vd.vc.pw[4] * rho * (1 + 3 * (-v_y)       + 4.5 * (-v_y)       * (-v_y)       - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[4] * rho * ( 1 - 3 *  v_y  + V_Y_2 - V_D_V ), // 
-                vd.vc.pw[5] * rho * (1 + 3 * ( v_x + v_y) + 4.5 * ( v_x + v_y) * ( v_x + v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[5] * rho * ( 1 + 3 * X_P_Y + XPY_2 - V_D_V ), // 
-                vd.vc.pw[6] * rho * (1 + 3 * (-v_x + v_y) + 4.5 * (-v_x + v_y) * (-v_x + v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[6] * rho * ( 1 - 3 * X_M_Y + XMY_2 - V_D_V ), // 
-                vd.vc.pw[7] * rho * (1 + 3 * (-v_x - v_y) + 4.5 * (-v_x - v_y) * (-v_x - v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[7] * rho * ( 1 - 3 * X_P_Y + XPY_2 - V_D_V ), // 
-                vd.vc.pw[8] * rho * (1 + 3 * ( v_x - v_y) + 4.5 * ( v_x - v_y) * ( v_x - v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[8] * rho * ( 1 + 3 * X_M_Y + XMY_2 - V_D_V )  // 
+                vd.vc.pw[0] * rho * (1                                                        - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[0] * rho * ( 1                     - V_D_V ), //
+                vd.vc.pw[1] * rho * (1 + 3 * ( v_x)       + 4.5 * ( v_x)       * ( v_x)       - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[1] * rho * ( 1 + 3 *  v_x  + V_X_2 - V_D_V ), //
+                vd.vc.pw[2] * rho * (1 + 3 * ( v_y)       + 4.5 * ( v_y)       * ( v_y)       - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[2] * rho * ( 1 + 3 *  v_y  + V_Y_2 - V_D_V ), //
+                vd.vc.pw[3] * rho * (1 + 3 * (-v_x)       + 4.5 * (-v_x)       * (-v_x)       - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[3] * rho * ( 1 - 3 *  v_x  + V_X_2 - V_D_V ), //
+                vd.vc.pw[4] * rho * (1 + 3 * (-v_y)       + 4.5 * (-v_y)       * (-v_y)       - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[4] * rho * ( 1 - 3 *  v_y  + V_Y_2 - V_D_V ), //
+                vd.vc.pw[5] * rho * (1 + 3 * ( v_x + v_y) + 4.5 * ( v_x + v_y) * ( v_x + v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[5] * rho * ( 1 + 3 * X_P_Y + XPY_2 - V_D_V ), //
+                vd.vc.pw[6] * rho * (1 + 3 * (-v_x + v_y) + 4.5 * (-v_x + v_y) * (-v_x + v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[6] * rho * ( 1 - 3 * X_M_Y + XMY_2 - V_D_V ), //
+                vd.vc.pw[7] * rho * (1 + 3 * (-v_x - v_y) + 4.5 * (-v_x - v_y) * (-v_x - v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[7] * rho * ( 1 - 3 * X_P_Y + XPY_2 - V_D_V ), //
+                vd.vc.pw[8] * rho * (1 + 3 * ( v_x - v_y) + 4.5 * ( v_x - v_y) * ( v_x - v_y) - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[8] * rho * ( 1 + 3 * X_M_Y + XMY_2 - V_D_V )  //
             ];
 
             // Collide - inlining is not working properly, hence manually

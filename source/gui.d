@@ -24,19 +24,22 @@ import visualize;
 // struct of gui related data //
 ////////////////////////////////
 struct VDrive_Gui_State {
+
     alias               vd this;
     VDrive_State        vd;
 
 
+    private:
+
     // GLFW data
-    float               time = 0.0f;
-    bool[ 3 ]           mouse_pressed = [ false, false, false ];
-    float               mouse_wheel = 0.0f;
+    float       time = 0.0f;
+    bool[ 3 ]   mouse_pressed = [ false, false, false ];
+    float       mouse_wheel = 0.0f;
 
     // gui resources
-    Core_Pipeline       gui_graphics_pso;
-    Core_Pipeline       current_pso;        // with this we keep track which pso is active to avoid rebinding of the
-    Meta_Image          gui_font_tex;
+    Core_Pipeline   gui_graphics_pso;
+    Core_Pipeline   current_pso;        // with this we keep track which pso is active to avoid rebinding of the
+    Meta_Image      gui_font_tex;
 
     alias                               GUI_QUEUED_FRAMES = vd.MAX_FRAMES;
     Meta_Buffer[ GUI_QUEUED_FRAMES ]    gui_vtx_buffers;
@@ -73,7 +76,7 @@ struct VDrive_Gui_State {
         re_10000,
     }
 
-    // Sim Display Struct is used to configure the lines display ueber shader 
+    // Sim Display Struct is used to configure the lines display ueber shader
     // it is applied as push constant the struct must be std140 conform
     struct Sim_Line_Display {
       align( 1 ):
@@ -107,32 +110,32 @@ struct VDrive_Gui_State {
 
     // ldc (0,1), taylor_green (2,4),
     int         init_shader_index   = 0;  // 0-based default init shader index, from all shaders in shader dir starting with init
-    int         loop_shader_index   = 1;  // 0-based default loop shader index, from all shaders in shader dir starting with loop   
+    int         loop_shader_index   = 1;  // 0-based default loop shader index, from all shaders in shader dir starting with loop
 
     // initial setting for Ghia et al. validation of lid driven cavity
-    Ghia_Type   sim_ghia_type       = Ghia_Type.re___100;
+    Ghia_Type   ghia_type           = Ghia_Type.re___100;
 
-    bool        sim_use_double;
-    bool        sim_use_3_dim;
-    bool        sim_compute_dirty;
-    bool        sim_work_group_dirty;
+    bool        use_double;
+    bool        use_3_dim;
+    bool        compute_dirty;
+    bool        work_group_dirty;
     bool        draw_velocity_lines_as_points = false;
-    bool        sim_profile_mode = false;
+    bool        profile_mode        = false;
 
-    bool        sim_draw_lines          = true;
-    bool        sim_draw_vel_base       = true;
-    bool        sim_draw_axis;
-    bool        sim_draw_grid;
-    bool        sim_draw_scale          = false;
-    bool        sim_draw_bounds;
-    bool        sim_validate_ghia;
-    bool        sim_validate_poiseuille_flow;
-    bool        sim_validate_taylor_green;
-    bool        sim_validate_velocity   = true;
-    bool        sim_validate_vel_base   = false;
+    bool        draw_lines          = true;
+    bool        draw_vel_base       = true;
+    bool        draw_axis;
+    bool        draw_grid;
+    bool        draw_scale          = false;
+    bool        draw_bounds;
+    bool        validate_ghia;
+    bool        validate_poiseuille_flow;
+    bool        validate_taylor_green;
+    bool        validate_velocity   = true;
+    bool        validate_vel_base   = false;
 
 
-
+    public:
 
     //
     // initialize imgui
@@ -273,16 +276,16 @@ struct VDrive_Gui_State {
         compareShaderNamesAndReplace( shader_names_ptr[ loop_shader_start_index + loop_shader_index ], sim_loop_shader );
 
         // initialize VDrive_Gui_State member from VDrive_State member
-        sim_domain              = vd.sim_domain;
-        sim_typical_length      = vd.sim_domain[0];
-        sim_typical_vel         = vd.compute_ubo.wall_velocity;
-        sim_layers              = vd.sim_layers;
-        sim_work_group_size     = vd.sim_work_group_size;
-        sim_step_size           = vd.sim_step_size;
-        sim_use_double          = vd.sim_use_double;
-        sim_use_3_dim           = vd.sim_use_3_dim;
-        sim_wall_velocity       = vd.compute_ubo.wall_velocity * vd.sim_speed_of_sound * vd.sim_speed_of_sound;
-        sim_relaxation_rate     = 1 / vd.compute_ubo.collision_frequency;
+        sim_domain          = vd.sim_domain;
+        sim_typical_length  = vd.sim_domain[0];
+        sim_typical_vel     = vd.compute_ubo.wall_velocity;
+        sim_layers          = vd.sim_layers;
+        sim_work_group_size = vd.sim_work_group_size;
+        sim_step_size       = vd.sim_step_size;
+        use_double          = vd.use_double;
+        use_3_dim           = vd.use_3_dim;
+        sim_wall_velocity   = vd.compute_ubo.wall_velocity * vd.sim_speed_of_sound * vd.sim_speed_of_sound;
+        sim_relaxation_rate = 1 / vd.compute_ubo.collision_frequency;
         sim_line_display.sim_domain  = vd.sim_domain;
 
         updateViscosity;
@@ -296,10 +299,13 @@ struct VDrive_Gui_State {
 
         // record next command buffer asynchronous
         if( draw_gui )      // this can't be a function pointer as well
-            this.buildGui;   // as we wouldn't know what else has to be drawn (drawFunc or drawFuncPlay etc. )
+            this.buildGui;  // as we wouldn't know what else has to be drawn (drawFunc or drawFuncPlay etc. )
 
         vd.draw;
     }
+
+
+    private:
 
     //
     // window flags for the main UI window
@@ -363,7 +369,7 @@ struct VDrive_Gui_State {
             ImGui.SetNextWindowPos(  scale_win_pos,  ImGuiCond_Always );
             ImGui.SetNextWindowSize( scale_win_size, ImGuiCond_Always );
 
-            if( sim_draw_scale ) {
+            if( draw_scale ) {
                 ImGui.PushStyleColor( ImGuiCol_WindowBg, 0 );
                 ImGui.Begin( "Scale Window", null, window_flags );
                 ImGui.Text( "%.3f", 1 / display_ubo.amplify_property );
@@ -433,12 +439,12 @@ struct VDrive_Gui_State {
                 if( compute_device == 0 ) {
                     vd.cpuReset;
                     vd.setCpuSimFuncs;
-                    vd.sim_use_cpu = true;
+                    vd.use_cpu = true;
                     vd.drawCmdBufferCount = sim_play_cmd_buffer_count = 1;
                 } else {
                     vd.setDefaultSimFuncs;
-                    vd.sim_use_cpu = false;
-                    sim_use_double &= feature_shader_double;
+                    vd.use_cpu = false;
+                    use_double &= feature_shader_double;
                     if( play_mode == Transport.play ) {      // in profile mode this must stay 1 (switches with play/pause )
                         sim_play_cmd_buffer_count = 2;       // as we submitted compute and draw command buffers separately
                         if( transport == Transport.play ) {  // if we are in play mode
@@ -564,17 +570,19 @@ struct VDrive_Gui_State {
             //
             // Radio 2D or 3D (simulation not implemented yet)
             //
-            int dimensions = sim_use_3_dim;
+            int dimensions = use_3_dim;
+
+            // 3D simulation is WIP
             /*
             if( ImGui.RadioButton( "2D", & dimensions, 0 )) {
-                sim_use_3_dim = false;
+                use_3_dim = false;
                 sim_domain[2] = 1;
                 checkComputeParams;
             }
 
             ImGui.SameLine;
             ImGui.SetCursorPosX( main_win_size.x * 0.25 + 6 );
-            if( ImGui.RadioButton( "3D", & dimensions, 1 )) sim_use_3_dim = true;
+            if( ImGui.RadioButton( "3D", & dimensions, 1 )) use_3_dim = true;
 
             ImGui.SameLine;
             ImGui.SetCursorPosX( main_win_size.x * 0.5 + 8 );
@@ -592,20 +600,20 @@ struct VDrive_Gui_State {
 
 
             // Specify precision
-            int precision = sim_use_double;
+            int precision = use_double;
             ImGui.SameLine;
-            if( ImGui.Combo( "Per Cell Values", & precision, feature_shader_double || vd.sim_use_cpu ? "Float\0Double\0\0" : "Float\0\0" )) {
-                sim_use_double = precision > 0;
+            if( ImGui.Combo( "Per Cell Values", & precision, feature_shader_double || vd.use_cpu ? "Float\0Double\0\0" : "Float\0\0" )) {
+                use_double = precision > 0;
                 checkComputeParams;
             }
 
             // inform if double precision is not available or CPU mode is deactivated
-            if( !( feature_shader_double || vd.sim_use_cpu ))
+            if( !( feature_shader_double || vd.use_cpu ))
                 showTooltip( "Shader double precision is not available on the selected device." );
 
             ImGui.PopItemWidth;
 
-            
+
             //
             // Grid Resolution
             //
@@ -676,7 +684,7 @@ struct VDrive_Gui_State {
             // Update the descriptor set, rebuild compute command buffers and reset cpu data if running on cpu
             // We also update the scale of the display plane and normalization factors for the velocity lines
             // Additionally if only the work group size changes, we need to update only the compute PSO (see else if)
-            if( sim_compute_dirty ) {
+            if( compute_dirty ) {
                 if( ImGui.Button( "Apply", button_size_2 )) {
 
                     // only if the sim domain changed we must ...
@@ -684,7 +692,7 @@ struct VDrive_Gui_State {
                         // recreate sim image and sim_line_display push constant data
                         vd.sim_domain = sim_line_display.sim_domain = sim_domain;
                         vd.createSimImage;
-                        
+
                         // recreate sim particle buffer
                         vd.sim_particle_count = sim_domain[0] * sim_domain[1] * sim_domain[2];
                         vd.createParticleBuffer;
@@ -694,11 +702,11 @@ struct VDrive_Gui_State {
                         vd.initTrackball;
                     }
 
-                    sim_compute_dirty        = sim_work_group_dirty = false;
-                    vd.sim_work_group_size   = sim_work_group_size;
-                    vd.sim_step_size         = sim_step_size;
-                    vd.sim_use_double        = sim_use_double;
-                    vd.sim_layers            = sim_layers;
+                    compute_dirty           = work_group_dirty = false;
+                    vd.sim_work_group_size  = sim_work_group_size;
+                    vd.sim_step_size        = sim_step_size;
+                    vd.use_double           = use_double;
+                    vd.sim_layers           = sim_layers;
 
                     // this must be after sim_domain_changed edits
                     vd.createSimBuffer;
@@ -709,16 +717,16 @@ struct VDrive_Gui_State {
                     // recreate Lattice Boltzmann pipeline with possibly new shaders
                     vd.createBoltzmannPSO( true, true, true );
 
-                    if( vd.sim_use_cpu ) {
+                    if( vd.use_cpu ) {
                         vd.cpuReset;
                     }
                 }
                 ImGui.SameLine;
                 ImGui.Text( "Changes" );
 
-            } else if( sim_work_group_dirty ) {
+            } else if( work_group_dirty ) {
                 if( ImGui.Button( "Apply", button_size_2 )) {
-                    sim_work_group_dirty     = false;
+                    work_group_dirty     = false;
                     vd.sim_work_group_size   = sim_work_group_size;
                     vd.sim_step_size         = sim_step_size;
                     vd.createBoltzmannPSO( true, true, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
@@ -1016,7 +1024,7 @@ struct VDrive_Gui_State {
             if( ImGui.DragInt( "Color Layers", cast( int* )( & display_ubo.color_layers ), 0.1f, 0, 255 )) updateDisplayUBO;
 
             static int z_layer = 0;
-            if( sim_use_3_dim ) {
+            if( use_3_dim ) {
                 if( ImGui.DragInt( "Z-Layer", & z_layer, 0.1f, 0, sim_domain[2] - 1 )) {
                     z_layer = 0 > z_layer ? 0 : z_layer >= sim_domain[2] ? sim_domain[2] - 1 : z_layer;
                     display_ubo.z_layer = z_layer;
@@ -1080,7 +1088,7 @@ struct VDrive_Gui_State {
                 }
 
                 ImGui.SetCursorPosX( 160 );
-                ImGui.Checkbox( "Draw Base Lines", & sim_draw_vel_base );
+                ImGui.Checkbox( "Draw Base Lines", & draw_vel_base );
 
                 ImGui.SetCursorPosX( 160 );
                 ImGui.Checkbox( "Draw as Points", & draw_velocity_lines_as_points );
@@ -1157,13 +1165,13 @@ struct VDrive_Gui_State {
                 ImGui.ColorEdit3( "Clear Color", cast( float* )( & framebuffers.clear_values[ 1 ] ));
 
                 ImGui.SetCursorPosX( 160 );
-                ImGui.Checkbox( "Draw Axis", & sim_draw_axis );
+                ImGui.Checkbox( "Draw Axis", & draw_axis );
 
                 ImGui.SetCursorPosX( 160 );
-                ImGui.Checkbox( "Draw Grid", & sim_draw_grid );
+                ImGui.Checkbox( "Draw Grid", & draw_grid );
 
                 ImGui.SetCursorPosX( 160 );
-                ImGui.Checkbox( "Draw Scale", & sim_draw_scale );
+                ImGui.Checkbox( "Draw Scale", & draw_scale );
 
                 ImGui.PopItemWidth;
                 ImGui.TreePop;
@@ -1184,17 +1192,17 @@ struct VDrive_Gui_State {
             //ImGui.DragInt( "Checkbox Offset", & checkbox_offset );
             ImGui.SetCursorPosX( 160 );
 
-            if( ImGui.Checkbox( "Enable Profiling", & sim_profile_mode )) {
+            if( ImGui.Checkbox( "Enable Profiling", & profile_mode )) {
 
                 auto playing = isPlaying;
                 simPause;    // currently sim is crashing we don't enter pause mode
 
-                if( sim_profile_mode ) {
+                if( profile_mode ) {
                     play_mode = Transport.profile;
                     sim_play_cmd_buffer_count = 1;
                 } else {
                     play_mode = Transport.play;
-                    if( !vd.sim_use_cpu ) {
+                    if( !vd.use_cpu ) {
                         sim_play_cmd_buffer_count = 2;
                     }
                 }
@@ -1262,8 +1270,8 @@ struct VDrive_Gui_State {
 
                 // setup parameter for profiling, sim_domain must be set manually
                 ImGui.SetCursorPosX( 160 );
-                if( ImGui.Checkbox( "Draw Ghia Profile", & sim_validate_ghia )) {
-                    if( sim_validate_ghia ) {
+                if( ImGui.Checkbox( "Draw Ghia Profile", & validate_ghia )) {
+                    if( validate_ghia ) {
 
                         bool update_descriptor = false;
 
@@ -1282,7 +1290,7 @@ struct VDrive_Gui_State {
                         }
 
                         sim_work_group_size[0] = 127;
-                        sim_use_double         = false;
+                        use_double             = false;
                         sim_layers             = 17;
 
                         // only if work group size or sim layers don't correspond to shader requirement
@@ -1302,7 +1310,7 @@ struct VDrive_Gui_State {
 
                         bool update_pso = false;
 
-                        if( vd.sim_use_double ) {
+                        if( vd.use_double ) {
                             if( sim_init_shader != "shader\\init_D2Q9_double.comp" ) {
                                 sim_init_shader  = "shader\\init_D2Q9_double.comp";
                                 update_pso = true;
@@ -1334,7 +1342,7 @@ struct VDrive_Gui_State {
                         compute_ubo.wall_thickness = 1;
 
                         immutable float[7] re = [ 100, 400, 1000, 3200, 5000, 7500, 10000 ];
-                        sim_viscosity = sim_wall_velocity * sim_typical_length / re[ sim_ghia_type ];  // typical_vel * sim_typical_length
+                        sim_viscosity = sim_wall_velocity * sim_typical_length / re[ ghia_type ];   // typical_vel * sim_typical_length
                         updateTauOmega;
                         updateComputeUBO;
                     }
@@ -1342,14 +1350,14 @@ struct VDrive_Gui_State {
 
 
                 ImGui.SetCursorPosX( 160 );
-                ImGui.Checkbox( "Draw Velocity Profile", & sim_validate_velocity );
+                ImGui.Checkbox( "Draw Velocity Profile", & validate_velocity );
 
                 ImGui.SetCursorPosX( 160 );
-                ImGui.Checkbox( "Draw Velocity Base", & sim_validate_vel_base );
+                ImGui.Checkbox( "Draw Velocity Base", & validate_vel_base );
 
-                if( ImGui.Combo( "Re Number", cast( int* )( & sim_ghia_type ), "   100\0   400\0  1000\0  3200\0  5000\0  7500\0 10000\0\0" )) {
+                if( ImGui.Combo( "Re Number", cast( int* )( & ghia_type ), "   100\0   400\0  1000\0  3200\0  5000\0  7500\0 10000\0\0" )) {
                     immutable float[7] re = [ 100, 400, 1000, 3200, 5000, 7500, 10000 ];
-                    sim_viscosity = sim_wall_velocity * sim_typical_length / re[ sim_ghia_type ];  // typical_vel * sim_typical_length
+                    sim_viscosity = sim_wall_velocity * sim_typical_length / re[ ghia_type ];   // typical_vel * sim_typical_length
                     updateTauOmega;
                     updateComputeUBO;
                 }
@@ -1371,8 +1379,8 @@ struct VDrive_Gui_State {
                 ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
 
                 ImGui.SetCursorPosX( 160 );
-                if( ImGui.Checkbox( "Draw Profile##1", & sim_validate_poiseuille_flow )) {
-                    if( sim_validate_poiseuille_flow ) {
+                if( ImGui.Checkbox( "Draw Profile##1", & validate_poiseuille_flow )) {
+                    if( validate_poiseuille_flow ) {
                         sim_line_display.velocity_axis  = Line_Axis.X;
                         sim_line_display.repl_axis      = Line_Axis.X;
                         sim_line_display.line_axis      = Line_Axis.Y;
@@ -1402,7 +1410,7 @@ struct VDrive_Gui_State {
                 ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
 
                 ImGui.SetCursorPosX( 160 );
-                ImGui.Checkbox( "Draw Profile##2", & sim_validate_taylor_green );
+                ImGui.Checkbox( "Draw Profile##2", & validate_taylor_green );
 
 
                 ImGui.PopItemWidth;
@@ -1421,7 +1429,7 @@ struct VDrive_Gui_State {
         if( ImGui.CollapsingHeader( "Export Ensight" )) {
             ImGui.Separator;
 
-            if( vd.sim_use_cpu ) {
+            if( vd.use_cpu ) {
                 ImGui.Text( "Export from CPU is not available" );
             } else {
 
@@ -1528,21 +1536,19 @@ struct VDrive_Gui_State {
     }
 
 
-
-
     //
     // helper
     //
     void checkComputeParams() {
-        sim_compute_dirty =
-            ( vd.sim_use_double != sim_use_double )
-        ||  ( vd.sim_use_3_dim  != sim_use_3_dim )
-        ||  ( vd.sim_domain     != sim_domain )
-        ||  ( vd.sim_layers     != sim_layers );
+        compute_dirty =
+            ( vd.use_double != use_double )
+        ||  ( vd.use_3_dim  != use_3_dim )
+        ||  ( vd.sim_domain != sim_domain )
+        ||  ( vd.sim_layers != sim_layers );
     }
 
     void checkComputePSO() {
-        sim_work_group_dirty = vd.sim_work_group_size != sim_work_group_size;
+        work_group_dirty = vd.sim_work_group_size != sim_work_group_size;
     }
 
     void updateTauOmega() {
@@ -1599,11 +1605,13 @@ struct VDrive_Gui_State {
     bool show_another_window        = false;
     bool show_imgui_examples        = false;
 
+
     //
     // used to determine fps
     //
     int resetFrameMax   = 0;
     float minFramerate  = 10000, maxFramerate = 0.0001f;
+
 
     //
     // Base item settings
@@ -1624,11 +1632,11 @@ struct VDrive_Gui_State {
     ubyte   device_count  = 1;      // initialize with one being the CPU
     char*   device_names;           // store all names of physical devices consecutively
     int     compute_device = 1;     // select compute device, 0 = CPU
-    //char**  device_names_ptr;     // store pointers to each individual string
 
 
-
-
+    //
+    // collect available devices
+    //
     void getAvailableDevices() {
 
         // This code here is a stub, as we have no opportunity to test on systems with multiple devices
@@ -1644,7 +1652,7 @@ struct VDrive_Gui_State {
         //devices_char_count += device_count * size_t.sizeof;  // sizeof( some_pointer );
 
         import core.stdc.string : strlen;
-        
+
         /*  // Use this loop to list all available vulkan devices
         foreach( ref gpu; gpus ) {
             devices_char_count += strlen( gpu.listProperties.deviceName.ptr ) + 1;
@@ -1675,10 +1683,10 @@ struct VDrive_Gui_State {
         device_names[ devices_char_count ] = '\0';  // we allocated devices_char_count + 1, hence no -1 required
     }
 
-    /////////////////////////////////////////////////////////////////////////////////////
-    // store available shader names concatenated and pointer into it as dynamic arrays //
-    /////////////////////////////////////////////////////////////////////////////////////
 
+    //
+    // store available shader names concatenated and pointer into it as dynamic arrays
+    //
     import vdrive.util.array;
     Array!( const( char )* )    shader_names_ptr;
     Array!char                  shader_names_combined;
@@ -1690,8 +1698,7 @@ struct VDrive_Gui_State {
     size_t  draw_shader_start_index;
     size_t  export_shader_start_index;
 
-
-
+    // parse shader directory
     void parseShaderDirectory( string path_to_dir = "shader" ) {
         import std.file : dirEntries, SpanMode;
         import std.path : stripExtension;
@@ -1828,9 +1835,7 @@ struct VDrive_Gui_State {
         //  }
     }
 
-    //
     // compare shader names of currently used shader and currently selected shader
-    //
     bool compareShaderNamesAndReplace( const( char* ) gui_shader, ref string sim_shader ) {
         import std.conv : to;
         import std.algorithm : cmp;
@@ -1842,13 +1847,10 @@ struct VDrive_Gui_State {
         return equal;
     }
 
-    //
     // detect if shader directory was modified
-    //
     import std.datetime : SysTime;
     SysTime shader_dir_mod_time;
     string  shader_dir;
-
     bool hasShaderDirChanged( string path_to_dir = "shader" ) {
         import std.file : getTimes;
         SysTime access_time, mod_time;                          // access times are irrelevant
@@ -1859,7 +1861,6 @@ struct VDrive_Gui_State {
         }
         return false;
     }
-
 }
 
 
@@ -1954,7 +1955,7 @@ void createRenderResources( ref VDrive_Gui_State vg ) {
         .addAttributeDescription( 2, 0, VK_FORMAT_R8G8B8A8_UNORM, ImDrawVert.col.offsetof )
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST )                           // set the input assembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vg.swapchain.imageExtent )         // add viewport and scissor state, necessary even if we use dynamic state
-        .cullMode( VK_CULL_MODE_NONE )                                                  // set rasterization state cull mode 
+        .cullMode( VK_CULL_MODE_NONE )                                                  // set rasterization state cull mode
         .depthState                                                                     // set depth state - enable depth test with default attributes
         .addColorBlendState( VK_TRUE )                                                  // color blend state - append common (default) color blend attachment state
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                                   // add dynamic states viewport
@@ -2063,12 +2064,12 @@ void registerCallbacks( ref VDrive_Gui_State vg ) {
     import input : input_registerCallbacks = registerCallbacks;
     input_registerCallbacks( vg.vd );   // here we use vg.vd to ensure that only the wrapped VDrive State struct becomes the user pointer
 
-    // now overwrite some of the input callbacks with these here (some of them also forward to input callbacks)
-    glfwSetWindowSizeCallback(      vg.window, & guiWindowSizeCallback );
-    glfwSetMouseButtonCallback(     vg.window, & guiMouseButtonCallback );
-    glfwSetScrollCallback(          vg.window, & guiScrollCallback );
-    glfwSetCharCallback(            vg.window, & guiCharCallback );
-    glfwSetKeyCallback(             vg.window, & guiKeyCallback );
+    // now overwrite some of the input callbacks (some of them also forward to input callbacks)
+    glfwSetWindowSizeCallback(  vg.window, & guiWindowSizeCallback );
+    glfwSetMouseButtonCallback( vg.window, & guiMouseButtonCallback );
+    glfwSetScrollCallback(      vg.window, & guiScrollCallback );
+    glfwSetCharCallback(        vg.window, & guiCharCallback );
+    glfwSetKeyCallback(         vg.window, & guiKeyCallback );
 }
 
 
@@ -2209,7 +2210,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     // Copy CPU buffer data to the gpu image
     //
-    if( vg.vd.sim_use_cpu && ( *vg ).isPlaying ) {
+    if( vg.vd.use_cpu && ( *vg ).isPlaying ) {
 
         // record image layout transition to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         cmd_buffer.recordTransition(
@@ -2287,7 +2288,7 @@ void drawGuiData( ImDrawData* draw_data ) {
         cmd_buffer.vkCmdPushConstants( vg.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sim_domain.sizeof, sim_domain.ptr ); //sim_line_display.scale.ptr );
 
         // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
-        cmd_buffer.vkCmdDraw( 4, 1 + vg.sim_draw_scale, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        cmd_buffer.vkCmdDraw( 4, 1 + vg.draw_scale, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
 
 
@@ -2307,8 +2308,8 @@ void drawGuiData( ImDrawData* draw_data ) {
     // set push constants and record draw commands for axis drawing
     //
     bool line_width_recorded = false;
-    if( vg.sim_draw_axis ) {
         bindPipeline( vg.draw_line_pso[ 0 ] );
+    if( vg.draw_axis ) {
         vg.sim_line_display.line_type = vg.Line_Type.axis;
 
         if( vg.vd.feature_wide_lines ) {
@@ -2322,8 +2323,8 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     // set push constants and record draw commands for grid drawing
     //
-    if( vg.sim_draw_grid ) {
         bindPipeline( vg.draw_line_pso[ 0 ] );
+    if( vg.draw_grid ) {
         vg.sim_line_display.line_type = vg.Line_Type.grid;
 
         if( vg.vd.feature_wide_lines && !line_width_recorded ) {
@@ -2362,7 +2363,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     // draw ghia validation profiles
     //
     import vdrive.util.util : toUint;
-    if( vg.sim_validate_ghia ) {
+    if( vg.validate_ghia ) {
 
         //
         // setup pipeline, either lines or points drawing
@@ -2384,7 +2385,7 @@ void drawGuiData( ImDrawData* draw_data ) {
         //
         // vertical lines
         //
-        vg.sim_line_display.repl_count      = cast( int )vg.sim_ghia_type;    // choose Re
+        vg.sim_line_display.repl_count      = cast( int )vg.ghia_type;  // choose Re
         vg.sim_line_display.line_axis       = vg.Line_Axis.Y;
         vg.sim_line_display.repl_axis       = vg.Line_Axis.X;
         vg.sim_line_display.velocity_axis   = vg.Line_Axis.X;
@@ -2396,7 +2397,7 @@ void drawGuiData( ImDrawData* draw_data ) {
         cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Line_Display.sizeof, & vg.sim_line_display );
         cmd_buffer.vkCmdDraw( 17, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
-        if( vg.sim_validate_velocity ) {
+        if( vg.validate_velocity ) {
             // adjust push constants and draw velocity line
             setPointSizeLineWidth( 1 );
             vg.sim_line_display.line_type = vg.Line_Type.velocity;
@@ -2404,7 +2405,7 @@ void drawGuiData( ImDrawData* draw_data ) {
             cmd_buffer.vkCmdDraw( vg.vd.sim_domain[ vg.sim_line_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
 
-        if( vg.sim_validate_vel_base ) {
+        if( vg.validate_vel_base ) {
             setPointSizeLineWidth( 2 );
             // adjust push constants and draw velocity line
             vg.sim_line_display.line_type = vg.Line_Type.vel_base;
@@ -2425,7 +2426,7 @@ void drawGuiData( ImDrawData* draw_data ) {
         cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.Sim_Line_Display.sizeof, & vg.sim_line_display );
         cmd_buffer.vkCmdDraw( 17, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
-        if( vg.sim_validate_velocity ) {
+        if( vg.validate_velocity ) {
             // adjust push constants and draw velocity line
             setPointSizeLineWidth( 1 );
             vg.sim_line_display.line_type = vg.Line_Type.velocity;
@@ -2433,7 +2434,7 @@ void drawGuiData( ImDrawData* draw_data ) {
             cmd_buffer.vkCmdDraw( vg.vd.sim_domain[ vg.sim_line_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
 
-        if( vg.sim_validate_vel_base ) {
+        if( vg.validate_vel_base ) {
             // adjust push constants and draw velocity base line
             setPointSizeLineWidth( 2 );
             vg.sim_line_display.line_type = vg.Line_Type.vel_base;
@@ -2457,7 +2458,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     // draw algorithmic poiseuille flow profile
     //
-    if( vg.sim_validate_poiseuille_flow ) {
+    if( vg.validate_poiseuille_flow ) {
 
         // setup pipeline, either lines or points drawing
         bindPipeline( vg.draw_line_pso[ vg.draw_velocity_lines_as_points.toUint ] );
@@ -2482,7 +2483,7 @@ void drawGuiData( ImDrawData* draw_data ) {
         bindPipeline( vg.draw_line_pso[ vg.draw_velocity_lines_as_points.toUint ] );
         auto pipeline_layout = vg.current_pso.pipeline_layout;
 
-        if( vg.sim_draw_vel_base ) {
+        if( vg.draw_vel_base ) {
             // push constant the whole sim_line_display struct
             setPointSizeLineWidth( 2 );
             vg.sim_line_display.line_type = vg.Line_Type.vel_base;
@@ -2508,7 +2509,7 @@ void drawGuiData( ImDrawData* draw_data ) {
         cmd_buffer.vkCmdPushConstants( vg.draw_part_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.particle_pc.sizeof, & vg.particle_pc );
         cmd_buffer.vkCmdDraw( vg.sim_particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
-    
+
 
 
     //
@@ -2551,7 +2552,6 @@ void drawGuiData( ImDrawData* draw_data ) {
         }
         vtx_offset += cmd_list.VtxBuffer.Size;
     }
-
 
     // end the render pass
     cmd_buffer.vkCmdEndRenderPass;
@@ -2642,9 +2642,9 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
     // return here on key up events, all functionality bellow requires key up events only
     if( val == 0 ) return;
 
-    // forward to input.guiKeyCallback
-    import input : inputKeyCallback = keyCallback;
-    inputKeyCallback( window, key, scancode, val, mod );
+    // forward to input.keyCallback
+    import input : keyCallback;
+    keyCallback( window, key, scancode, val, mod );
 
     // if window fullscreen event happened we will not be notified, we must catch the key itself
     auto vg = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData

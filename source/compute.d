@@ -26,8 +26,8 @@ void createSimBuffer( ref VDrive_State vd ) {
     // For D2Q9 we need 1 + 2 * 8 Shader Storage Buffers with sim_dim.x * sim_dim.y cells,
     // for 512 ^ 2 cells this means ( 1 + 2 * 8 ) * 4 * 512 * 512 = 17_825_792 bytes
     // create one buffer 1 + 2 * 8 buffer views into that buffer
-    uint32_t buffer_size = vd.sim_layers * vd.sim_domain[0] * vd.sim_domain[1] * ( vd.sim_use_3_dim ? vd.sim_domain[2] : 1 );
-    uint32_t buffer_mem_size = buffer_size * ( vd.sim_use_double ? double.sizeof : float.sizeof ).toUint;
+    uint32_t buffer_size = vd.sim_layers * vd.sim_domain[0] * vd.sim_domain[1] * ( vd.use_3_dim ? vd.sim_domain[2] : 1 );
+    uint32_t buffer_mem_size = buffer_size * ( vd.use_double ? double.sizeof : float.sizeof ).toUint;
 
     vd.sim_buffer( vd )
         .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_mem_size )
@@ -35,7 +35,7 @@ void createSimBuffer( ref VDrive_State vd ) {
 
     vd.sim_buffer_view =
         vd.createBufferView( vd.sim_buffer.buffer,
-            vd.sim_use_double ? VK_FORMAT_R32G32_UINT : VK_FORMAT_R32_SFLOAT, 0, buffer_mem_size );
+            vd.use_double ? VK_FORMAT_R32G32_UINT : VK_FORMAT_R32_SFLOAT, 0, buffer_mem_size );
 
 }
 
@@ -77,7 +77,7 @@ private void createBoltzmannPSO( ref VDrive_State vd, ref Core_Pipeline pso, str
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
         .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 8 )
         .construct( vd.compute_cache )          // construct using pipeline cache
-        .destroyShaderModule                    // destroy shader modules             
+        .destroyShaderModule                    // destroy shader modules
         .reset;                                 // reset temporary Meta_Compute struct and extract core pipeline data
 }
 
@@ -192,7 +192,7 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
         size                : VK_WHOLE_SIZE,
     };
 
-    
+
 
     //
     // otherwise record complex commands with memory barriers in loop
@@ -220,7 +220,7 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
             cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );   // dispatch compute command
 
             // buffer barrier to wait for all populations being written to memory
-            cmd_buffer.vkCmdPipelineBarrier(                
+            cmd_buffer.vkCmdPipelineBarrier(
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,       // VkPipelineStageFlags                 srcStageMask,
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,       // VkPipelineStageFlags                 dstStageMask,
                 0,                                          // VkDependencyFlags                    dependencyFlags,
@@ -231,6 +231,6 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
         }
 
         // finish recording current command buffer
-        cmd_buffer.vkEndCommandBuffer;                  
+        cmd_buffer.vkEndCommandBuffer;
     }
 }

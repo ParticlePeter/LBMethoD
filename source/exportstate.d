@@ -117,7 +117,7 @@ void createExportResources( ref VDrive_State vd ) {
     options.set_default_options;
 
     // setup domain parameter
-    if( vd.sim_use_3_dim ) vd.sim_domain[2] = 1;
+    if( vd.use_3_dim ) vd.sim_domain[2] = 1;
     float[3] minDomain = [ 0, 0, 0 ];
     float[3] maxDomain = [ vd.sim_domain[0], vd.sim_domain[1], vd.sim_domain[2] ];
     float[3] incDomain = [ 1, 1, 1 ];
@@ -150,7 +150,7 @@ void createExportResources( ref VDrive_State vd ) {
 
 void createExportBuffer( ref VDrive_State vd ) {
 
-    uint32_t buffer_size = vd.sim_domain[0] * vd.sim_domain[1] * ( vd.sim_use_3_dim ? vd.sim_domain[2] : 1 );
+    uint32_t buffer_size = vd.sim_domain[0] * vd.sim_domain[1] * ( vd.use_3_dim ? vd.sim_domain[2] : 1 );
     uint32_t buffer_mem_size = buffer_size * (( vd.export_as_vector ? 3 : 1 ) * float.sizeof ).toUint;
     auto header_size = ensGetBinaryVarHeaderSize;
 

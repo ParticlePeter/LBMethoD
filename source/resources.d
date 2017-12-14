@@ -54,21 +54,21 @@ void createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags command
     // draw submit info for vkQueueSubmit
     with( vd.submit_info ) {
         waitSemaphoreCount      = 1;
-        pWaitSemaphores         = &vd.acquired_semaphore[0];
-        pWaitDstStageMask       = &vd.submit_wait_stage_mask;   // configured before entering createResources func
+        pWaitSemaphores         = & vd.acquired_semaphore[0];
+        pWaitDstStageMask       = & vd.submit_wait_stage_mask;  // configured before entering createResources func
         commandBufferCount      = 1;
-    //  pCommandBuffers         = &vd.cmd_buffers[ i ];         // set before submission, choosing cmd_buffers[0/1]
+    //  pCommandBuffers         = & vd.cmd_buffers[ i ];        // set before submission, choosing cmd_buffers[0/1]
         signalSemaphoreCount    = 1;
-        pSignalSemaphores       = &vd.rendered_semaphore[0];
+        pSignalSemaphores       = & vd.rendered_semaphore[0];
     }
 
     // initialize present info for vkQueuePresentKHR
     with( vd.present_info ) {
         waitSemaphoreCount      = 1;
-        pWaitSemaphores         = &vd.rendered_semaphore[0];
+        pWaitSemaphores         = & vd.rendered_semaphore[0];
         swapchainCount          = 1;
-        pSwapchains             = &vd.swapchain.swapchain;
-    //  pImageIndices           = &next_image_index;            // set before presentation, using the acquired next_image_index
+        pSwapchains             = & vd.swapchain.swapchain;
+    //  pImageIndices           = & next_image_index;           // set before presentation, using the acquired next_image_index
     //  pResults                = null;                         // per swapchain prsentation results, redundant when using only one swapchain
     }
 }
@@ -126,8 +126,6 @@ void createMemoryObjects( ref VDrive_State vd ) {
     // cast the mapped memory pointer with its offset into the backing memory to our compute ubo struct and init_pso the memory
     vd.compute_ubo = cast( VDrive_State.Compute_UBO* )( mapped_memory + vd.compute_ubo_buffer.memOffset );
     vd.compute_ubo_flush = vd.compute_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the compute ubo
-    //vd.compute_ubo.collision_frequency = 1; //1.25; //2;
-    //vd.compute_ubo.wall_velocity = 0.1 * 3; //0.25 * 3;// / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
     vd.compute_ubo.collision_frequency = 1 / 0.504;
     vd.compute_ubo.wall_velocity    = 0.005 * 3; //0.25 * 3;// / vd.sim_speed_of_sound / vd.sim_speed_of_sound;
     vd.compute_ubo.wall_thickness   = 3;
@@ -199,7 +197,7 @@ void createSimImage( ref VDrive_State vd ) {
     // transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
     auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
     auto init_cmd_buffer_bi = createCmdBufferBI( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
-    init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
+    init_cmd_buffer.vkBeginCommandBuffer( & init_cmd_buffer_bi );
 
     // record image layout transition to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
     init_cmd_buffer.recordTransition(
@@ -214,7 +212,7 @@ void createSimImage( ref VDrive_State vd ) {
 
     init_cmd_buffer.vkEndCommandBuffer;                     // finish recording and submit the command
     auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
-    vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
+    vd.graphics_queue.vkQueueSubmit( 1, & submit_info, VK_NULL_HANDLE ).vkAssert;
 
     // staging buffer for cpu computed velocity copy to the sim_image
     if( vd.sim_stage_buffer.is_constructed ) {
@@ -274,7 +272,7 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
     vd.nearest_sampler = meta_sampler
         .filter( VK_FILTER_NEAREST, VK_FILTER_NEAREST )
     //  .addressMode( VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER )
-    //  .unnormalizedCoordinates( VK_TRUE )     // not requires to set as it is still set from edit before
+    //  .unnormalizedCoordinates( VK_TRUE )     // not required to set as it is still set from edit before
         .construct
         .sampler;
 
@@ -307,7 +305,7 @@ void createDescriptorSet( ref VDrive_State vd, Meta_Descriptor* meta_descriptor_
         .addLayoutBinding( 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT )
         .addBufferInfo( vd.display_ubo_buffer.buffer )
 
-        // Particle Buffer 
+        // Particle Buffer
         .addLayoutBinding( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
         .addTexelBufferView( vd.sim_particle_buffer_view )
 
@@ -424,7 +422,7 @@ void createRenderResources( ref VDrive_State vd ) {
 
     // Note: to get GPU swapchain capabilities to check for possible image usages
     //VkSurfaceCapabilitiesKHR surface_capabilities;
-    //vkGetPhysicalDeviceSurfaceCapabilitiesKHR( swapchain.gpu, swapchain.swapchain, &surface_capabilities );
+    //vkGetPhysicalDeviceSurfaceCapabilitiesKHR( swapchain.gpu, swapchain.swapchain, & surface_capabilities );
     //surface_capabilities.printTypeInfo;
 
     // we need to know the swapchain image format before we create a render pass
@@ -437,9 +435,8 @@ void createRenderResources( ref VDrive_State vd ) {
     // list of preferred formats and modes, the first found will be used, otherwise the first available not in lists
     VkFormat[4] request_format = [ VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM ];
     VkPresentModeKHR[3] request_mode = [ VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
-    //VkPresentModeKHR[2] request_mode = [ VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
 
-
+    // parametrize swapchain but postpone construction
     vd.swapchain( vd )
         .selectSurfaceFormat( request_format )
         .selectPresentMode( request_mode )
@@ -481,7 +478,7 @@ void createRenderResources( ref VDrive_State vd ) {
     vd.createGraphicsPSO;       // to draw the display plane
     vd.createParticlePSO;       // particle pso to visualize influnece of velocity field
     vd.createLinePSO;           // line /  PSO to draw velocity lines coordinate axis, grid and 3D bounding box
-    vd.createComputeResources;  // create all resources for the compute pipeline 
+    vd.createComputeResources;  // create all resources for the compute pipeline
 }
 
 
@@ -497,7 +494,7 @@ void resizeRenderResources( ref VDrive_State vd ) {
     vd.swapchain.construct;
 
     // set the corresponding present info member to the (re)constructed swapchain
-    vd.present_info.pSwapchains = &vd.swapchain.swapchain;
+    vd.present_info.pSwapchains = & vd.swapchain.swapchain;
 
 
 
@@ -535,7 +532,7 @@ void resizeRenderResources( ref VDrive_State vd ) {
 
     VkCommandBufferBeginInfo cmd_buffer_begin_info = {
         flags : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, };
-    vkBeginCommandBuffer( cmd_buffer, &cmd_buffer_begin_info );
+    vkBeginCommandBuffer( cmd_buffer, & cmd_buffer_begin_info );
 
     cmd_buffer.recordTransition(
         vd.depth_image.image,
@@ -553,7 +550,7 @@ void resizeRenderResources( ref VDrive_State vd ) {
 
     // submit the command buffer
     auto submit_info = cmd_buffer.queueSubmitInfo;
-    vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
+    vd.graphics_queue.vkQueueSubmit( 1, & submit_info, VK_NULL_HANDLE ).vkAssert;
 
 
 
@@ -626,11 +623,11 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
         vd.render_pass.attachFramebuffer( vd.framebuffers( i ));
 
         // begin command buffer recording
-        cmd_buffer.vkBeginCommandBuffer( &cmd_buffer_begin_info );
+        cmd_buffer.vkBeginCommandBuffer( & cmd_buffer_begin_info );
 
         // take care of dynamic state
-        cmd_buffer.vkCmdSetViewport( 0, 1, &vd.viewport );
-        cmd_buffer.vkCmdSetScissor(  0, 1, &vd.scissors );
+        cmd_buffer.vkCmdSetViewport( 0, 1, & vd.viewport );
+        cmd_buffer.vkCmdSetScissor(  0, 1, & vd.scissors );
 
         // bind descriptor set
         cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
@@ -638,13 +635,13 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
             vd.graphics_pso.pipeline_layout,    // VkPipelineLayout             layout
             0,                                  // uint32_t                     firstSet
             1,                                  // uint32_t                     descriptorSetCount
-            &vd.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
+            & vd.descriptor.descriptor_set,     // const( VkDescriptorSet )*    pDescriptorSets
             0,                                  // uint32_t                     dynamicOffsetCount
             null                                // const( uint32_t )*           pDynamicOffsets
         );
 
         // begin the render pass
-        cmd_buffer.vkCmdBeginRenderPass( &vd.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
+        cmd_buffer.vkCmdBeginRenderPass( & vd.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
 
         // bind lbmd display plane pipeline and draw
         if( vd.draw_display ) {
@@ -732,8 +729,5 @@ void destroyResources( ref VDrive_State vd ) {
     // export resources
     import exportstate;
     vd.destroyExportResources;
-    //if( vd.comp_export_pso.is_constructed ) vd.destroy( vd.comp_export_pso );
-    //if( vd.export_buffer[0].is_constructed ) vd.export_buffer[0].destroyResources;
-    //if( vd.export_buffer_view[0] != VK_NULL_HANDLE ) vd.destroy( vd.export_buffer_view[0] );
 }
 
