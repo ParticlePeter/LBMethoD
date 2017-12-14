@@ -21,7 +21,7 @@ struct VDrive_Cpu_State {
     double* popul_buffer_d;
     ubyte   ping;
     size_t  current_buffer_mem_size;
-    float*  sim_image_ptr;              // cpu simulation resources
+    float*  sim_image_ptr;              // pointer to mapped image to be displayd
     float*  sim_export_ptr;
 
 }
@@ -32,26 +32,26 @@ struct VDrive_Cpu_State {
 void cpuInit( ref VDrive_State vd ) {
     vd.vc.ping = 8;
 
-        if( vd.vc.popul_buffer_d is null || vd.sim_image_ptr is null )
     if( vd.use_double ) {
+        if( vd.vc.popul_buffer_d is null || vd.vc.sim_image_ptr is null )
             vd.cpuReset;
 
         for( int I = 0; I < vd.vc.cell_count; ++I ) {
-            vd.sim_image_ptr[ 2 * I + 0 ] = 0;
-            vd.sim_image_ptr[ 2 * I + 1 ] = 0;
+            vd.vc.sim_image_ptr[ 2 * I + 0 ] = 0;
+            vd.vc.sim_image_ptr[ 2 * I + 1 ] = 0;
             for( int p = 0; p < 9; ++p )  {
                 float w = vd.vc.pw[ p ];
                 vd.vc.popul_buffer_d[ p * vd.vc.cell_count + I ] = w;
             }
         }
     } else {
-        if( vd.vc.popul_buffer_f is null || vd.sim_image_ptr is null )
+        if( vd.vc.popul_buffer_f is null || vd.vc.sim_image_ptr is null )
             vd.cpuReset;
 
         for( int I = 0; I < vd.vc.cell_count; ++I ) {
             // init display image velocity
-            vd.sim_image_ptr[ 2 * I + 0 ] = 0;
-            vd.sim_image_ptr[ 2 * I + 1 ] = 0;
+            vd.vc.sim_image_ptr[ 2 * I + 0 ] = 0;
+            vd.vc.sim_image_ptr[ 2 * I + 1 ] = 0;
             // init all distribution f(unctions) with equilibrium, p = population
             for( int p = 0; p < 9; ++p )  {
                 float w = vd.vc.pw[ p ];
@@ -221,10 +221,10 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State vd ) nothrow @system {
             T v_y = ( f[2] - f[4] + f[5] - f[7] + f[6] - f[8] ) / rho;
 
             // store velocities and densities in stage buffer to copy to image with format VK_FORMAT_R32G32B32A32_SFLOAT
-            vd.sim_image_ptr[ 4 * I + 0 ] = cast( float )v_x;
-            vd.sim_image_ptr[ 4 * I + 1 ] = cast( float )v_y;
-            vd.sim_image_ptr[ 4 * I + 2 ] = 0;
-            vd.sim_image_ptr[ 4 * I + 3 ] = 1;
+            vd.vc.sim_image_ptr[ 4 * I + 0 ] = cast( float )v_x;
+            vd.vc.sim_image_ptr[ 4 * I + 1 ] = cast( float )v_y;
+            vd.vc.sim_image_ptr[ 4 * I + 2 ] = 0;
+            vd.vc.sim_image_ptr[ 4 * I + 3 ] = 1;
 
             T[9] f_eq = [
                 vd.vc.pw[0] * rho * (1                                                        - 1.5 * (v_x * v_x + v_y * v_y)), // vd.vc.pw[0] * rho * ( 1                     - V_D_V ), //

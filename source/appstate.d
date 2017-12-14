@@ -125,7 +125,6 @@ struct VDrive_State {
     //
     import cpustate;
     VDrive_Cpu_State            vc;
-    float*                      sim_image_ptr;             // pointer to the mapped image
 
 
     /////////////////////////////////////////////////

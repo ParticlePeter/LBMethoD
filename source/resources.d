@@ -223,7 +223,7 @@ void createSimImage( ref VDrive_State vd ) {
     uint32_t buffer_size = 4 * vd.sim_domain[0] * vd.sim_domain[1];     // only in 2D and with VK_FORMAT_R32G32B32A32_SFLOAT
     uint32_t buffer_mem_size = buffer_size * float.sizeof.toUint;
 
-    vd.sim_image_ptr = cast( float* )( vd.sim_stage_buffer( vd )
+    vd.vc.sim_image_ptr = cast( float* )( vd.sim_stage_buffer( vd )
         .create( VK_BUFFER_USAGE_TRANSFER_SRC_BIT, buffer_mem_size )
         .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
         .mapMemory );
