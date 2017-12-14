@@ -40,8 +40,10 @@ void createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags command
 
 
     // rendering and presenting semaphores for VkSubmitInfo, VkPresentInfoKHR and vkAcquireNextImageKHR
-    vd.acquired_semaphore = vd.createSemaphore;    // signaled when a new swapchain image is acquired
-    vd.rendered_semaphore = vd.createSemaphore;    // signaled when submitted command buffer(s) complete execution
+    foreach( i; 0 .. vd.MAX_FRAMES ) {
+        vd.acquired_semaphore[i] = vd.createSemaphore;    // signaled when a new swapchain image is acquired
+        vd.rendered_semaphore[i] = vd.createSemaphore;    // signaled when submitted command buffer(s) complete execution
+    }
 
 
 
@@ -52,18 +54,18 @@ void createCommandObjects( ref VDrive_State vd, VkCommandPoolCreateFlags command
     // draw submit info for vkQueueSubmit
     with( vd.submit_info ) {
         waitSemaphoreCount      = 1;
-        pWaitSemaphores         = &vd.acquired_semaphore;
+        pWaitSemaphores         = &vd.acquired_semaphore[0];
         pWaitDstStageMask       = &vd.submit_wait_stage_mask;   // configured before entering createResources func
         commandBufferCount      = 1;
     //  pCommandBuffers         = &vd.cmd_buffers[ i ];         // set before submission, choosing cmd_buffers[0/1]
         signalSemaphoreCount    = 1;
-        pSignalSemaphores       = &vd.rendered_semaphore;
+        pSignalSemaphores       = &vd.rendered_semaphore[0];
     }
 
     // initialize present info for vkQueuePresentKHR
     with( vd.present_info ) {
         waitSemaphoreCount      = 1;
-        pWaitSemaphores         = &vd.rendered_semaphore;
+        pWaitSemaphores         = &vd.rendered_semaphore[0];
         swapchainCount          = 1;
         pSwapchains             = &vd.swapchain.swapchain;
     //  pImageIndices           = &next_image_index;            // set before presentation, using the acquired next_image_index
@@ -723,11 +725,9 @@ void destroyResources( ref VDrive_State vd ) {
     // command and synchronize
     vd.destroy( vd.cmd_pool );
     vd.destroy( vd.sim_cmd_pool );
-    vd.destroy( vd.acquired_semaphore );
-    vd.destroy( vd.rendered_semaphore );
-    foreach( ref fence; vd.submit_fence )
-        vd.destroy( fence );
-
+    foreach( ref f; vd.submit_fence )       vd.destroy( f );
+    foreach( ref s; vd.acquired_semaphore ) vd.destroy( s );
+    foreach( ref s; vd.rendered_semaphore ) vd.destroy( s );
 
     // export resources
     import exportstate;

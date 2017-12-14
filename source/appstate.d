@@ -63,8 +63,8 @@ struct VDrive_State {
 
     // synchronize
     VkFence[ MAX_FRAMES ]       submit_fence;
-    VkSemaphore                 acquired_semaphore;
-    VkSemaphore                 rendered_semaphore;
+    VkSemaphore[ MAX_FRAMES ]   acquired_semaphore;
+    VkSemaphore[ MAX_FRAMES ]   rendered_semaphore;
     uint32_t                    next_image_index;
 
 
@@ -414,14 +414,12 @@ struct VDrive_State {
             updateWVPM;  // this happens anyway in recreateSwapchain
         }
 
-        
-        // acquire next swapchain image
-        vk.device.vkAcquireNextImageKHR( swapchain.swapchain, uint64_t.max, acquired_semaphore, VK_NULL_HANDLE, &next_image_index );
+        // acquire next swapchain image, we use semaphore[0] which is also the first one on which we wait before our first real draw
+        vk.device.vkAcquireNextImageKHR( swapchain.swapchain, uint64_t.max, acquired_semaphore[0], VK_NULL_HANDLE, & next_image_index );
 
-        // wait for finished drawing
-        vk.device.vkWaitForFences( 1, &submit_fence[ next_image_index ], VK_TRUE, uint64_t.max );
-        vk.device.vkResetFences( 1, &submit_fence[ next_image_index ] ).vkAssert;
-        
+        // reset the fence corresponding to the currently acquired image index, will be signal after next draw
+        vk.device.vkResetFences( 1, & submit_fence[ next_image_index ] ).vkAssert;
+
     }
 
 
@@ -459,6 +457,9 @@ struct VDrive_State {
         // present rendered image
         present_info.pImageIndices = &next_image_index;
         swapchain.present_queue.vkQueuePresentKHR( &present_info );
+        submit_info.pWaitSemaphores     = & acquired_semaphore[ next_image_index ];
+        submit_info.pSignalSemaphores   = & rendered_semaphore[ next_image_index ];
+        present_info.pWaitSemaphores    = & rendered_semaphore[ next_image_index ];
 
 
         // check if window was resized and handle the case
@@ -472,7 +473,8 @@ struct VDrive_State {
         }
 
         // acquire next swapchain image
-        vk.device.vkAcquireNextImageKHR( swapchain.swapchain, uint64_t.max, acquired_semaphore, VK_NULL_HANDLE, &next_image_index );
+        vk.device.vkAcquireNextImageKHR( swapchain.swapchain, uint64_t.max, acquired_semaphore[ next_image_index ], VK_NULL_HANDLE, & next_image_index );
+
 
         // wait for finished drawing
         vk.device.vkWaitForFences( 1, &submit_fence[ next_image_index ], VK_TRUE, uint64_t.max );
@@ -537,7 +539,7 @@ void profileSim( ref VDrive_State vd ) @system {
         pWaitSemaphores         = null;
         pWaitDstStageMask       = null;
         signalSemaphoreCount    = 1;
-        pSignalSemaphores       = &vd.rendered_semaphore;
+        pSignalSemaphores       = & vd.rendered_semaphore[ vd.next_image_index ];
         pCommandBuffers         = & vd.cmd_buffers[ vd.next_image_index ];
     }
 
@@ -562,18 +564,21 @@ void profileSim( ref VDrive_State vd ) @system {
     }
 
     // acquire next swapchain image
-    vd.device.vkAcquireNextImageKHR( vd.swapchain.swapchain, uint64_t.max, vd.acquired_semaphore, VK_NULL_HANDLE, &vd.next_image_index );
-
-    // wait for finished drawing
-    vd.device.vkWaitForFences( 1, &vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );
-    vd.device.vkResetFences( 1, &vd.submit_fence[ vd.next_image_index ] ).vkAssert;
+    vd.device.vkAcquireNextImageKHR( vd.swapchain.swapchain, uint64_t.max, vd.acquired_semaphore[ vd.next_image_index ], VK_NULL_HANDLE, & vd.next_image_index );
 
     // edit submmit info to default settings
     with( vd.submit_info ) {
-        waitSemaphoreCount      = 1;
-        pWaitSemaphores         = &vd.acquired_semaphore;
-        pWaitDstStageMask       = &vd.submit_wait_stage_mask;   // configured before entering createResources func
+        waitSemaphoreCount  = 1;
+        pWaitSemaphores     = & vd.acquired_semaphore[ vd.next_image_index ];
+        pWaitDstStageMask   = & vd.submit_wait_stage_mask;   // configured before entering createResources func
     }
+    vd.present_info.pWaitSemaphores = & vd.rendered_semaphore[ vd.next_image_index ];
+
+    // wait for finished drawing
+    vd.device.vkWaitForFences( 1, & vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );
+    vd.device.vkResetFences( 1, & vd.submit_fence[ vd.next_image_index ] ).vkAssert;
+
+
 }
 
 
