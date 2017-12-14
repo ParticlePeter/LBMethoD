@@ -383,14 +383,14 @@ void updateDescriptorSet( ref VDrive_State vd ) {
 void createGraphicsPSO( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
-    if( vd.graphics_pso.pipeline != VK_NULL_HANDLE ) {
+    if( vd.display_pso.pipeline != VK_NULL_HANDLE ) {
         vd.graphics_queue.vkQueueWaitIdle;
-        vd.destroy( vd.graphics_pso );
+        vd.destroy( vd.display_pso );
     }
 
     // create the pso
     Meta_Graphics meta_graphics;
-    vd.graphics_pso = meta_graphics( vd )
+    vd.display_pso = meta_graphics( vd )
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_display.vert" ))
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_display.frag" ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
@@ -632,7 +632,7 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
         // bind descriptor set
         cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
             VK_PIPELINE_BIND_POINT_GRAPHICS,    // VkPipelineBindPoint          pipelineBindPoint
-            vd.graphics_pso.pipeline_layout,    // VkPipelineLayout             layout
+            vd.display_pso.pipeline_layout,     // VkPipelineLayout             layout
             0,                                  // uint32_t                     firstSet
             1,                                  // uint32_t                     descriptorSetCount
             & vd.descriptor.descriptor_set,     // const( VkDescriptorSet )*    pDescriptorSets
@@ -645,12 +645,12 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
 
         // bind lbmd display plane pipeline and draw
         if( vd.draw_display ) {
-            
-            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.graphics_pso.pipeline );
+
+            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.display_pso.pipeline );
 
             // push constant the sim display scale
             float[2] sim_domain = [ vd.sim_domain[0], vd.sim_domain[1] ];
-            cmd_buffer.vkCmdPushConstants( vd.graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sim_domain.sizeof, sim_domain.ptr );
+            cmd_buffer.vkCmdPushConstants( vd.display_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sim_domain.sizeof, sim_domain.ptr );
 
             // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
             cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
@@ -658,8 +658,8 @@ void createResizedCommands( ref VDrive_State vd ) nothrow {
 
         // bind particle pipeline and draw
         if( vd.draw_particles ) {
-            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.draw_part_pso.pipeline );
-            cmd_buffer.vkCmdPushConstants( vd.draw_part_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vd.particle_pc.sizeof, & vd.particle_pc );
+            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.particle_pso.pipeline );
+            cmd_buffer.vkCmdPushConstants( vd.particle_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vd.particle_pc.sizeof, & vd.particle_pc );
             cmd_buffer.vkCmdDraw( vd.sim_particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
 
@@ -712,7 +712,7 @@ void destroyResources( ref VDrive_State vd ) {
     vd.render_pass.destroyResources;
     vd.framebuffers.destroyResources;
     vd.destroy( vd.descriptor );
-    vd.destroy( vd.graphics_pso );
+    vd.destroy( vd.display_pso );
     vd.destroy( vd.comp_init_pso );
     vd.destroy( vd.comp_loop_pso );
 

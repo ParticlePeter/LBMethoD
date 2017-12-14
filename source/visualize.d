@@ -73,9 +73,9 @@ void resetParticleBuffer( ref VDrive_State vd ) nothrow {
 void createParticlePSO( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
-    if( vd.draw_part_pso.pipeline != VK_NULL_HANDLE ) {
+    if( vd.particle_pso.pipeline != VK_NULL_HANDLE ) {
         vd.graphics_queue.vkQueueWaitIdle;
-        vd.destroy( vd.draw_part_pso );
+        vd.destroy( vd.particle_pso );
     }
 
     //
@@ -101,9 +101,9 @@ void createParticlePSO( ref VDrive_State vd ) {
             .setAlphaBlendState( VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_DST_ALPHA );
     } else {
         meta_graphics.addColorBlendState( VK_TRUE );
-    }      
+    }
 
-    vd.draw_part_pso = meta_graphics
+    vd.particle_pso = meta_graphics
         .construct( vd.graphics_cache )                                             // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct
@@ -117,7 +117,7 @@ void createParticlePSO( ref VDrive_State vd ) {
 void createLinePSO( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
-    foreach( ref pso; vd.draw_line_pso ) {
+    foreach( ref pso; vd.lines_pso ) {
         if( pso.is_constructed ) {
             vd.graphics_queue.vkQueueWaitIdle;
             vd.destroy( pso );
@@ -126,8 +126,8 @@ void createLinePSO( ref VDrive_State vd ) {
 
     // first create PSO to draw lines
     Meta_Graphics meta_graphics;
-    vd.draw_line_pso[ 1 ] = meta_graphics( vd )
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.vert" ))
+    vd.lines_pso[ 1 ] = meta_graphics( vd )
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.frag" ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_POINT_LIST )                          // set the inputAssembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
@@ -148,7 +148,7 @@ void createLinePSO( ref VDrive_State vd ) {
     if( vd.feature_wide_lines )
         meta_graphics.addDynamicState( VK_DYNAMIC_STATE_LINE_WIDTH );
 
-    vd.draw_line_pso[ 0 ] = meta_graphics
+    vd.lines_pso[ 0 ] = meta_graphics
         .construct( vd.graphics_cache )                                             // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct and delete temporary data
@@ -162,11 +162,11 @@ void createLinePSO( ref VDrive_State vd ) {
 void destroyVisualizeResources( ref VDrive_State vd ) {
 
     // particle resources
-    vd.destroy( vd.draw_part_pso );
+    vd.destroy( vd.particle_pso );
     vd.destroy( vd.sim_particle_buffer_view );
     vd.sim_particle_buffer.destroyResources;
 
     // line resources
-    if( vd.draw_line_pso[0].is_constructed ) vd.destroy( vd.draw_line_pso[0] );
-    if( vd.draw_line_pso[1].is_constructed ) vd.destroy( vd.draw_line_pso[1] );
+    if( vd.lines_pso[0].is_constructed ) vd.destroy( vd.lines_pso[0] );
+    if( vd.lines_pso[1].is_constructed ) vd.destroy( vd.lines_pso[1] );
 }

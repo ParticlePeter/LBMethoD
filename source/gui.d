@@ -2263,7 +2263,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     // bind descriptor set - we do not have to rebind this for other pipelines as long as the pipeline layouts are compatible
     cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
         VK_PIPELINE_BIND_POINT_GRAPHICS,    // VkPipelineBindPoint          pipelineBindPoint
-        vg.current_pso.pipeline_layout,     // VkPipelineLayout             layout
+        vg.display_pso.pipeline_layout,     // VkPipelineLayout             layout
         0,                                  // uint32_t                     firstSet
         1,                                  // uint32_t                     descriptorSetCount
         &vg.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
@@ -2304,12 +2304,13 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
+
     //
     // set push constants and record draw commands for axis drawing
     //
     bool line_width_recorded = false;
-        bindPipeline( vg.draw_line_pso[ 0 ] );
     if( vg.draw_axis ) {
+        bindPipeline( vg.lines_pso[ 0 ] );
         vg.sim_line_display.line_type = vg.Line_Type.axis;
 
         if( vg.vd.feature_wide_lines ) {
@@ -2323,8 +2324,8 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     // set push constants and record draw commands for grid drawing
     //
-        bindPipeline( vg.draw_line_pso[ 0 ] );
     if( vg.draw_grid ) {
+        bindPipeline( vg.lines_pso[ 0 ] );
         vg.sim_line_display.line_type = vg.Line_Type.grid;
 
         if( vg.vd.feature_wide_lines && !line_width_recorded ) {
@@ -2368,7 +2369,7 @@ void drawGuiData( ImDrawData* draw_data ) {
         //
         // setup pipeline, either lines or points drawing
         //
-        bindPipeline( vg.draw_line_pso[ vg.draw_velocity_lines_as_points.toUint ] );
+        bindPipeline( vg.lines_pso[ vg.draw_velocity_lines_as_points.toUint ] );
         auto pipeline_layout = vg.current_pso.pipeline_layout;
 
 
@@ -2461,7 +2462,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     if( vg.validate_poiseuille_flow ) {
 
         // setup pipeline, either lines or points drawing
-        bindPipeline( vg.draw_line_pso[ vg.draw_velocity_lines_as_points.toUint ] );
+        bindPipeline( vg.lines_pso[ vg.draw_velocity_lines_as_points.toUint ] );
         auto pipeline_layout = vg.current_pso.pipeline_layout;
 
         // push constant the whole sim_line_display struct and draw
@@ -2480,7 +2481,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     if( vg.sim_line_display.repl_count ) {
 
         // setup pipeline, either lines or points drawing
-        bindPipeline( vg.draw_line_pso[ vg.draw_velocity_lines_as_points.toUint ] );
+        bindPipeline( vg.lines_pso[ vg.draw_velocity_lines_as_points.toUint ] );
         auto pipeline_layout = vg.current_pso.pipeline_layout;
 
         if( vg.draw_vel_base ) {
@@ -2505,8 +2506,8 @@ void drawGuiData( ImDrawData* draw_data ) {
     // bind particle pipeline and draw
     //
     if( vg.draw_particles ) {
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.draw_part_pso.pipeline );
-        cmd_buffer.vkCmdPushConstants( vg.draw_part_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.particle_pc.sizeof, & vg.particle_pc );
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.particle_pso.pipeline );
+        cmd_buffer.vkCmdPushConstants( vg.particle_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, vg.particle_pc.sizeof, & vg.particle_pc );
         cmd_buffer.vkCmdDraw( vg.sim_particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
 

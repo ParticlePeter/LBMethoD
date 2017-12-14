@@ -76,7 +76,6 @@ struct VDrive_State {
 
     // render setup
     Meta_Renderpass             render_pass;
-    Core_Pipeline               graphics_pso;
     VkPipelineCache             graphics_cache;
     Meta_FB!( MAX_FRAMES, 2 )   framebuffers;           // template count of ( VkFramebuffer, VkClearValue )
     VkViewport                  viewport;               // dynamic state viewport
@@ -106,12 +105,13 @@ struct VDrive_State {
     uint32_t                    sim_particle_count = 400 * 225;
     Meta_Buffer                 sim_particle_buffer;
     VkBufferView                sim_particle_buffer_view;
-    Core_Pipeline               draw_part_pso;
-    Core_Pipeline[2]            draw_line_pso;
+    Core_Pipeline               display_pso;
+    Core_Pipeline               particle_pso;
+    Core_Pipeline[2]            lines_pso;
 
 
     // export resources
-    Core_Pipeline               comp_export_pso;
+    Core_Pipeline               export_pso;
     Meta_Memory                 export_memory;
     Meta_Buffer[2]              export_buffer;
     VkBufferView[2]             export_buffer_view;

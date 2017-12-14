@@ -235,13 +235,13 @@ void createExportBuffer( ref VDrive_State vd ) {
 
 void createExportPipeline( ref VDrive_State vd ) {
 
-    if( vd.comp_export_pso.is_constructed ) {
+    if( vd.export_pso.is_constructed ) {
         vd.graphics_queue.vkQueueWaitIdle;          // wait for queue idle as we need to destroy the pipeline
-        vd.destroy( vd.comp_export_pso );
+        vd.destroy( vd.export_pso );
     }
 
     Meta_Compute meta_compute;                      // use temporary Meta_Compute struct to specify and create the pso
-    vd.comp_export_pso = meta_compute( vd )         // extracting the core items after construction with reset call
+    vd.export_pso = meta_compute( vd )         // extracting the core items after construction with reset call
         .shaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_COMPUTE_BIT, vd.export_shader ))
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
         .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 8 )
@@ -322,11 +322,11 @@ void createExportCommands( ref VDrive_State vd ) nothrow {
 
         cmd_buffer.vkBeginCommandBuffer( &sim_cmd_buffers_bi );  // begin command buffer recording
 
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.comp_export_pso.pipeline );    // bind compute vd.comp_export_pso.pipeline
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.export_pso.pipeline );    // bind compute vd.export_pso.pipeline
 
         cmd_buffer.vkCmdBindDescriptorSets(             // VkCommandBuffer              commandBuffer
             VK_PIPELINE_BIND_POINT_COMPUTE,             // VkPipelineBindPoint          pipelineBindPoint
-            vd.comp_export_pso.pipeline_layout,         // VkPipelineLayout             layout
+            vd.export_pso.pipeline_layout,              // VkPipelineLayout             layout
             0,                                          // uint32_t                     firstSet
             1,                                          // uint32_t                     descriptorSetCount
             &vd.descriptor.descriptor_set,              // const( VkDescriptorSet )*    pDescriptorSets
@@ -340,7 +340,7 @@ void createExportCommands( ref VDrive_State vd ) nothrow {
         // to get proper results, the pong range of the population buffer and the macroscopic property image
         // must be properly initialized
         uint32_t[2] push_constant = [ ( i + 1 ).toUint % 2, vd.sim_layers ];
-        cmd_buffer.vkCmdPushConstants( vd.comp_export_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
+        cmd_buffer.vkCmdPushConstants( vd.export_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
 
         cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );   // dispatch compute command
 
@@ -411,7 +411,7 @@ void createExportCommands( ref VDrive_State vd ) nothrow {
 
 void destroyExportResources( ref VDrive_State vd ) {
     // export resources
-    if( vd.comp_export_pso.is_constructed ) vd.destroy( vd.comp_export_pso );
+    if( vd.export_pso.is_constructed ) vd.destroy( vd.export_pso );
     if( vd.export_memory.is_constructed ) vd.export_memory.destroyResources;
     if( vd.export_buffer[0].is_constructed ) vd.export_buffer[0].destroyResources;
     if( vd.export_buffer[1].is_constructed ) vd.export_buffer[1].destroyResources;
