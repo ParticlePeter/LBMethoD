@@ -1002,7 +1002,7 @@ struct VDrive_Gui_State {
 
             if( ImGui.BeginPopupContextItem( "Display Property Context Menu" )) {
                 if( ImGui.Selectable( "Parse Display Shader" )) {
-                    vd.createGraphicsPSO;
+                    vd.createDisplayPSO;
                 } ImGui.EndPopup();
             }
 
@@ -2658,10 +2658,10 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
 
     // turn gui on or off with tab key
     switch( key ) {
-        case GLFW_KEY_F2    : vg.show_imgui_examples ^= 1;                                                      break;
-        case GLFW_KEY_P     : try { vg.vd.createLinePSO;     } catch( Exception ) {}                            break;
-        case GLFW_KEY_D     : try { vg.vd.createGraphicsPSO; } catch( Exception ) {}                            break;
-        default             :                                                                                   break;
+        case GLFW_KEY_F2    : vg.show_imgui_examples ^= 1;                              break;
+        case GLFW_KEY_P     : try { vg.vd.createLinePSO;    } catch( Exception ) {}     break;
+        case GLFW_KEY_D     : try { vg.vd.createDisplayPSO; } catch( Exception ) {}     break;
+        default             :                                                           break;
     }
 }
 

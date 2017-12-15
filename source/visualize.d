@@ -45,7 +45,42 @@ struct VDrive_Visualize_State {
 
 
 
-/// create particle buffer
+/////////////////////////////////
+// create display graphics PSO //
+/////////////////////////////////
+void createDisplayPSO( ref VDrive_State vd ) {
+
+    // if we are recreating an old pipeline exists already, destroy it first
+    if( vd.vv.display_pso.pipeline != VK_NULL_HANDLE ) {
+        vd.graphics_queue.vkQueueWaitIdle;
+        vd.destroy( vd.vv.display_pso );
+    }
+
+    // create the pso
+    Meta_Graphics meta_graphics;
+    vd.vv.display_pso = meta_graphics( vd )
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_display.vert" ))
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_display.frag" ))
+        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
+        .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
+        .depthState                                                                 // set depth state - enable depth test with default attributes
+        .addColorBlendState( VK_FALSE )                                             // color blend state - append common (default) color blend attachment state
+        .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
+        .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
+        .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )              // describe pipeline layout
+        .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 8 )                   // specify push constant range
+        .renderPass( vd.render_pass.render_pass )                                   // describe compatible render pass
+        .construct( vd.vv.graphics_cache )                                             // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
+        .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
+        .reset;                                                                     // extract core data into Core_Pipeline struct
+}
+
+
+
+////////////////////////////
+// create particle buffer //
+////////////////////////////
 void createParticleBuffer( ref VDrive_State vd ) {
 
     // (re)create buffer and buffer view
