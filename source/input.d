@@ -54,8 +54,8 @@ void initTrackball( ref VDrive_State vd ) {
 
     import std.math : tan;
     enum deg2rad = 0.0174532925199432957692369076849f;
-    home_pos_x = - 0.5f * vd.sim_domain[0];     // Todo(pp): this seems to be a bug in the trackball manipulator
-    home_pos_y = - 0.5f * vd.sim_domain[1];     // both the values should be positive, confirm if we are creating a inverse matrix
+    home_pos_x = - 0.5f * vd.vs.sim_domain[0];     // Todo(pp): this seems to be a bug in the trackball manipulator
+    home_pos_y = - 0.5f * vd.vs.sim_domain[1];     // both the values should be positive, confirm if we are creating an inverse matrix
     home_pos_z = 0.5 / tan( 0.5 * deg2rad * vd.projection_fovy );   // this is not finished yet and will be scaled bellow
     home_trg_x = home_pos_x;
     home_trg_y = home_pos_y;
@@ -63,10 +63,10 @@ void initTrackball( ref VDrive_State vd ) {
 
     // if the aspect of the sim domain is smaller than the aspect of the window
     // we fit the height of the display plane to the window, otherwise the width of the plane
-    if( cast( float )vd.sim_domain[0] / vd.sim_domain[1] < cast( float )vd.windowWidth / vd.windowHeight ) {
-        home_pos_z *= vd.sim_domain[1];
+    if( cast( float )vd.vs.sim_domain[0] / vd.vs.sim_domain[1] < cast( float )vd.windowWidth / vd.windowHeight ) {
+        home_pos_z *= vd.vs.sim_domain[1];
     } else {
-        home_pos_z *= vd.sim_domain[0] * cast( float )vd.windowHeight / vd.windowWidth;
+        home_pos_z *= vd.vs.sim_domain[0] * cast( float )vd.windowHeight / vd.windowWidth;
     }
 
     vd.tb.camHome;

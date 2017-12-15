@@ -8,7 +8,6 @@ import input;
 
 
 enum Transport : uint32_t { pause, play, step, profile };
-enum Collision : uint32_t { SRT, TRT, MRT, CSC, CSC_DRAG };
 
 
 //////////////////////////////
@@ -76,109 +75,30 @@ struct VDrive_State {
 
     // render setup
     Meta_Renderpass             render_pass;
-    VkPipelineCache             graphics_cache;
     Meta_FB!( MAX_FRAMES, 2 )   framebuffers;           // template count of ( VkFramebuffer, VkClearValue )
     VkViewport                  viewport;               // dynamic state viewport
     VkRect2D                    scissors;               // dynamic state scissors
 
 
-    // simulation resources
-    VkCommandPool               sim_cmd_pool;           // we do not reset this on window resize events
-    VkCommandBuffer[2]          sim_cmd_buffers;        // using ping pong approach for now
-    Meta_Image                  sim_image;              // output macroscopic moments density and velocity
-    VkSampler                   nearest_sampler;
-    Meta_Buffer                 sim_buffer;             // mesoscopic velocity populations
-    Meta_Memory                 sim_memory;             // memory backing image and buffer
-    VkBufferView                sim_buffer_view;        // arbitrary count of buffer views, dynamic resizing is not that easy as we would have to recreate the descriptor set each time
-    Core_Pipeline               comp_loop_pso;
-    Core_Pipeline               comp_init_pso;
-    VkPipelineCache             compute_cache;
-    Meta_Buffer                 compute_ubo_buffer;
-    VkMappedMemoryRange         compute_ubo_flush;
-    Meta_Buffer                 sim_stage_buffer;
+    // simulate resources
+    import compute;
+    VDrive_Simulate_State       vs;
 
 
-
-    // visualization resources
-    Meta_Buffer                 display_ubo_buffer;
-    VkMappedMemoryRange         display_ubo_flush;
-    uint32_t                    sim_particle_count = 400 * 225;
-    Meta_Buffer                 sim_particle_buffer;
-    VkBufferView                sim_particle_buffer_view;
-    Core_Pipeline               display_pso;
-    Core_Pipeline               particle_pso;
-    Core_Pipeline[2]            lines_pso;
+    // visualize resources
+    import visualize;
+    VDrive_Visualize_State      vv;
 
 
-    // export resources
-    Core_Pipeline               export_pso;
-    Meta_Memory                 export_memory;
-    Meta_Buffer[2]              export_buffer;
-    VkBufferView[2]             export_buffer_view;
-    Meta_Descriptor_Update      export_descriptor_update;  // update only the export descriptor
-    VkDeviceSize                export_size;
-    void*[2]                    export_data;
-    VkMappedMemoryRange[2]      export_mapped_range;
-
-    //
     // cpu resources
-    //
     import cpustate;
     VDrive_Cpu_State            vc;
 
 
-    /////////////////////////////////////////////////
-    // simulation configuration and auxiliary data //
-    /////////////////////////////////////////////////
+    // export resources
+    import exportstate;
+    VDrive_Export_State         ve;
 
-
-    //
-    // Compute Parameter
-    //
-    uint32_t[3] sim_domain                  = [ 400, 225, 1 ]; //[ 256, 256, 1 ];   // [ 256, 64, 1 ];
-    uint32_t    sim_layers                  = 17;
-    uint32_t[3] sim_work_group_size         = [ 400, 1, 1 ];
-    uint32_t    sim_ping_pong               = 1;
-    uint32_t    sim_step_size               = 1;
-
-    string      sim_init_shader             = "shader\\init_D2Q9.comp";
-    string      sim_loop_shader             = "shader\\loop_D2Q9_ldc.comp";
-    string      export_shader               = "shader\\export_from_image.comp";
-
-    struct Compute_UBO {
-        float       collision_frequency     = 1;    // sim param omega
-        float       wall_velocity           = 0;    // sim param for lid driven cavity
-        uint32_t    wall_thickness          = 1;
-        uint32_t    comp_index              = 0;
-    }
-    Compute_UBO*    compute_ubo;
-
-
-    //
-    // Simulation Parameter
-    //
-    immutable float sim_unit_speed_of_sound = 0.5773502691896258; // 1 / sqrt( 3 );
-    float           sim_speed_of_sound      = sim_unit_speed_of_sound;
-    float           sim_unit_spatial        = 1;
-    float           sim_unit_temporal       = 1;
-    Collision       sim_collision           = Collision.CSC_DRAG;
-    uint32_t        sim_index               = 0;
-
-
-    //
-    // Display Parameter
-    //
-    struct Display_UBO {
-        uint32_t    display_property        = 0;    // display param display
-        float       amplify_property        = 1;    // display param amplify param
-        uint32_t    color_layers            = 0;
-        uint32_t    z_layer                 = 0;
-    }
-    Display_UBO*    display_ubo;
-
-    import visualize : Particle_PC;
-    Particle_PC     particle_pc;
-    VkCommandBuffer particle_reset_cmd_buffer;
 
 
     //
@@ -214,12 +134,6 @@ struct VDrive_State {
         }
     }
 
-
-    //
-    // Export Ensight
-    //
-    import exportstate;
-    VDrive_Export_State ve;
 
 
     //
@@ -294,7 +208,7 @@ struct VDrive_State {
             sim_profile_step_index = sim_profile_step_limit = 0;
         }
         resetStopWatch;
-        sim_index = compute_ubo.comp_index = 0;
+        vs.sim_index = vs.compute_ubo.comp_index = 0;
         try {
             if( use_cpu ) {
                 import cpustate : cpuInit;
@@ -322,28 +236,28 @@ struct VDrive_State {
     // update LBM compute UBO
     void updateComputeUBO() {
         // data will be updated elsewhere
-        vk.device.vkFlushMappedMemoryRanges( 1, & compute_ubo_flush );
+        vk.device.vkFlushMappedMemoryRanges( 1, & vs.compute_ubo_flush );
     }
 
     // update display UBO of velocity and density data
     void updateDisplayUBO() {
         // data will be updated elsewhere
-        vk.device.vkFlushMappedMemoryRanges( 1, & display_ubo_flush );
+        vk.device.vkFlushMappedMemoryRanges( 1, & vv.display_ubo_flush );
     }
 
 
-    /// Scale the display based on the aspect(s) of vd.sim_domain
+    /// Scale the display based on the aspect(s) of vs.sim_domain
     /// Parameter signals dimension count, 2D vs 3D
     /// Params:
     ///     vd = reference to this modules VDrive_State struct
     ///     dim = the current dimensions
     /// Returns: scale factor for the plane or box, in the fomer case result[2] should be ignored
     float[3] simDisplayScale( int dim ) {
-        float scale =  sim_domain[0] < sim_domain[1] ?  sim_domain[0] : sim_domain[1];
-        if( dim > 2 && sim_domain[2] < sim_domain[0] && sim_domain[2] < sim_domain[1] )
-            scale = sim_domain[2];
+        float scale =  vs.sim_domain[0] < vs.sim_domain[1] ?  vs.sim_domain[0] : vs.sim_domain[1];
+        if( dim > 2 && vs.sim_domain[2] < vs.sim_domain[0] && vs.sim_domain[2] < vs.sim_domain[1] )
+            scale = vs.sim_domain[2];
         float[3] result;
-        result[] = sim_domain[] / scale;
+        result[] = vs.sim_domain[] / scale;
         return result;
     }
 
@@ -439,7 +353,7 @@ struct VDrive_State {
 
     // increments profile counter and calls draw_func_profile function pointer, which is setable
     void drawProfile() @system {
-        sim_profile_step_index += sim_step_size;
+        sim_profile_step_index += vs.sim_step_size;
         this.draw_func_profile;
 
         if( 0 < sim_profile_step_count && sim_profile_step_limit <= sim_profile_step_index ) {
@@ -452,7 +366,7 @@ struct VDrive_State {
     void drawSim() @system {
 
         // sellect and draw command buffers
-        VkCommandBuffer[2] cmd_buffers = [ cmd_buffers[ next_image_index ], sim_cmd_buffers[ sim_ping_pong ]];
+        VkCommandBuffer[2] cmd_buffers = [ cmd_buffers[ next_image_index ], vs.sim_cmd_buffers[ vs.sim_ping_pong ]];
         submit_info.pCommandBuffers = cmd_buffers.ptr;
         graphics_queue.vkQueueSubmit( 1, & submit_info, submit_fence[ next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
 
@@ -505,26 +419,26 @@ nothrow:
 
 // compute ping pong, increment sim counter and draw the sim result
 void playSim( ref VDrive_State vd ) @system {
-    vd.sim_ping_pong = vd.sim_index % 2;                // compute new ping_pong value
-    vd.compute_ubo.comp_index += vd.sim_step_size;      // increase shader compute counter
-    if( vd.sim_step_size > 1 ) vd.updateComputeUBO;     // we need this value in compute shader if its greater than 1
-    ++vd.sim_index;                                     // increment the compute buffer submission count
+    vd.vs.sim_ping_pong = vd.vs.sim_index % 2;                // compute new ping_pong value
+    vd.vs.compute_ubo.comp_index += vd.vs.sim_step_size;      // increase shader compute counter
+    if( vd.vs.sim_step_size > 1 ) vd.updateComputeUBO;     // we need this value in compute shader if its greater than 1
+    ++vd.vs.sim_index;                                     // increment the compute buffer submission count
     vd.drawSim;                                         // let vulkan dance
 }
 
 // similar to playSim but with profiling facility for compute work
 void profileSim( ref VDrive_State vd ) @system {
 
-    vd.sim_ping_pong = vd.sim_index % 2;                // compute new ping_pong value
-    vd.compute_ubo.comp_index += vd.sim_step_size;      // increase shader compute counter
-    if( vd.sim_step_size > 1 ) vd.updateComputeUBO;     // we need this value in compute shader if its greater than 1
-    ++vd.sim_index;                                     // increment the compute buffer submission count
+    vd.vs.sim_ping_pong = vd.vs.sim_index % 2;                // compute new ping_pong value
+    vd.vs.compute_ubo.comp_index += vd.vs.sim_step_size;      // increase shader compute counter
+    if( vd.vs.sim_step_size > 1 ) vd.updateComputeUBO;     // we need this value in compute shader if its greater than 1
+    ++vd.vs.sim_index;                                     // increment the compute buffer submission count
 
     // edit submit info for compute work
     with( vd.submit_info ) {
         signalSemaphoreCount    = 0;
         pSignalSemaphores       = null;
-        pCommandBuffers = & vd.sim_cmd_buffers[ vd.sim_ping_pong ];
+        pCommandBuffers = & vd.vs.sim_cmd_buffers[ vd.vs.sim_ping_pong ];
     }
 
     // profile compute work

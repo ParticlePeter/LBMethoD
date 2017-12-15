@@ -1,3 +1,4 @@
+
 import appstate;
 import erupted;
 
@@ -9,20 +10,23 @@ import dlsl.vector;
 
 
 
-//////////////////////
-// cpu state struct //
-//////////////////////
+///////////////////////////////////
+// cpu state and resource struct //
+///////////////////////////////////
 struct VDrive_Cpu_State {
     // Directions:              R       E       N       W       S       NE      NW      SW      SE
     immutable float[9] pw = [   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 ];
 
-    size_t  cell_count = 0;
-    float*  popul_buffer_f;
-    double* popul_buffer_d;
-    ubyte   ping;
-    size_t  current_buffer_mem_size;
-    float*  sim_image_ptr;              // pointer to mapped image to be displayd
-    float*  sim_export_ptr;
+    size_t      cell_count = 0;
+    float*      popul_buffer_f;
+    double*     popul_buffer_d;
+    ubyte       ping;
+    size_t      current_buffer_mem_size;
+    float*      sim_image_ptr;          // pointer to mapped image to be displayd
+    float*      sim_export_ptr;
+
+    import vdrive.memory;
+    Meta_Buffer sim_stage_buffer;       // Todo(pp): this belongs into VDrive_Cpu_State
 
 }
 
@@ -63,9 +67,9 @@ void cpuInit( ref VDrive_State vd ) {
 
     //vd.device.vkFlushMappedMemoryRanges( 1, &sim_image_flush );
     import vdrive.memory;
-    vd.sim_image.flushMappedMemoryRange;
+    vd.vs.sim_image.flushMappedMemoryRange;
 
-    //vd.sim_index = 0;
+    //vd.vs.sim_index = 0;
     vd.ve.store_index = -1;
 
 }
@@ -78,8 +82,8 @@ void cpuReset( ref VDrive_State vd ) {
     assert( !( vd.vc.popul_buffer_f !is null && vd.vc.popul_buffer_d !is null ));
 
     auto old_cell_count = vd.vc.cell_count;
-    vd.vc.cell_count = vd.sim_domain[0] * vd.sim_domain[1] * vd.sim_domain[2];
-    size_t buffer_size = vd.vc.cell_count * vd.sim_layers;
+    vd.vc.cell_count = vd.vs.sim_domain[0] * vd.vs.sim_domain[1] * vd.vs.sim_domain[2];
+    size_t buffer_size = vd.vc.cell_count * vd.vs.sim_layers;
     size_t old_buffer_mem_size = vd.vc.current_buffer_mem_size;
     vd.vc.current_buffer_mem_size = buffer_size * ( vd.use_double ? double.sizeof : float.sizeof );
     if( vd.vc.current_buffer_mem_size < old_buffer_mem_size )
@@ -167,10 +171,10 @@ alias cpuSimD_Profile   = cpuSim!( double, true );
 // multi-threaded template function implementing one cpu sim step
 void cpuSim( T, bool PROFILE = false )( ref VDrive_State vd ) nothrow @system {
 
-    float    omega = vd.compute_ubo.collision_frequency;
-    float    wall_velocity = vd.compute_ubo.wall_velocity;
-    int      D_x = vd.sim_domain[0];
-    int      D_y = vd.sim_domain[1];
+    float    omega = vd.vs.compute_ubo.collision_frequency;
+    float    wall_velocity = vd.vs.compute_ubo.wall_velocity;
+    int      D_x = vd.vs.sim_domain[0];
+    int      D_y = vd.vs.sim_domain[1];
 
     static if( is( T == double )) {
         assert( vd.vc.popul_buffer_d !is null );
@@ -188,7 +192,7 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State vd ) nothrow @system {
     try {
         static if( PROFILE ) vd.startStopWatch;
         import std.range : iota;
-        foreach( I; parallel( iota( 0, vd.vc.cell_count, 1 ), vd.sim_work_group_size[0] )) {
+        foreach( I; parallel( iota( 0, vd.vc.cell_count, 1 ), vd.vs.sim_work_group_size[0] )) {
 
             // load populations
             T[9] f = [
@@ -270,13 +274,22 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State vd ) nothrow @system {
 
 
     import vdrive.memory;
-    vd.sim_stage_buffer.flushMappedMemoryRange;
+    vd.vc.sim_stage_buffer.flushMappedMemoryRange;
 
     // increment indexes
-    ++vd.sim_index;
-    ++vd.compute_ubo.comp_index;
+    ++vd.vs.sim_index;
+    ++vd.vs.compute_ubo.comp_index;
 
     // display the result
     vd.drawSim;
-
 }
+
+
+
+//////////////////////////////
+// destroy vulkan resources //
+//////////////////////////////
+void destroyCpuResources( ref VDrive_State vd ) {
+    vd.vc.sim_stage_buffer.destroyResources;
+}
+

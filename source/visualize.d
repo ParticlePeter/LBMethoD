@@ -5,13 +5,42 @@ import vdrive;
 import appstate;
 
 
-///////////////////////////////////////////////
-// push constant struct for particle drawing //
-///////////////////////////////////////////////
-struct Particle_PC {
-    float[4]    point_rgba = [ 1, 0.5, 0, 0.375 ];
-    float       point_size  = 2.0f;
-    float       speed_scale = 2.0f;
+
+/////////////////////////////////////////
+// visualize state and resource struct //
+/////////////////////////////////////////
+struct VDrive_Visualize_State {
+
+    // display resources
+    struct Display_UBO {    // diplay ubo struct
+        uint32_t            display_property    = 0;    // display param display
+        float               amplify_property    = 1;    // display param amplify param
+        uint32_t            color_layers        = 0;
+        uint32_t            z_layer             = 0;
+    } Display_UBO*      display_ubo;
+    Meta_Buffer         display_ubo_buffer;
+    VkMappedMemoryRange display_ubo_flush;
+    Core_Pipeline       display_pso;
+    
+    // particle resources
+    struct Particle_PC {    // push constant struct
+        float[4]            point_rgba  = [ 1, 0.5, 0, 0.375 ];
+        float               point_size  = 2.0f;
+        float               speed_scale = 2.0f;
+    } Particle_PC       particle_pc;
+    uint32_t            particle_count = 400 * 225;
+    Meta_Buffer         particle_buffer;
+    VkBufferView        particle_buffer_view;
+    VkCommandBuffer     particle_reset_cmd_buffer;
+    Core_Pipeline       particle_pso;
+    
+    // line resources
+    Core_Pipeline[2]    lines_pso;
+
+    // scale resources
+
+    // pipeline cahe
+    VkPipelineCache     graphics_cache;
 }
 
 
@@ -20,23 +49,23 @@ struct Particle_PC {
 void createParticleBuffer( ref VDrive_State vd ) {
 
     // (re)create buffer and buffer view
-    if( vd.sim_particle_buffer.buffer   != VK_NULL_HANDLE ) {
+    if( vd.vv.particle_buffer.buffer   != VK_NULL_HANDLE ) {
         vd.graphics_queue.vkQueueWaitIdle;
-        vd.sim_particle_buffer.destroyResources;          // destroy old buffer
+        vd.vv.particle_buffer.destroyResources;          // destroy old buffer
     }
-    if( vd.sim_particle_buffer_view != VK_NULL_HANDLE ) {
+    if( vd.vv.particle_buffer_view != VK_NULL_HANDLE ) {
         vd.graphics_queue.vkQueueWaitIdle;
-        vd.destroy( vd.sim_particle_buffer_view );        // destroy old buffer view
+        vd.destroy( vd.vv.particle_buffer_view );        // destroy old buffer view
     }
 
-    uint32_t buffer_mem_size = vd.sim_particle_count * ( 4 * float.sizeof ).toUint;
+    uint32_t buffer_mem_size = vd.vv.particle_count * ( 4 * float.sizeof ).toUint;
 
-    vd.sim_particle_buffer( vd )
+    vd.vv.particle_buffer( vd )
         .create( VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_mem_size )
         .createMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 
-    vd.sim_particle_buffer_view =
-        vd.createBufferView( vd.sim_particle_buffer.buffer, VK_FORMAT_R32G32B32A32_SFLOAT );
+    vd.vv.particle_buffer_view =
+        vd.createBufferView( vd.vv.particle_buffer.buffer, VK_FORMAT_R32G32B32A32_SFLOAT );
 
     // initialize buffer
     vd.createParticleResetCmdBuffer;
@@ -49,10 +78,10 @@ void createParticleBuffer( ref VDrive_State vd ) {
 // create particle buffer reset command buffer //
 /////////////////////////////////////////////////
 void createParticleResetCmdBuffer( ref VDrive_State vd ) nothrow {
-    vd.particle_reset_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
-    vd.particle_reset_cmd_buffer.vdBeginCommandBuffer;
-    vd.particle_reset_cmd_buffer.vkCmdFillBuffer( vd.sim_particle_buffer.buffer, 0, VK_WHOLE_SIZE, 0 );
-    vd.particle_reset_cmd_buffer.vkEndCommandBuffer;
+    vd.vv.particle_reset_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
+    vd.vv.particle_reset_cmd_buffer.vdBeginCommandBuffer;
+    vd.vv.particle_reset_cmd_buffer.vkCmdFillBuffer( vd.vv.particle_buffer.buffer, 0, VK_WHOLE_SIZE, 0 );
+    vd.vv.particle_reset_cmd_buffer.vkEndCommandBuffer;
 }
 
 
@@ -61,7 +90,7 @@ void createParticleResetCmdBuffer( ref VDrive_State vd ) nothrow {
 // submit particle reset command buffer //
 //////////////////////////////////////////
 void resetParticleBuffer( ref VDrive_State vd ) nothrow {
-    auto submit_info = vd.particle_reset_cmd_buffer.queueSubmitInfo;
+    auto submit_info = vd.vv.particle_reset_cmd_buffer.queueSubmitInfo;
     vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
 }
 
@@ -73,9 +102,9 @@ void resetParticleBuffer( ref VDrive_State vd ) nothrow {
 void createParticlePSO( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
-    if( vd.particle_pso.pipeline != VK_NULL_HANDLE ) {
+    if( vd.vv.particle_pso.pipeline != VK_NULL_HANDLE ) {
         vd.graphics_queue.vkQueueWaitIdle;
-        vd.destroy( vd.particle_pso );
+        vd.destroy( vd.vv.particle_pso );
     }
 
     //
@@ -103,8 +132,8 @@ void createParticlePSO( ref VDrive_State vd ) {
         meta_graphics.addColorBlendState( VK_TRUE );
     }
 
-    vd.particle_pso = meta_graphics
-        .construct( vd.graphics_cache )                                             // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
+    vd.vv.particle_pso = meta_graphics
+        .construct( vd.vv.graphics_cache )                                          // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct
 }
@@ -117,7 +146,7 @@ void createParticlePSO( ref VDrive_State vd ) {
 void createLinePSO( ref VDrive_State vd ) {
 
     // if we are recreating an old pipeline exists already, destroy it first
-    foreach( ref pso; vd.lines_pso ) {
+    foreach( ref pso; vd.vv.lines_pso ) {
         if( pso.is_constructed ) {
             vd.graphics_queue.vkQueueWaitIdle;
             vd.destroy( pso );
@@ -126,8 +155,8 @@ void createLinePSO( ref VDrive_State vd ) {
 
     // first create PSO to draw lines
     Meta_Graphics meta_graphics;
-        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.vert" ))
-    vd.lines_pso[ 1 ] = meta_graphics( vd )
+    vd.vv.lines_pso[ 1 ] = meta_graphics( vd )
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_axis.vert" ))
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_line.frag" ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_POINT_LIST )                          // set the inputAssembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
@@ -139,7 +168,7 @@ void createLinePSO( ref VDrive_State vd ) {
         .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )              // describe pipeline layout
         .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 32 )                  // specify push constant range
         .renderPass( vd.render_pass.render_pass )                                   // describe compatible render pass
-        .construct( vd.graphics_cache )                                             // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
+        .construct( vd.vv.graphics_cache )                                          // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
         .extractCore;                                                               // extract core data into Core_Pipeline struct
 
     // now edit the Meta_Pipeline to create an alternate points PSO
@@ -148,8 +177,8 @@ void createLinePSO( ref VDrive_State vd ) {
     if( vd.feature_wide_lines )
         meta_graphics.addDynamicState( VK_DYNAMIC_STATE_LINE_WIDTH );
 
-    vd.lines_pso[ 0 ] = meta_graphics
-        .construct( vd.graphics_cache )                                             // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
+    vd.vv.lines_pso[ 0 ] = meta_graphics
+        .construct( vd.vv.graphics_cache )                                          // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct and delete temporary data
 }
@@ -159,14 +188,21 @@ void createLinePSO( ref VDrive_State vd ) {
 //////////////////////////////
 // destroy vulkan resources //
 //////////////////////////////
-void destroyVisualizeResources( ref VDrive_State vd ) {
+void destroyVisResources( ref VDrive_State vd ) {
+
+    // display resources
+    vd.destroy( vd.vv.display_pso );
+    vd.vv.display_ubo_buffer.destroyResources;
 
     // particle resources
-    vd.destroy( vd.particle_pso );
-    vd.destroy( vd.sim_particle_buffer_view );
-    vd.sim_particle_buffer.destroyResources;
+    vd.destroy( vd.vv.particle_pso );
+    vd.destroy( vd.vv.particle_buffer_view );
+    vd.vv.particle_buffer.destroyResources;
 
     // line resources
-    if( vd.lines_pso[0].is_constructed ) vd.destroy( vd.lines_pso[0] );
-    if( vd.lines_pso[1].is_constructed ) vd.destroy( vd.lines_pso[1] );
+    if( vd.vv.lines_pso[0].is_constructed ) vd.destroy( vd.vv.lines_pso[0] );
+    if( vd.vv.lines_pso[1].is_constructed ) vd.destroy( vd.vv.lines_pso[1] );
+
+    // graphics cache
+    vd.destroy( vd.vv.graphics_cache );
 }
