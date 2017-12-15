@@ -2,6 +2,7 @@ import erupted;
 import vdrive;
 import gui;
 import appstate;
+import simulate;
 import resources;
 import ensight;
 

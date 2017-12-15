@@ -4,11 +4,12 @@ import erupted;
 
 import vdrive;
 import appstate;
+import simulate;
 import visualize;
 
 import dlsl.matrix;
 
-public import compute;
+
 
 
 

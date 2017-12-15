@@ -81,7 +81,7 @@ struct VDrive_State {
 
 
     // simulate resources
-    import compute;
+    import simulate;
     VDrive_Simulate_State       vs;
 
 
@@ -214,7 +214,7 @@ struct VDrive_State {
                 import cpustate : cpuInit;
                 this.cpuInit;
             } else {
-                import compute : createBoltzmannPSO;
+                import simulate : createBoltzmannPSO;
                 this.createBoltzmannPSO( false, false, true );  // rebuild init pipeline, rebuild loop pipeline, reset domain
             }
         } catch( Exception ) {}
