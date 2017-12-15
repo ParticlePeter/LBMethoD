@@ -417,7 +417,7 @@ void createRenderResources( ref VDrive_State vd ) {
     // create render pass
     //
     vd.render_pass( vd )
-        .renderPassAttachment_Clear_None(  vd.depth_image_format,  vd.sample_count, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ).subpassRefDepthStencil
+        .renderPassAttachment_Clear_None(  vd.depth_image_format,    vd.sample_count, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ).subpassRefDepthStencil
         .renderPassAttachment_Clear_Store( vd.swapchain.imageFormat, vd.sample_count, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ).subpassRefColor( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL )
 
         // Note: specify dependencies despite of only one subpass, as suggested by:
@@ -431,21 +431,11 @@ void createRenderResources( ref VDrive_State vd ) {
         .construct;
 
 
-
     //
-    // create pipeline cache for the graphics and compute pipelines
+    // create simulate and visualize resources
     //
-    vd.vv.graphics_cache   = vd.createPipelineCache;   // create once, but will be used several times in createDisplayPSO
-
-
-    //
-    // create pipelines and compute resources
-    //
-    vd.createDisplayPSO;        // to draw the display plane
-    vd.createParticlePSO;       // particle pso to visualize influnece of velocity field
-    vd.createLinePSO;           // line /  PSO to draw velocity lines coordinate axis, grid and 3D bounding box
-    vd.createComputeResources;  // create all resources for the compute pipeline
     vd.createSimResources;      // create all resources for the simulate compute pipeline
+    vd.createVisResources;      // create all resources for the visualize graphics pipelines
 }
 
 
@@ -557,7 +547,6 @@ void resizeRenderResources( ref VDrive_State vd ) {
     //
     vd.viewport = VkViewport( 0, 0, vd.swapchain.imageExtent.width, vd.swapchain.imageExtent.height, 0, 1 );
     vd.scissors = VkRect2D( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent );
-
 }
 
 

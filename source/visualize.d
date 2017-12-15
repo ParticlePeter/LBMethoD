@@ -45,6 +45,18 @@ struct VDrive_Visualize_State {
 
 
 
+/////////////////////////////////////////////////////////////////////////////////////////
+// create compute pipelines and compute command buffers to initialize and simulate LBM //
+/////////////////////////////////////////////////////////////////////////////////////////
+void createVisResources( ref VDrive_State vd ) {
+    vd.vv.graphics_cache = vd.createPipelineCache;
+    vd.createDisplayPSO;        // to draw the display plane
+    vd.createParticlePSO;       // particle pso to visualize influnece of velocity field
+    vd.createLinePSO;           // line /  PSO to draw velocity lines coordinate axis, grid and 3D bounding box
+}
+
+
+
 /////////////////////////////////
 // create display graphics PSO //
 /////////////////////////////////
