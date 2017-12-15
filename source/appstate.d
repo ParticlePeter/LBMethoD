@@ -149,6 +149,7 @@ struct VDrive_State {
     bool        feature_large_points    = false;
     bool        feature_wide_lines      = false;
     bool        draw_gui                = false;    // hidden by default in case we compile without gui
+    bool        draw_scale              = true;
     bool        draw_display            = true;
     bool        draw_particles          = false;
     bool        additive_particle_blend = true;

@@ -127,7 +127,6 @@ struct VDrive_Gui_State {
     bool        draw_vel_base       = true;
     bool        draw_axis;
     bool        draw_grid;
-    bool        draw_scale          = false;
     bool        draw_bounds;
     bool        validate_ghia;
     bool        validate_poiseuille_flow;
@@ -2258,8 +2257,6 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
-    // set lbmd graphics pso as current pso, use its pipeline layout to bind the descriptor set
-    vg.current_pso = vg.graphics_pso;
 
     // bind descriptor set - we do not have to rebind this for other pipelines as long as the pipeline layouts are compatible
     cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
@@ -2277,30 +2274,50 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
+    //
+    // avoid rerecording binding of identical pipelines
+    //
+
+    // initialize current pso with default values, a bind pipeline command will be recorded only if the current pso differs from the new pso
+    vg.current_pso = Core_Pipeline.init;
+
+    // helper function which checks if the new pipeline is the same as the last bound one
+    void bindPipeline( ref Core_Pipeline pso ) {    // bind pipeline helper
+        if( vg.current_pso != pso ) {
+            vg.current_pso  = pso;
+            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.current_pso.pipeline );
+        }
+    }
+
+
 
     //
     // bind lbmd graphics pso which was assigned to current pso before
     //
     if( vg.draw_display ) {
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.current_pso.pipeline );
+        bindPipeline( vg.vv.display_pso );
+        //cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.current_pso.pipeline );
 
         // push constant the sim display scale
-        float[2] sim_domain = [ vg.vs.sim_domain[0], vg.vs.sim_domain[1] ];
-        cmd_buffer.vkCmdPushConstants( vg.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sim_domain.sizeof, sim_domain.ptr ); //sim_line_display.scale.ptr );
+        cmd_buffer.vkCmdPushConstants( vg.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * uint32_t.sizeof, vg.vs.sim_domain.ptr );
 
         // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
-        cmd_buffer.vkCmdDraw( 4, 1 + vg.draw_scale, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
 
 
 
-    
-    // bind pipeline helper, to avoid rebinding the same pipeline
-    void bindPipeline( ref Core_Pipeline pso ) {
-        if( vg.current_pso != pso ) {
-            vg.current_pso  = pso;
-            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vg.current_pso.pipeline );
-        }
+    //
+    // bind lbmd data scale pso
+    //
+    if( vg.draw_scale ) {
+        bindPipeline( vg.vv.scale_pso );
+
+        // push constant the sim display scale
+        cmd_buffer.vkCmdPushConstants( vg.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * float.sizeof, vg.recip_window_size.ptr );
+
+        // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
+        cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
 
 

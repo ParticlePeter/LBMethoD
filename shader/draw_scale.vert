@@ -2,13 +2,8 @@
 
 // push constants
 layout( push_constant ) uniform Push_Constant {
-    uvec2 scale;
+    vec2 scale;
 } pc;
-
-// uniform buffer
-layout( std140, binding = 0 ) uniform uboViewer {
-    mat4 WVPM;                                  // World View Projection Matrix
-};
 
 // per vertex data
 out gl_PerVertex {                              // not redifining gl_PerVertex used to create a layer validation error
@@ -23,6 +18,7 @@ layout( location = 0 ) out vec2 vs_tex_coord;   // vertex shader output vertex c
 
 
 void main() {
-    vs_tex_coord = pc.scale * vec2( VI >> 1, VI & 1 );
-    gl_Position = WVPM * vec4( vs_tex_coord, 0.1, 1 );
+	vs_tex_coord = vec2( VI >> 1, VI & 1 );
+    vec2 pos = - pc.scale * ( vec2( - 30, 160 ) * vs_tex_coord.xy + vec2( 40, 10 ) - 1 / pc.scale );
+    gl_Position = vec4( pos, 0.1, 1 );
 }
