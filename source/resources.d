@@ -445,6 +445,7 @@ void createRenderResources( ref VDrive_State vd ) {
     vd.createParticlePSO;       // particle pso to visualize influnece of velocity field
     vd.createLinePSO;           // line /  PSO to draw velocity lines coordinate axis, grid and 3D bounding box
     vd.createComputeResources;  // create all resources for the compute pipeline
+    vd.createSimResources;      // create all resources for the simulate compute pipeline
 }
 
 

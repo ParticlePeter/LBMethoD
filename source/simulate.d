@@ -88,11 +88,9 @@ void createSimBuffer( ref VDrive_State vd ) {
 /////////////////////////////////////////////////////////////////////////////////////////
 // create compute pipelines and compute command buffers to initialize and simulate LBM //
 /////////////////////////////////////////////////////////////////////////////////////////
-void createComputeResources( ref VDrive_State vd ) {
-
+void createSimResources( ref VDrive_State vd ) {
     vd.vs.compute_cache = vd.createPipelineCache;
     vd.createBoltzmannPSO( true, true, true );
-
 }
 
 
