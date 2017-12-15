@@ -24,13 +24,6 @@ layout( std140, binding = 6 ) uniform Display_UBO {
     uint    z_layer;
 };
 
-#define DISPLAY_DENSITY 0
-#define DISPLAY_VELOCITY_X 1
-#define DISPLAY_VELOCITY_Y 2
-#define DISPLAY_VELOCITY_MAGNITUDE 3
-#define DISPLAY_VELOCITY_GRADIENT 4
-#define DISPLAY_VELOCITY_CURL 5
-
 
 
 // R: 0 0 0 0 1 1
@@ -56,16 +49,42 @@ vec3 colorRamp( float t ) {
 }
 
 
+#define PI 3.1415926535897932384626433832795
+#define u_max wall_velocity
+#define t comp_index
+#define rho0 1
+#define D textureSize( vel_rho_tex[0], 0 )
+
 
 void main() {
 
+    vec2 tex_coord = vs_tex_coord.xy;
+    
     // get velocity and density data
-    vec4 vel_rho = texture( vel_rho_tex[0], vec3( vs_tex_coord, z_layer ));  // access velocity density layer texture
+    vec4 vel_rho = texture( vel_rho_tex[0], vec3( tex_coord, z_layer ));  // access velocity density layer texture
 
-    // switch based on display mode
+    float nu  = 1.0 / ( 6.0 * omega );  // float nu = vg.sim_speed_of_sound * vg.sim_speed_of_sound * ( vg.sim_relaxation_rate / vg.sim_unit_temporal - 0.5 );
+    float kx  = 2.0 * PI / D.x;
+    float ky  = 2.0 * PI / D.y;
+    float td  = nu * ( kx * kx + ky * ky ); // 1.0 / ( nu * ( kx * kx + ky * ky ));    // this is twice divided, why ???
+    float xx  = tex_coord.x; // X + 0.5;
+    float yy  = tex_coord.y; // Y + 0.5;
+    float ux  = - u_max * sqrt( ky / kx ) * cos( kx * xx ) * sin( ky * yy ) * exp( -1.0 * t * td ); // / td );
+    float uy  =   u_max * sqrt( kx / ky ) * sin( kx * xx ) * cos( ky * yy ) * exp( -1.0 * t * td ); // / td );
+    float pp  = - 0.25  * rho0 * u_max * u_max
+              * (( ky / kx ) * cos( 2.0 * kx * xx ) + ( kx / ky ) * cos( 2.0 * ky * yy ))
+              * exp( - 2.0 * t * td ); // / td );
+    float rho = rho0 + 3.0 * pp;
+
+    // procedural value
+    //vel_rho = vec4( ux, uy, 0, 1 );
+
+    // differnce between procedural and compute value
+    vel_rho = abs( vec4( ux, uy, 0, 1 ) - vel_rho );
+
     switch( display_property ) {
-
         case DISPLAY_DENSITY : {
+            //fs_color = vec4( colorRamp( amplify_property * vel_rho.a ), 1 );
             float vel_mag;
             if( color_layers == 0 )
                 vel_mag = amplify_property * vel_rho.a;
@@ -115,5 +134,6 @@ void main() {
             }
             fs_color = vec4( max( 0, curl ), max( 0, -curl ), 0, 1 );
         } break;
+
     }
 }
