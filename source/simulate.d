@@ -40,11 +40,11 @@ struct VDrive_Simulate_State {
     string              loop_shader         = "shader\\loop_D2Q9_ldc.comp";
 
     // simulate parameter
-    enum Collision      : uint32_t { SRT, TRT, MRT, CSC, CSC_DRAG };
     immutable float     unit_speed_of_sound = 0.5773502691896258; // 1 / sqrt( 3 );
     float               speed_of_sound      = unit_speed_of_sound;
     float               unit_spatial        = 1;
     float               unit_temporal       = 1;
+    enum Collision      : uint32_t {SRT, TRT, MRT, CSC, CSC_DRAG };
     Collision           sim_collision       = Collision.CSC_DRAG;
     uint32_t            sim_index           = 0;
 }
@@ -109,9 +109,10 @@ private void createBoltzmannPSO( ref VDrive_State vd, ref Core_Pipeline pso, str
         .addMapEntry( MapEntry32(( vd.vs.sim_step_size << 8 ) + cast( uint32_t )vd.vs.sim_collision ))    // upper 24 bits is the step_size, lower 8 bits the algorithm
         .construct;
 
-    vd.graphics_queue.vkQueueWaitIdle;          // wait for queue idle as we need to destroy the pipeline
-    if( pso.is_constructed )                    // possibly destroy old compute pipeline and layout
-        vd.destroy( pso );
+    if( pso.is_constructed ) {
+        vd.graphics_queue.vkQueueWaitIdle;      // wait for queue idle, we need to destroy the pipeline
+        vd.destroy( pso );                      // possibly destroy old compute pipeline and layout
+    }
 
     Meta_Compute meta_compute;                  // use temporary Meta_Compute struct to specify and create the pso
     pso = meta_compute( vd )                    // extracting the core items after construction with reset call
