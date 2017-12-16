@@ -696,7 +696,7 @@ struct VDrive_Gui_State {
                     if( sim.domain != sim_domain ) {
                         // recreate sim image and vis_line_display push constant data
                         sim.domain = vis_line_display.sim_domain = sim_domain;
-                        this.createSimImage;
+                        this.createMacroImage;
 
                         // recreate sim particle buffer
                         vis.particle_count = sim_domain[0] * sim_domain[1] * sim_domain[2];
@@ -714,7 +714,7 @@ struct VDrive_Gui_State {
                     app.use_double      = app_use_double;
 
                     // this must be after sim_domain_changed edits
-                    this.createSimBuffer;
+                    this.createPopulBuffer;
 
                     // update descriptor, at least the sim buffer has changed, and possibly the sim image
                     this.updateDescriptorSet;
@@ -1314,7 +1314,7 @@ struct VDrive_Gui_State {
                         if( sim.domain != sim_domain ) {
                             // recreate sim image, update trackball and vis_line_display push constant data
                             sim.domain = vis_line_display.sim_domain = sim_domain;
-                            this.createSimImage;
+                            this.createMacroImage;
                             update_descriptor = true;
                             import input : initTrackball;
                             this.initTrackball;
@@ -1330,7 +1330,7 @@ struct VDrive_Gui_State {
                             sim.layers              = sim_layers             = 17;
 
                             // this must be after sim_domain_changed edits
-                            this.createSimBuffer;
+                            this.createPopulBuffer;
                             update_descriptor = true;
 
                         }

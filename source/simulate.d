@@ -54,7 +54,7 @@ struct VDrive_Simulate_State {
 //////////////////////////////////////////
 // create or recreate simulation buffer //
 //////////////////////////////////////////
-void createSimBuffer( ref VDrive_State app ) {
+void createPopulBuffer( ref VDrive_State app ) {
 
     // (re)create buffer and buffer view
     if( app.sim.popul_buffer.buffer   != VK_NULL_HANDLE ) {
@@ -88,7 +88,7 @@ void createSimBuffer( ref VDrive_State app ) {
 ////////////////////////////////////////////////
 /// create or recreate simulation image array //
 ////////////////////////////////////////////////
-void createSimImage( ref VDrive_State app ) {
+void createMacroImage( ref VDrive_State app ) {
 
     // 1) (re)create Image
     if( app.sim.macro_image.image != VK_NULL_HANDLE ) {

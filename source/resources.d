@@ -146,8 +146,8 @@ void createMemoryObjects( ref VDrive_State app ) {
     //
     // create simulate and visualize memory objects
     //
-    app.createSimBuffer;
-    app.createSimImage;
+    app.createPopulBuffer;
+    app.createMacroImage;
     app.createParticleBuffer;
 }
 
