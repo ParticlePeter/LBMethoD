@@ -18,18 +18,20 @@ layout( std140, binding = 5 ) uniform Compute_UBO {
 
 // uniform buffer
 layout( std140, binding = 6 ) uniform Display_UBO {
-    uint    display_property;
     float   amplify_property;
     uint    color_layers;
     uint    z_layer;
 };
 
-#define DISPLAY_DENSITY 0
-#define DISPLAY_VELOCITY_X 1
-#define DISPLAY_VELOCITY_Y 2
-#define DISPLAY_VELOCITY_MAGNITUDE 3
-#define DISPLAY_VELOCITY_GRADIENT 4
-#define DISPLAY_VELOCITY_CURL 5
+// specialization constant for display property
+#define DENSITY     0
+#define VEL_X       1
+#define VEL_Y       2
+#define VEL_MAG     3
+#define VEL_GRAD    4
+#define VEL_CURL    5
+layout( constant_id = 0 ) const uint PROPERTY = VEL_MAG;
+
 
 
 
@@ -63,9 +65,9 @@ void main() {
     vec4 vel_rho = texture( vel_rho_tex[0], vec3( vs_tex_coord, z_layer ));  // access velocity density layer texture
 
     // switch based on display mode
-    switch( display_property ) {
+    switch( PROPERTY ) {
 
-        case DISPLAY_DENSITY : {
+        case DENSITY : {
             float vel_mag;
             if( color_layers == 0 )
                 vel_mag = amplify_property * vel_rho.a;
@@ -74,19 +76,19 @@ void main() {
             fs_color = vec4( colorRamp( vel_mag ), 1 );
         } break;
 
-        case DISPLAY_VELOCITY_X :
+        case VEL_X :
             if( color_layers == 0 ) vel_rho *= amplify_property;
             else vel_rho = trunc( vel_rho * color_layers * amplify_property ) / color_layers;
             fs_color = vec4( max( 0, vel_rho.x ), max( 0, - vel_rho.x ), 0, 1 );
         break;
 
-        case DISPLAY_VELOCITY_Y :
+        case VEL_Y :
             if( color_layers == 0 ) vel_rho *= amplify_property;
             else vel_rho = trunc( vel_rho * color_layers * amplify_property ) / color_layers;
             fs_color = vec4( max( 0, vel_rho.y ), max( 0, - vel_rho.y ), 0, 1 );
         break;
 
-        case DISPLAY_VELOCITY_MAGNITUDE : {
+        case VEL_MAG : {
             float vel_mag;
             if( color_layers == 0 )
                 vel_mag = amplify_property * length( vel_rho.xy );
@@ -95,7 +97,7 @@ void main() {
             fs_color = vec4( colorRamp( vel_mag ), 1 );
         } break;
 
-        case DISPLAY_VELOCITY_GRADIENT : {
+        case VEL_GRAD : {
             float vel_mag;
             if( color_layers == 0 )
                 vel_mag = amplify_property * length( vel_rho.xy );
@@ -104,7 +106,7 @@ void main() {
             fs_color = vec4( 0.5 + dFdx( vel_mag ), 0.5 + dFdy( vel_mag ), 0, 1 );
         } break;
 
-        case DISPLAY_VELOCITY_CURL : {
+        case VEL_CURL : {
             float curl;
             if( color_layers == 0 ) {
                 vel_rho *= amplify_property;

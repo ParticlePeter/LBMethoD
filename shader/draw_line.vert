@@ -28,7 +28,6 @@ layout( std140, binding = 5 ) uniform Compute_UBO {
 
 // uniform buffer
 layout( std140, binding = 6 ) uniform Display_UBO {
-    uint    display_property;
     float   amplify_property;
     uint    color_layers;
     uint    z_layer;

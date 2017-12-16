@@ -1007,9 +1007,12 @@ struct VDrive_Gui_State {
 
             // specify display parameter
             if( ImGui.Combo(
-                "Display Property", cast( int* )( & vv.display_ubo.display_property ),
+                "Display Property", cast( int* )( & vv.display_property ),
                 "Density\0Velocity X\0Velocity Y\0Velocity Magnitude\0Velocity Gradient\0Velocity Curl\0\0"
-            ))  updateDisplayUBO;
+            ))  {
+                vd.createDisplayPSO;
+                vd.createScalePSO;
+            }
 
             if( ImGui.DragFloat( "Amp Display Property", & vv.display_ubo.amplify_property, 0.001f, 0, 255 )) updateDisplayUBO;
 

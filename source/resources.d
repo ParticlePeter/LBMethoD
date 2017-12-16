@@ -136,7 +136,6 @@ void createMemoryObjects( ref VDrive_State vd ) {
     // cast the mapped memory pointer with its offset into the backing memory to our display ubo struct and init_pso the memory
     vd.vv.display_ubo = cast( VDrive_Visualize_State.Display_UBO* )( mapped_memory + vd.vv.display_ubo_buffer.memOffset );
     vd.vv.display_ubo_flush = vd.vv.display_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the display ubo
-    vd.vv.display_ubo.display_property = 3;
     vd.vv.display_ubo.amplify_property = 1;
     vd.vv.display_ubo.color_layers = 0;
     vd.vv.display_ubo.z_layer = 0;

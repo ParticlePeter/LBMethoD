@@ -13,11 +13,13 @@ struct VDrive_Visualize_State {
 
     // display resources
     struct Display_UBO {    // diplay ubo struct
-        uint32_t            display_property    = 0;    // display param display
         float               amplify_property    = 1;    // display param amplify param
         uint32_t            color_layers        = 0;
         uint32_t            z_layer             = 0;
     } Display_UBO*      display_ubo;
+
+    enum Property       : uint32_t { DENSITY, VEL_X, VEL_Y, VEL_MAG, VEL_GRAD, VEL_CURL };
+    Property            display_property = Property.VEL_MAG;
     Meta_Buffer         display_ubo_buffer;
     VkMappedMemoryRange display_ubo_flush;
     Core_Pipeline       display_pso;
@@ -28,6 +30,7 @@ struct VDrive_Visualize_State {
         float               point_size  = 2.0f;
         float               speed_scale = 2.0f;
     } Particle_PC       particle_pc;
+
     uint32_t            particle_count = 400 * 225;
     Meta_Buffer         particle_buffer;
     VkBufferView        particle_buffer_view;
@@ -40,7 +43,7 @@ struct VDrive_Visualize_State {
     // scale resources
     Core_Pipeline       scale_pso;
 
-    // pipeline cahe
+    // pipeline cache
     VkPipelineCache     graphics_cache;
 }
 
@@ -64,6 +67,12 @@ void createVisResources( ref VDrive_State vd ) {
 /////////////////////////////////
 void createDisplayPSO( ref VDrive_State vd ) {
 
+    // create meta_Specialization struct to specify display shader property display
+    Meta_SC!( 1 ) meta_sc;
+    meta_sc
+        .addMapEntry( MapEntry32( cast( uint32_t )vd.vv.display_property ))
+        .construct;
+
     // if we are recreating an old pipeline exists already, destroy it first
     if( vd.vv.display_pso.pipeline != VK_NULL_HANDLE ) {
         vd.graphics_queue.vkQueueWaitIdle;
@@ -74,7 +83,7 @@ void createDisplayPSO( ref VDrive_State vd ) {
     Meta_Graphics meta_graphics;
     vd.vv.display_pso = meta_graphics( vd )
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_display.vert" ))
-        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_display.frag" ))
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_display.frag", & meta_sc.specialization_info ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
@@ -97,6 +106,12 @@ void createDisplayPSO( ref VDrive_State vd ) {
 ///////////////////////////////
 void createScalePSO( ref VDrive_State vd ) {
 
+    // create meta_Specialization struct to specify display shader property display
+    Meta_SC!( 1 ) meta_sc;
+    meta_sc
+        .addMapEntry( MapEntry32( cast( uint32_t )vd.vv.display_property ))
+        .construct;
+        
     // if we are recreating an old pipeline exists already, destroy it first
     if( vd.vv.scale_pso.pipeline != VK_NULL_HANDLE ) {
         vd.graphics_queue.vkQueueWaitIdle;
@@ -107,7 +122,7 @@ void createScalePSO( ref VDrive_State vd ) {
     Meta_Graphics meta_graphics;
     vd.vv.scale_pso = meta_graphics( vd )
         .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_scale.vert" ))
-        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_scale.frag" ))
+        .addShaderStageCreateInfo( vd.createPipelineShaderStage( "shader/draw_scale.frag", & meta_sc.specialization_info ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
