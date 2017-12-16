@@ -253,7 +253,7 @@ void createLinePSO( ref VDrive_State app ) {
     // first create PSO to draw lines
     Meta_Graphics meta_graphics;
     app.vis.lines_pso[ 1 ] = meta_graphics( app )
-        .addShaderStageCreateInfo( app.createPipelineShaderStage( "shader/draw_axis.vert" ))
+        .addShaderStageCreateInfo( app.createPipelineShaderStage( "shader/draw_line.vert" ))
         .addShaderStageCreateInfo( app.createPipelineShaderStage( "shader/draw_line.frag" ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_POINT_LIST )                          // set the inputAssembly
         .addViewportAndScissors( VkOffset2D( 0, 0 ), app.swapchain.imageExtent )    // add viewport and scissor state, necessary even if we use dynamic state
