@@ -85,6 +85,85 @@ void createSimBuffer( ref VDrive_State app ) {
 
 
 
+////////////////////////////////////////////////
+/// create or recreate simulation image array //
+////////////////////////////////////////////////
+void createSimImage( ref VDrive_State app ) {
+
+    // 1) (re)create Image
+    if( app.sim.macro_image.image != VK_NULL_HANDLE ) {
+        app.graphics_queue.vkQueueWaitIdle;
+        app.sim.macro_image.destroyResources( false );  // destroy old image and its view, keeping the sampler
+    }
+
+    // Todo(pp): the format should be choose-able
+    // Todo(pp): here checks are required if this image format is available for VK_IMAGE_USAGE_STORAGE_BIT
+    //import vdrive.util.info;
+    //app.imageFormatProperties(
+    //    VK_FORMAT_R32G32B32A32_SFLOAT,
+    //    VK_IMAGE_TYPE_2D,
+    //    VK_IMAGE_TILING_OPTIMAL,
+    //    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+    //).printTypeInfo;
+
+    auto image_format = VK_FORMAT_R32G32B32A32_SFLOAT; //VK_FORMAT_R16G16B16A16_SFLOAT
+    VkImageSubresourceRange subresource_range = {
+        aspectMask      : VK_IMAGE_ASPECT_COLOR_BIT,
+        baseMipLevel    : cast( uint32_t )0,
+        levelCount      : 1,
+        baseArrayLayer  : cast( uint32_t )0,
+        layerCount      : app.sim.domain[2],
+    };
+    app.sim.macro_image( app )
+        .create(
+            image_format,
+            app.sim.domain[0], app.sim.domain[1], 0,    // through the 0 we request a VK_IMAGE_TYPE_2D
+            1, app.sim.domain[2],                       // mip levels and array layers
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_SAMPLE_COUNT_1_BIT,
+            VK_IMAGE_TILING_OPTIMAL     // : VK_IMAGE_TILING_LINEAR
+            )
+        .createMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT )    // : VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )   // Todo(pp): check which memory property is required for the image format
+        .createView( subresource_range, VK_IMAGE_VIEW_TYPE_2D_ARRAY, image_format );
+
+
+    // transition VkImage from layout VK_IMAGE_LAYOUT_UNDEFINED into layout VK_IMAGE_LAYOUT_GENERAL for compute shader access
+    auto init_cmd_buffer = app.allocateCommandBuffer( app.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
+    auto init_cmd_buffer_bi = createCmdBufferBI( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
+    init_cmd_buffer.vkBeginCommandBuffer( & init_cmd_buffer_bi );
+
+    // record image layout transition to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    init_cmd_buffer.recordTransition(
+        app.sim.macro_image.image,
+        app.sim.macro_image.subresourceRange,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_GENERAL,
+        0,  // no access mask required here
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_HOST_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+
+    init_cmd_buffer.vkEndCommandBuffer;                 // finish recording and submit the command
+    auto submit_info = init_cmd_buffer.queueSubmitInfo; // submit the command buffer
+    app.graphics_queue.vkQueueSubmit( 1, & submit_info, VK_NULL_HANDLE ).vkAssert;
+
+    // staging buffer for cpu computed velocity copy to the sim_image
+    if( app.cpu.sim_stage_buffer.is_constructed ) {
+        app.graphics_queue.vkQueueWaitIdle;
+        app.cpu.sim_stage_buffer.destroyResources;      // destroy old image and its view, keeping the sampler
+    }
+
+    uint32_t buffer_size = 4 * app.sim.domain[0] * app.sim.domain[1];   // only in 2D and with VK_FORMAT_R32G32B32A32_SFLOAT
+    uint32_t buffer_mem_size = buffer_size * float.sizeof.toUint;
+
+    app.cpu.sim_image_ptr = cast( float* )( app.cpu.sim_stage_buffer( app )
+        .create( VK_BUFFER_USAGE_TRANSFER_SRC_BIT, buffer_mem_size )
+        .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
+        .mapMemory );
+}
+
+
+
 /////////////////////////////////////////////////////////////////////////////////////////
 // create compute pipelines and compute command buffers to initialize and simulate LBM //
 /////////////////////////////////////////////////////////////////////////////////////////
