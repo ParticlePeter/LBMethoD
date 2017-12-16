@@ -366,13 +366,18 @@ struct VDrive_Gui_State {
             // Start the frame
             ImGui.NewFrame;
 
-            ImGui.SetNextWindowPos(  scale_win_pos,  ImGuiCond_Always );
-            ImGui.SetNextWindowSize( scale_win_size, ImGuiCond_Always );
 
-            if( draw_scale ) {
+
+            if( draw_scale && vv.display_property != VDrive_Visualize_State.Property.VEL_GRAD ) {
+                ImGui.SetNextWindowPos(  scale_win_pos,  ImGuiCond_Always );
+                ImGui.SetNextWindowSize( scale_win_size, ImGuiCond_Always );
                 ImGui.PushStyleColor( ImGuiCol_WindowBg, 0 );
                 ImGui.Begin( "Scale Window", null, window_flags );
-                ImGui.Text( "%.3f", 1 / vv.display_ubo.amplify_property );
+                if(( vv.display_property == VDrive_Visualize_State.Property.DENSITY )
+                || ( vv.display_property == VDrive_Visualize_State.Property.VEL_MAG ))
+                    ImGui.Text( " %.3f", 1 / vv.display_ubo.amplify_property );
+                else
+                    ImGui.Text( "+-%.3f", 1 / vv.display_ubo.amplify_property );
                 ImGui.End();
                 ImGui.PopStyleColor;
             }
@@ -1645,8 +1650,8 @@ struct VDrive_Gui_State {
     immutable auto main_win_pos     = ImVec2( 0, 0 );
     auto main_win_size              = ImVec2( 352, 900 );
 
-    auto scale_win_pos              = ImVec2( 1550, 710 );
-    immutable auto scale_win_size   = ImVec2(   50,  20 );
+    auto scale_win_pos              = ImVec2( 1540, 710 );
+    immutable auto scale_win_size   = ImVec2(   60,  20 );
 
     immutable auto button_size_1    = ImVec2( 344, 20 );
     immutable auto button_size_2    = ImVec2( 176, 20 );
@@ -1655,7 +1660,7 @@ struct VDrive_Gui_State {
 
     immutable auto disabled_text    = ImVec4( 0.4, 0.4, 0.4, 1 );
 
-    ubyte   device_count  = 1;      // initialize with one being the CPU
+    ubyte   device_count = 1;       // initialize with one being the CPU
     char*   device_names;           // store all names of physical devices consecutively
     int     compute_device = 1;     // select compute device, 0 = CPU
 
@@ -2336,7 +2341,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     // bind lbmd data scale pso
     //
-    if( vg.draw_scale ) {
+    if( vg.draw_scale && vg.vv.display_property != VDrive_Visualize_State.Property.VEL_GRAD ) {
         bindPipeline( vg.vv.scale_pso );
 
         // push constant the sim display scale
@@ -2717,7 +2722,7 @@ void guiWindowSizeCallback( GLFWwindow * window, int w, int h ) {
     //import std.stdio;
     //printf( "WindowSize: %d, %d\n", w, h );
 
-    vg.scale_win_pos.x = w -  50;     // set x - position of scale window
+    vg.scale_win_pos.x = w -  60;     // set x - position of scale window
     vg.scale_win_pos.y = h - 190;     // set y - position of scale window
     vg.main_win_size.y = h;           // this sets the window gui height to the window height
 
