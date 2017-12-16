@@ -1479,7 +1479,7 @@ struct VDrive_Gui_State {
                 ImGui.InputText( "Var Name",  exp.variable_name.ptr, 9 );
                 ImGui.SameLine;
                 ImGui.SetCursorPosX( 10 + ImGui.GetCursorPosX );
-                ImGui.Checkbox( "is Vector", & app.export_as_vector );
+                ImGui.Checkbox( "is Vector", & app.exp.as_vector );
                 ImGui.Combo( "File Format", & cast( int )exp.file_format, "Ascii\0Binary\0\0" );
                 ImGui.Separator;
 

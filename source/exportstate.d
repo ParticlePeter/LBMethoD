@@ -28,7 +28,7 @@ struct VDrive_Export_State {
     // export parameter 
     int             start_index     = 0;
     int             step_count      = 21;
-    int             step_size       = 10001;
+    int             step_size       = 101;
     int             store_index     = -1;
     char[256]       case_file_name  = "ensight/LDC_D2Q9";
     char[12]        variable_name   = "velocity\0\0\0\0";
@@ -36,6 +36,7 @@ struct VDrive_Export_State {
     private int     export_index    = 0;
     char[256]       var_file_buffer;
     char[]          var_file_name;
+    bool            as_vector       = true;
 }
 
 
@@ -166,7 +167,7 @@ void createExportResources( ref VDrive_State app ) {
 void createExportBuffer( ref VDrive_State app ) {
 
     uint32_t buffer_size = app.sim.domain[0] * app.sim.domain[1] * ( app.use_3_dim ? app.sim.domain[2] : 1 );
-    uint32_t buffer_mem_size = buffer_size * (( app.export_as_vector ? 3 : 1 ) * float.sizeof ).toUint;
+    uint32_t buffer_mem_size = buffer_size * (( app.exp.as_vector ? 3 : 1 ) * float.sizeof ).toUint;
     auto header_size = ensGetBinaryVarHeaderSize;
 
     //

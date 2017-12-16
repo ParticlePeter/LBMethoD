@@ -156,7 +156,6 @@ struct VDrive_State {
     bool        use_double              = false;
     bool        use_3_dim               = false;
     bool        use_cpu                 = false;
-    bool        export_as_vector        = true;
 
 
 
