@@ -33,7 +33,7 @@ struct VDrive_State {
     }
 
     // trackball
-    TrackballButton             tb;                         // Trackball manipulator updating View Matrix
+    TrackballButton             tbb;                        // Trackball manipulator updating View Matrix
     XForm_UBO*                  xform_ubo;                  // World View Projection Matrix
     mat4                        projection;                 // Projection Matrix
     float                       projection_fovy =    60;    // Projection Field Of View in Y dimension
@@ -82,22 +82,22 @@ struct VDrive_State {
 
     // simulate resources
     import simulate;
-    VDrive_Simulate_State       vs;
+    VDrive_Simulate_State       sim;
 
 
     // visualize resources
     import visualize;
-    VDrive_Visualize_State      vv;
+    VDrive_Visualize_State      vis;
 
 
     // cpu resources
     import cpustate;
-    VDrive_Cpu_State            vc;
+    VDrive_Cpu_State            cpu;
 
 
     // export resources
     import exportstate;
-    VDrive_Export_State         ve;
+    VDrive_Export_State         exp;
 
 
 
@@ -209,7 +209,7 @@ struct VDrive_State {
             sim_profile_step_index = sim_profile_step_limit = 0;
         }
         resetStopWatch;
-        vs.sim_index = vs.compute_ubo.comp_index = 0;
+        sim.sim_index = sim.compute_ubo.comp_index = 0;
         try {
             if( use_cpu ) {
                 import cpustate : cpuInit;
@@ -229,36 +229,36 @@ struct VDrive_State {
 
     // update world view projection matrix UBO
     void updateWVPM() {
-        xform_ubo.wvpm = projection * tb.matrix;
-        xform_ubo.eyep = tb.eye;
+        xform_ubo.wvpm = projection * tbb.matrix;
+        xform_ubo.eyep = tbb.eye;
         vk.device.vkFlushMappedMemoryRanges( 1, & xform_ubo_flush );
     }
 
     // update LBM compute UBO
     void updateComputeUBO() {
         // data will be updated elsewhere
-        vk.device.vkFlushMappedMemoryRanges( 1, & vs.compute_ubo_flush );
+        vk.device.vkFlushMappedMemoryRanges( 1, & sim.compute_ubo_flush );
     }
 
     // update display UBO of velocity and density data
     void updateDisplayUBO() {
         // data will be updated elsewhere
-        vk.device.vkFlushMappedMemoryRanges( 1, & vv.display_ubo_flush );
+        vk.device.vkFlushMappedMemoryRanges( 1, & vis.display_ubo_flush );
     }
 
 
-    /// Scale the display based on the aspect(s) of vs.sim_domain
-    /// Parameter signals dimension count, 2D vs 3D
+    /// Scale the display based on the aspect(s) of sim.sim_domain
+    /// Parameter signals dimension count, 2D sim 3D
     /// Params:
-    ///     vd = reference to this modules VDrive_State struct
+    ///     app = reference to this modules VDrive_State struct
     ///     dim = the current dimensions
     /// Returns: scale factor for the plane or box, in the fomer case result[2] should be ignored
     float[3] simDisplayScale( int dim ) {
-        float scale =  vs.sim_domain[0] < vs.sim_domain[1] ?  vs.sim_domain[0] : vs.sim_domain[1];
-        if( dim > 2 && vs.sim_domain[2] < vs.sim_domain[0] && vs.sim_domain[2] < vs.sim_domain[1] )
-            scale = vs.sim_domain[2];
+        float scale =  sim.sim_domain[0] < sim.sim_domain[1] ?  sim.sim_domain[0] : sim.sim_domain[1];
+        if( dim > 2 && sim.sim_domain[2] < sim.sim_domain[0] && sim.sim_domain[2] < sim.sim_domain[1] )
+            scale = sim.sim_domain[2];
         float[3] result;
-        result[] = vs.sim_domain[] / scale;
+        result[] = sim.sim_domain[] / scale;
         return result;
     }
 
@@ -271,7 +271,7 @@ struct VDrive_State {
         updateWVPM;                  // multiplies projection trackball (view) matrix and uploads to uniform buffer
 
         // notify trackball manipulator about win height change, this has effect on panning speed
-        tb.windowHeight( windowHeight );
+        tbb.windowHeight( windowHeight );
 
         // wait till device is idle
         vk.device.vkDeviceWaitIdle;
@@ -326,7 +326,7 @@ struct VDrive_State {
             recreateSwapchain;
             import resources : createResizedCommands;
             this.createResizedCommands;
-        } else if( tb.dirty ) {
+        } else if( tbb.dirty ) {
             updateWVPM;  // this happens anyway in recreateSwapchain
         }
 
@@ -354,7 +354,7 @@ struct VDrive_State {
 
     // increments profile counter and calls draw_func_profile function pointer, which is setable
     void drawProfile() @system {
-        sim_profile_step_index += vs.sim_step_size;
+        sim_profile_step_index += sim.sim_step_size;
         this.draw_func_profile;
 
         if( 0 < sim_profile_step_count && sim_profile_step_limit <= sim_profile_step_index ) {
@@ -367,7 +367,7 @@ struct VDrive_State {
     void drawSim() @system {
 
         // sellect and draw command buffers
-        VkCommandBuffer[2] cmd_buffers = [ cmd_buffers[ next_image_index ], vs.sim_cmd_buffers[ vs.sim_ping_pong ]];
+        VkCommandBuffer[2] cmd_buffers = [ cmd_buffers[ next_image_index ], sim.sim_cmd_buffers[ sim.sim_ping_pong ]];
         submit_info.pCommandBuffers = cmd_buffers.ptr;
         graphics_queue.vkQueueSubmit( 1, & submit_info, submit_fence[ next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
 
@@ -386,7 +386,7 @@ struct VDrive_State {
             recreateSwapchain;
             import resources : createResizedCommands;
             this.createResizedCommands;
-        } else if( tb.dirty ) {
+        } else if( tbb.dirty ) {
             updateWVPM;  // this happens anyway in recreateSwapchain
         }
 
@@ -419,77 +419,77 @@ nothrow:
 //////////////////////////////////////////////////////////
 
 // compute ping pong, increment sim counter and draw the sim result
-void playSim( ref VDrive_State vd ) @system {
-    vd.vs.sim_ping_pong = vd.vs.sim_index % 2;                // compute new ping_pong value
-    vd.vs.compute_ubo.comp_index += vd.vs.sim_step_size;      // increase shader compute counter
-    if( vd.vs.sim_step_size > 1 ) vd.updateComputeUBO;     // we need this value in compute shader if its greater than 1
-    ++vd.vs.sim_index;                                     // increment the compute buffer submission count
-    vd.drawSim;                                         // let vulkan dance
+void playSim( ref VDrive_State app ) @system {
+    app.sim.sim_ping_pong = app.sim.sim_index % 2;                // compute new ping_pong value
+    app.sim.compute_ubo.comp_index += app.sim.sim_step_size;      // increase shader compute counter
+    if( app.sim.sim_step_size > 1 ) app.updateComputeUBO;     // we need this value in compute shader if its greater than 1
+    ++app.sim.sim_index;                                     // increment the compute buffer submission count
+    app.drawSim;                                         // let vulkan dance
 }
 
 // similar to playSim but with profiling facility for compute work
-void profileSim( ref VDrive_State vd ) @system {
+void profileSim( ref VDrive_State app ) @system {
 
-    vd.vs.sim_ping_pong = vd.vs.sim_index % 2;                // compute new ping_pong value
-    vd.vs.compute_ubo.comp_index += vd.vs.sim_step_size;      // increase shader compute counter
-    if( vd.vs.sim_step_size > 1 ) vd.updateComputeUBO;     // we need this value in compute shader if its greater than 1
-    ++vd.vs.sim_index;                                     // increment the compute buffer submission count
+    app.sim.sim_ping_pong = app.sim.sim_index % 2;                // compute new ping_pong value
+    app.sim.compute_ubo.comp_index += app.sim.sim_step_size;      // increase shader compute counter
+    if( app.sim.sim_step_size > 1 ) app.updateComputeUBO;     // we need this value in compute shader if its greater than 1
+    ++app.sim.sim_index;                                     // increment the compute buffer submission count
 
     // edit submit info for compute work
-    with( vd.submit_info ) {
+    with( app.submit_info ) {
         signalSemaphoreCount    = 0;
         pSignalSemaphores       = null;
-        pCommandBuffers = & vd.vs.sim_cmd_buffers[ vd.vs.sim_ping_pong ];
+        pCommandBuffers = & app.sim.sim_cmd_buffers[ app.sim.sim_ping_pong ];
     }
 
     // profile compute work
-    vd.startStopWatch;
-    vd.graphics_queue.vkQueueSubmit( 1, & vd.submit_info, vd.submit_fence[ vd.next_image_index ] );     // or VK_NULL_HANDLE, fence is only required if syncing to CPU
-    vd.device.vkWaitForFences( 1, & vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );    // wait for finished compute
-    vd.stopStopWatch;
-    vd.device.vkResetFences( 1, & vd.submit_fence[ vd.next_image_index ] ).vkAssert;
+    app.startStopWatch;
+    app.graphics_queue.vkQueueSubmit( 1, & app.submit_info, app.submit_fence[ app.next_image_index ] );     // or VK_NULL_HANDLE, fence is only required if syncing to CPU
+    app.device.vkWaitForFences( 1, & app.submit_fence[ app.next_image_index ], VK_TRUE, uint64_t.max );    // wait for finished compute
+    app.stopStopWatch;
+    app.device.vkResetFences( 1, & app.submit_fence[ app.next_image_index ] ).vkAssert;
 
     // edit submmit info for display work
-    with( vd.submit_info ) {
+    with( app.submit_info ) {
         waitSemaphoreCount      = 0;
         pWaitSemaphores         = null;
         pWaitDstStageMask       = null;
         signalSemaphoreCount    = 1;
-        pSignalSemaphores       = & vd.rendered_semaphore[ vd.next_image_index ];
-        pCommandBuffers         = & vd.cmd_buffers[ vd.next_image_index ];
+        pSignalSemaphores       = & app.rendered_semaphore[ app.next_image_index ];
+        pCommandBuffers         = & app.cmd_buffers[ app.next_image_index ];
     }
 
     // submit graphics work
-    vd.graphics_queue.vkQueueSubmit( 1, & vd.submit_info, vd.submit_fence[ vd.next_image_index ] );  // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
+    app.graphics_queue.vkQueueSubmit( 1, & app.submit_info, app.submit_fence[ app.next_image_index ] );  // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
 
     // present rendered image
-    vd.present_info.pImageIndices = & vd.next_image_index;
-    vd.swapchain.present_queue.vkQueuePresentKHR( & vd.present_info );
+    app.present_info.pImageIndices = & app.next_image_index;
+    app.swapchain.present_queue.vkQueuePresentKHR( & app.present_info );
 
     // check if window was resized and handle the case
-    if( vd.window_resized ) {
-        vd.window_resized = false;
-        vd.recreateSwapchain;
+    if( app.window_resized ) {
+        app.window_resized = false;
+        app.recreateSwapchain;
         import resources : createResizedCommands;
-        vd.createResizedCommands;
-    } else if( vd.tb.dirty ) {
-        vd.updateWVPM;  // this happens anyway in recreateSwapchain
+        app.createResizedCommands;
+    } else if( app.tbb.dirty ) {
+        app.updateWVPM;  // this happens anyway in recreateSwapchain
     }
 
     // acquire next swapchain image
-    vd.device.vkAcquireNextImageKHR( vd.swapchain.swapchain, uint64_t.max, vd.acquired_semaphore[ vd.next_image_index ], VK_NULL_HANDLE, & vd.next_image_index );
+    app.device.vkAcquireNextImageKHR( app.swapchain.swapchain, uint64_t.max, app.acquired_semaphore[ app.next_image_index ], VK_NULL_HANDLE, & app.next_image_index );
 
     // edit submmit info to default settings
-    with( vd.submit_info ) {
+    with( app.submit_info ) {
         waitSemaphoreCount  = 1;
-        pWaitSemaphores     = & vd.acquired_semaphore[ vd.next_image_index ];
-        pWaitDstStageMask   = & vd.submit_wait_stage_mask;   // configured before entering createResources func
+        pWaitSemaphores     = & app.acquired_semaphore[ app.next_image_index ];
+        pWaitDstStageMask   = & app.submit_wait_stage_mask;   // configured before entering createResources func
     }
-    vd.present_info.pWaitSemaphores = & vd.rendered_semaphore[ vd.next_image_index ];
+    app.present_info.pWaitSemaphores = & app.rendered_semaphore[ app.next_image_index ];
 
     // wait for finished drawing
-    vd.device.vkWaitForFences( 1, & vd.submit_fence[ vd.next_image_index ], VK_TRUE, uint64_t.max );
-    vd.device.vkResetFences( 1, & vd.submit_fence[ vd.next_image_index ] ).vkAssert;
+    app.device.vkWaitForFences( 1, & app.submit_fence[ app.next_image_index ], VK_TRUE, uint64_t.max );
+    app.device.vkResetFences( 1, & app.submit_fence[ app.next_image_index ] ).vkAssert;
 }
 
 
@@ -499,15 +499,15 @@ void profileSim( ref VDrive_State vd ) @system {
 // Draw function pointer for sim play and profile //
 ////////////////////////////////////////////////////
 
-alias   Draw_Func = void function( ref VDrive_State vd ) nothrow @system;
+alias   Draw_Func = void function( ref VDrive_State app ) nothrow @system;
 private Draw_Func draw_func_play;
 private Draw_Func draw_func_profile;
 
 // set the functions above as default sim funcs
-void setDefaultSimFuncs( ref VDrive_State vd ) nothrow @system {
+void setDefaultSimFuncs( ref VDrive_State app ) nothrow @system {
     draw_func_play      = & playSim;
     draw_func_profile   = & profileSim;
-    vd.sim_play_cmd_buffer_count = 2;
+    app.sim_play_cmd_buffer_count = 2;
 }
 
 // set some other play func

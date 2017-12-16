@@ -40,122 +40,122 @@ struct VDrive_Export_State {
 
 
 
-void drawExportWait( ref VDrive_State vd ) nothrow @system {
+void drawExportWait( ref VDrive_State app ) nothrow @system {
     // draw the normal simulation before we hit the start index
-    if( vd.vs.sim_index < vd.ve.start_index ) {
-        vd.drawSim;
+    if( app.sim.sim_index < app.exp.start_index ) {
+        app.drawSim;
     // now draw with the export version
     } else {
         setSimFuncPlay( & drawExport );
-        vd.drawCmdBufferCount = vd.sim_play_cmd_buffer_count = 1;
-        vd.createExportCommands;        // create export commands now
-        vd.drawExport;                  // call once as we skipped drawSim above
+        app.drawCmdBufferCount = app.sim_play_cmd_buffer_count = 1;
+        app.createExportCommands;        // create export commands now
+        app.drawExport;                  // call once as we skipped drawSim above
     }
 }
 
 
-void drawExport( ref VDrive_State vd ) nothrow @system {
+void drawExport( ref VDrive_State app ) nothrow @system {
 
     // call the export command buffers step_count times
-    // use ve.export_index counter to keeo track of steps
-    // store sim_index in ve.sim_index to compute modulo
-    // vd.ping_pong is still based on vd.vs.sim_index
+    // use exp.export_index counter to keeo track of steps
+    // store sim_index in exp.sim_index to compute modulo
+    // app.ping_pong is still based on app.sim.sim_index
     // but we recompute sim_index differently
-    // - vd.ping_pong = ve.sim_index % 2;
-    // - vd.vs.sim_index = ve.start_index + ve.export_index * ve.step_size;
+    // - app.ping_pong = exp.sim_index % 2;
+    // - app.sim.sim_index = exp.start_index + exp.export_index * exp.step_size;
 
-    // it should be possible to replace vd.sim_command_buffers with our once
-    // and simply call vd.draw
+    // it should be possible to replace app.sim_command_buffers with our once
+    // and simply call app.draw
 
-    if( vd.ve.export_index < vd.ve.step_count ) {
+    if( app.exp.export_index < app.exp.step_count ) {
 
-        vd.sim_profile_step_index += vd.ve.step_size;
-        vd.profileSim;  // allways use profilSim to observe MLups when mass exporting
+        app.sim_profile_step_index += app.exp.step_size;
+        app.profileSim;  // allways use profilSim to observe MLups when mass exporting
 
         // invlidate
-        vd.ve.export_buffer[ vd.ve.export_index % 2 ].invalidateMappedMemoryRange;
+        app.exp.export_buffer[ app.exp.export_index % 2 ].invalidateMappedMemoryRange;
 
         // now we have to export the data
         // best way is to write it out raw
-        vd.ve.export_data[ vd.ve.export_index % 2 ][ 0 .. vd.ve.export_size ]
-            .ensRawWriteBinaryVarFile( vd.ve.var_file_name, vd.ve.export_index );
+        app.exp.export_data[ app.exp.export_index % 2 ][ 0 .. app.exp.export_size ]
+            .ensRawWriteBinaryVarFile( app.exp.var_file_name, app.exp.export_index );
 
         // update indexes and ping pong
-        vd.vs.sim_ping_pong = ( vd.ve.start_index + vd.ve.export_index ) % 2;
-        ++vd.ve.export_index;
-        vd.vs.sim_index = vd.ve.start_index + vd.ve.export_index * vd.ve.step_size;
+        app.sim.sim_ping_pong = ( app.exp.start_index + app.exp.export_index ) % 2;
+        ++app.exp.export_index;
+        app.sim.sim_index = app.exp.start_index + app.exp.export_index * app.exp.step_size;
 
     } else {
-        // recreate original vd.vs.sim_cmd_buffers
+        // recreate original app.sim.sim_cmd_buffers
         // don't reset or recreate the pipeline
         try {
-            vd.createBoltzmannPSO( false, false, false );
+            app.createBoltzmannPSO( false, false, false );
         } catch( Exception ) {}
 
         // set default function pointer for play and profile and pause the playback
-        vd.setDefaultSimFuncs;
-        vd.simPause;
+        app.setDefaultSimFuncs;
+        app.simPause;
 
         // draw the graphics display once
         // otherwisethis draw would be omitted, and the gui rebuild immediatelly
-        vd.drawSim;
+        app.drawSim;
 
     }
 }
 
 
 
-void createExportResources( ref VDrive_State vd ) {
+void createExportResources( ref VDrive_State app ) {
 
     // create vulkan resources
-    vd.createExportBuffer;
-    vd.createExportPipeline;
-    vd.createExportCommands;
+    app.createExportBuffer;
+    app.createExportPipeline;
+    app.createExportCommands;
 
     // setup export draw function
     setSimFuncPlay( & drawExportWait );
 
     // initialize profile data
-    vd.sim_profile_step_index = 0;
-    vd.resetStopWatch;
+    app.sim_profile_step_index = 0;
+    app.resetStopWatch;
 
 
     // setup ensight options
     import std.string : fromStringz;
     import std.conv : to;
     Export_Options options = {
-        output      : vd.ve.case_file_name.ptr.fromStringz.to!string,
-        variable    : vd.ve.variable_name,
-        format      : vd.ve.file_format,
+        output      : app.exp.case_file_name.ptr.fromStringz.to!string,
+        variable    : app.exp.variable_name,
+        format      : app.exp.file_format,
         overwrite   : true,
     };
     options.set_default_options;
 
     // setup domain parameter
-    if( vd.use_3_dim ) vd.vs.sim_domain[2] = 1;
+    if( app.use_3_dim ) app.sim.sim_domain[2] = 1;
     float[3] minDomain = [ 0, 0, 0 ];
-    float[3] maxDomain = [ vd.vs.sim_domain[0], vd.vs.sim_domain[1], vd.vs.sim_domain[2] ];
+    float[3] maxDomain = [ app.sim.sim_domain[0], app.sim.sim_domain[1], app.sim.sim_domain[2] ];
     float[3] incDomain = [ 1, 1, 1 ];
-    uint [3] cellCount = vd.vs.sim_domain[ 0..3 ];
+    uint [3] cellCount = app.sim.sim_domain[ 0..3 ];
 
     // export case and geo file
-    options.ensStoreCase( vd.ve.start_index, vd.ve.step_count, vd.ve.step_size );
+    options.ensStoreCase( app.exp.start_index, app.exp.step_count, app.exp.step_size );
     options.ensStoreGeo( minDomain, maxDomain, incDomain, cellCount );
 
     // get var file name from options
 
     auto length = options.outVar.length;
-    //vd.ve.var_file_buffer[ ] = '\0';
-    vd.ve.var_file_buffer[ 0 .. length ] = options.outVar[];
-    vd.ve.var_file_buffer[ length .. length + 3 ] = cast( char )( 48 );
+    //app.exp.var_file_buffer[ ] = '\0';
+    app.exp.var_file_buffer[ 0 .. length ] = options.outVar[];
+    app.exp.var_file_buffer[ length .. length + 3 ] = cast( char )( 48 );
 
     // assign the prepared buffer to the name slice
-    vd.ve.var_file_name = vd.ve.var_file_buffer[ 0 .. length + 3 ];
-    vd.ve.export_index = 0;
+    app.exp.var_file_name = app.exp.var_file_buffer[ 0 .. length + 3 ];
+    app.exp.export_index = 0;
 
     // set a Export_Binary_Variable_Header in the beginning
-    vd.ve.variable_name.ptr.ensGetBinaryVarHeader( vd.ve.export_data[0] );
-    vd.ve.variable_name.ptr.ensGetBinaryVarHeader( vd.ve.export_data[1] );
+    app.exp.variable_name.ptr.ensGetBinaryVarHeader( app.exp.export_data[0] );
+    app.exp.variable_name.ptr.ensGetBinaryVarHeader( app.exp.export_data[1] );
 
 }
 
@@ -163,36 +163,36 @@ void createExportResources( ref VDrive_State vd ) {
 
 
 
-void createExportBuffer( ref VDrive_State vd ) {
+void createExportBuffer( ref VDrive_State app ) {
 
-    uint32_t buffer_size = vd.vs.sim_domain[0] * vd.vs.sim_domain[1] * ( vd.use_3_dim ? vd.vs.sim_domain[2] : 1 );
-    uint32_t buffer_mem_size = buffer_size * (( vd.export_as_vector ? 3 : 1 ) * float.sizeof ).toUint;
+    uint32_t buffer_size = app.sim.sim_domain[0] * app.sim.sim_domain[1] * ( app.use_3_dim ? app.sim.sim_domain[2] : 1 );
+    uint32_t buffer_mem_size = buffer_size * (( app.export_as_vector ? 3 : 1 ) * float.sizeof ).toUint;
     auto header_size = ensGetBinaryVarHeaderSize;
 
     //
     // exit early if memory is sufficiently large
     //
-    if( header_size + buffer_mem_size <= vd.ve.export_memory.memSize ) return;
+    if( header_size + buffer_mem_size <= app.exp.export_memory.memSize ) return;
 
 
-    vd.graphics_queue.vkQueueWaitIdle;
+    app.graphics_queue.vkQueueWaitIdle;
     //
     // (re)create memory, buffer and buffer view
     //
-    if( vd.ve.export_memory.memory != VK_NULL_HANDLE )
-        vd.ve.export_memory.destroyResources;               // destroy old memory
+    if( app.exp.export_memory.memory != VK_NULL_HANDLE )
+        app.exp.export_memory.destroyResources;               // destroy old memory
 
-    if( vd.ve.export_buffer[0].buffer != VK_NULL_HANDLE )
-        vd.ve.export_buffer[0].destroyResources;            // destroy old buffer
+    if( app.exp.export_buffer[0].buffer != VK_NULL_HANDLE )
+        app.exp.export_buffer[0].destroyResources;            // destroy old buffer
 
-    if( vd.ve.export_buffer_view[0]   != VK_NULL_HANDLE )
-        vd.destroy( vd.ve.export_buffer_view[0] );          // destroy old buffer view
+    if( app.exp.export_buffer_view[0]   != VK_NULL_HANDLE )
+        app.destroy( app.exp.export_buffer_view[0] );          // destroy old buffer view
 
-    if( vd.ve.export_buffer[1].buffer != VK_NULL_HANDLE )
-        vd.ve.export_buffer[1].destroyResources;            // destroy old buffer
+    if( app.exp.export_buffer[1].buffer != VK_NULL_HANDLE )
+        app.exp.export_buffer[1].destroyResources;            // destroy old buffer
 
-    if( vd.ve.export_buffer_view[1]   != VK_NULL_HANDLE )
-        vd.destroy( vd.ve.export_buffer_view[1] );          // destroy old buffer view
+    if( app.exp.export_buffer_view[1]   != VK_NULL_HANDLE )
+        app.destroy( app.exp.export_buffer_view[1] );          // destroy old buffer view
 
     //
     // as we are computing in a ping pong fashion we need two export buffers
@@ -200,84 +200,84 @@ void createExportBuffer( ref VDrive_State vd ) {
     //
 
     // create first memory less buffer and get its alignment requirement
-    auto aligned_offset_0 = vd.ve.export_buffer[0]( vd )
+    auto aligned_offset_0 = app.exp.export_buffer[0]( app )
         .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_mem_size )
         .alignedOffset( header_size );
 
     // create second memory less buffer and get its alignment requirement
-    auto aligned_offset_1 = vd.ve.export_buffer[1]( vd )
+    auto aligned_offset_1 = app.exp.export_buffer[1]( app )
         .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_mem_size )
-        .alignedOffset( aligned_offset_0 + vd.ve.export_buffer[0].memSize + header_size );
+        .alignedOffset( aligned_offset_0 + app.exp.export_buffer[0].memSize + header_size );
 
     //import std.stdio;
     //writeln( "header_size      : ", header_size );
     //writeln( "aligned_offset_0 : ", aligned_offset_0 );
     //writeln( "aligned_offset_1 : ", aligned_offset_1 );
     //writeln( "buffer_mem_size  : ", buffer_mem_size );
-    //writeln( "memSize_0        : ", vd.ve.export_buffer[0].memSize );
-    //writeln( "memSize_1        : ", vd.ve.export_buffer[1].memSize );
+    //writeln( "memSize_0        : ", app.exp.export_buffer[0].memSize );
+    //writeln( "memSize_1        : ", app.exp.export_buffer[1].memSize );
     //writeln;
 
     // create memory with additional spaces for two headers
-    vd.ve.export_memory( vd )
-        .create( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, aligned_offset_1 + vd.ve.export_buffer[1].memSize );
+    app.exp.export_memory( app )
+        .create( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, aligned_offset_1 + app.exp.export_buffer[1].memSize );
 
     // bind memory with offset to first buffer
-    vd.ve.export_buffer[0]
-        .bindMemory( vd.ve.export_memory.memory, aligned_offset_0 );
+    app.exp.export_buffer[0]
+        .bindMemory( app.exp.export_memory.memory, aligned_offset_0 );
 
     // bind memory with offset to first buffer
-    vd.ve.export_buffer[1]
-        .bindMemory( vd.ve.export_memory.memory, aligned_offset_1 );
+    app.exp.export_buffer[1]
+        .bindMemory( app.exp.export_memory.memory, aligned_offset_1 );
 
     // bind two buffers to two buffer views
-    vd.ve.export_buffer_view[0] = vd.createBufferView( vd.ve.export_buffer[0].buffer, VK_FORMAT_R32_SFLOAT );
-    vd.ve.export_buffer_view[1] = vd.createBufferView( vd.ve.export_buffer[1].buffer, VK_FORMAT_R32_SFLOAT );
+    app.exp.export_buffer_view[0] = app.createBufferView( app.exp.export_buffer[0].buffer, VK_FORMAT_R32_SFLOAT );
+    app.exp.export_buffer_view[1] = app.createBufferView( app.exp.export_buffer[1].buffer, VK_FORMAT_R32_SFLOAT );
 
     // update the descriptor with buffer
-    vd.ve.export_descriptor_update.texel_buffer_views[0] = vd.ve.export_buffer_view[0];  // export target buffer
-    vd.ve.export_descriptor_update.texel_buffer_views[1] = vd.ve.export_buffer_view[1];  // export target buffer
-    vd.ve.export_descriptor_update.update;
+    app.exp.export_descriptor_update.texel_buffer_views[0] = app.exp.export_buffer_view[0];  // export target buffer
+    app.exp.export_descriptor_update.texel_buffer_views[1] = app.exp.export_buffer_view[1];  // export target buffer
+    app.exp.export_descriptor_update.update;
 
     // map first and second memory ranges, including the aligned headers
-    vd.ve.export_size = header_size + buffer_mem_size;
-    auto mapped_memory = vd.ve.export_memory.mapMemory;
-    vd.ve.export_data[0]  = mapped_memory + aligned_offset_0 - header_size;    //vd.ve.export_memory.mapMemory( vd.ve.export_size, aligned_offset_0 - header_size );    // size, offset
-    vd.ve.export_data[1]  = mapped_memory + aligned_offset_1 - header_size;    //vd.ve.export_memory.mapMemory( vd.ve.export_size, aligned_offset_1 - header_size );    // size, offset
+    app.exp.export_size = header_size + buffer_mem_size;
+    auto mapped_memory = app.exp.export_memory.mapMemory;
+    app.exp.export_data[0]  = mapped_memory + aligned_offset_0 - header_size;    //app.exp.export_memory.mapMemory( app.exp.export_size, aligned_offset_0 - header_size );    // size, offset
+    app.exp.export_data[1]  = mapped_memory + aligned_offset_1 - header_size;    //app.exp.export_memory.mapMemory( app.exp.export_size, aligned_offset_1 - header_size );    // size, offset
 
 }
 
 
-void createExportPipeline( ref VDrive_State vd ) {
+void createExportPipeline( ref VDrive_State app ) {
 
-    if( vd.ve.export_pso.is_constructed ) {
-        vd.graphics_queue.vkQueueWaitIdle;          // wait for queue idle as we need to destroy the pipeline
-        vd.destroy( vd.ve.export_pso );
+    if( app.exp.export_pso.is_constructed ) {
+        app.graphics_queue.vkQueueWaitIdle;          // wait for queue idle as we need to destroy the pipeline
+        app.destroy( app.exp.export_pso );
     }
 
     Meta_Compute meta_compute;                      // use temporary Meta_Compute struct to specify and create the pso
-    vd.ve.export_pso = meta_compute( vd )         // extracting the core items after construction with reset call
-        .shaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_COMPUTE_BIT, vd.ve.export_shader ))
-        .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
+    app.exp.export_pso = meta_compute( app )         // extracting the core items after construction with reset call
+        .shaderStageCreateInfo( app.createPipelineShaderStage( VK_SHADER_STAGE_COMPUTE_BIT, app.exp.export_shader ))
+        .addDescriptorSetLayout( app.descriptor.descriptor_set_layout )
         .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 8 )
-        .construct( vd.vs.compute_cache )              // construct using pipeline cache
+        .construct( app.sim.compute_cache )              // construct using pipeline cache
         .destroyShaderModule
         .reset;
 }
 
 
-void createExportCommands( ref VDrive_State vd ) nothrow {
+void createExportCommands( ref VDrive_State app ) nothrow {
 
     ///////////////////////////////////////////////////////////////////////////
     // create two reusable compute command buffers with export functionality //
     ///////////////////////////////////////////////////////////////////////////
 
     // reset the command pool to start recording drawing commands
-    vd.graphics_queue.vkQueueWaitIdle;   // equivalent using a fence per Spec v1.0.48
-    vd.device.vkResetCommandPool( vd.vs.sim_cmd_pool, 0 ); // second argument is VkCommandPoolResetFlags
+    app.graphics_queue.vkQueueWaitIdle;   // equivalent using a fence per Spec v1.0.48
+    app.device.vkResetCommandPool( app.sim.sim_cmd_pool, 0 ); // second argument is VkCommandPoolResetFlags
 
     // two command buffers for compute loop, one ping and one pong buffer
-    vd.allocateCommandBuffers( vd.vs.sim_cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vd.vs.sim_cmd_buffers );
+    app.allocateCommandBuffers( app.sim.sim_cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, app.sim.sim_cmd_buffers );
     auto sim_cmd_buffers_bi = createCmdBufferBI;
 
     // barrier for population access from export shader
@@ -286,7 +286,7 @@ void createExportCommands( ref VDrive_State vd ) nothrow {
         dstAccessMask       : VK_ACCESS_SHADER_READ_BIT,
         srcQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
         dstQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
-        buffer              : vd.vs.sim_buffer.buffer,
+        buffer              : app.sim.sim_buffer.buffer,
         offset              : 0,
         size                : VK_WHOLE_SIZE,
     };
@@ -299,7 +299,7 @@ void createExportCommands( ref VDrive_State vd ) nothrow {
         newLayout           : VK_IMAGE_LAYOUT_GENERAL,
         srcQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
         dstQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
-        image               : vd.vs.sim_image.image,
+        image               : app.sim.sim_image.image,
         subresourceRange    : {
             aspectMask          : VK_IMAGE_ASPECT_COLOR_BIT,    // VkImageAspectFlags  aspectMask;
             baseMipLevel        : 0,                            // uint32_t            baseMipLevel;
@@ -315,21 +315,21 @@ void createExportCommands( ref VDrive_State vd ) nothrow {
         dstAccessMask       : VK_ACCESS_HOST_READ_BIT,
         srcQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
         dstQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
-        //buffer              : vd.ve.export_buffer.buffer,
+        //buffer              : app.exp.export_buffer.buffer,
         offset              : 0,
         size                : VK_WHOLE_SIZE,
     };
 
 
-    uint32_t dispatch_x = vd.vs.sim_domain[0] * vd.vs.sim_domain[1] * vd.vs.sim_domain[2] / vd.vs.sim_work_group_size[0];
+    uint32_t dispatch_x = app.sim.sim_domain[0] * app.sim.sim_domain[1] * app.sim.sim_domain[2] / app.sim.sim_work_group_size[0];
 
 
 
     // record commands in loop, only difference is the push constant
-    foreach( i, ref cmd_buffer; vd.vs.sim_cmd_buffers ) {
+    foreach( i, ref cmd_buffer; app.sim.sim_cmd_buffers ) {
 
-        // - vd.ping_pong = ve.sim_index % 2;
-        // - vd.vs.sim_index = ve.start_index + ve.export_index * ve.step_size;
+        // - app.ping_pong = exp.sim_index % 2;
+        // - app.sim.sim_index = exp.start_index + exp.export_index * exp.step_size;
 
         //
         // First export the current frame!
@@ -337,14 +337,14 @@ void createExportCommands( ref VDrive_State vd ) nothrow {
 
         cmd_buffer.vkBeginCommandBuffer( &sim_cmd_buffers_bi );  // begin command buffer recording
 
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.ve.export_pso.pipeline );    // bind compute vd.ve.export_pso.pipeline
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, app.exp.export_pso.pipeline );    // bind compute app.exp.export_pso.pipeline
 
         cmd_buffer.vkCmdBindDescriptorSets(             // VkCommandBuffer              commandBuffer
             VK_PIPELINE_BIND_POINT_COMPUTE,             // VkPipelineBindPoint          pipelineBindPoint
-            vd.ve.export_pso.pipeline_layout,           // VkPipelineLayout             layout
+            app.exp.export_pso.pipeline_layout,           // VkPipelineLayout             layout
             0,                                          // uint32_t                     firstSet
             1,                                          // uint32_t                     descriptorSetCount
-            &vd.descriptor.descriptor_set,              // const( VkDescriptorSet )*    pDescriptorSets
+            &app.descriptor.descriptor_set,              // const( VkDescriptorSet )*    pDescriptorSets
             0,                                          // uint32_t                     dynamicOffsetCount
             null                                        // const( uint32_t )*           pDynamicOffsets
         );
@@ -354,12 +354,12 @@ void createExportCommands( ref VDrive_State vd ) nothrow {
         // hence we use ( i + 1 ) % 2 instead of i % 2
         // to get proper results, the pong range of the population buffer and the macroscopic property image
         // must be properly initialized
-        uint32_t[2] push_constant = [ ( i + 1 ).toUint % 2, vd.vs.sim_layers ];
-        cmd_buffer.vkCmdPushConstants( vd.ve.export_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
+        uint32_t[2] push_constant = [ ( i + 1 ).toUint % 2, app.sim.sim_layers ];
+        cmd_buffer.vkCmdPushConstants( app.exp.export_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
 
         cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );   // dispatch compute command
 
-        export_buffer_memory_barrier.buffer = vd.ve.export_buffer[i].buffer;
+        export_buffer_memory_barrier.buffer = app.exp.export_buffer[i].buffer;
         cmd_buffer.vkCmdPipelineBarrier(
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,       // VkPipelineStageFlags                 srcStageMask,
             VK_PIPELINE_STAGE_HOST_BIT,                 // VkPipelineStageFlags                 dstStageMask,
@@ -373,24 +373,24 @@ void createExportCommands( ref VDrive_State vd ) nothrow {
         // Now do step_size count simulations
         //
 
-        foreach( s; 0 .. vd.ve.step_size ) {
+        foreach( s; 0 .. app.exp.step_size ) {
 
-            //push_constant[0] = (( ve.sim_index + i + s ) % 2 ).toUint;
+            //push_constant[0] = (( exp.sim_index + i + s ) % 2 ).toUint;
             push_constant[0] = (( i + s ) % 2 ).toUint;
 
-            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.vs.loop_pso.pipeline );    // bind compute vd.vs.loop_pso.pipeline
+            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, app.sim.loop_pso.pipeline );    // bind compute app.sim.loop_pso.pipeline
 
             cmd_buffer.vkCmdBindDescriptorSets(             // VkCommandBuffer              commandBuffer
                 VK_PIPELINE_BIND_POINT_COMPUTE,             // VkPipelineBindPoint          pipelineBindPoint
-                vd.vs.loop_pso.pipeline_layout,           // VkPipelineLayout             layout
+                app.sim.loop_pso.pipeline_layout,           // VkPipelineLayout             layout
                 0,                                          // uint32_t                     firstSet
                 1,                                          // uint32_t                     descriptorSetCount
-                &vd.descriptor.descriptor_set,              // const( VkDescriptorSet )*    pDescriptorSets
+                &app.descriptor.descriptor_set,              // const( VkDescriptorSet )*    pDescriptorSets
                 0,                                          // uint32_t                     dynamicOffsetCount
                 null                                        // const( uint32_t )*           pDynamicOffsets
             );
 
-            cmd_buffer.vkCmdPushConstants( vd.vs.loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
+            cmd_buffer.vkCmdPushConstants( app.sim.loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
 
             cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );   // dispatch compute command
 
@@ -419,17 +419,17 @@ void createExportCommands( ref VDrive_State vd ) nothrow {
 
     // init_pso ping pong variable to 1
     // it will be switched to 0 ( pp = 1 - pp ) befor submitting compute commands
-    //vd.vs.sim_ping_pong = 1;
+    //app.sim.sim_ping_pong = 1;
 }
 
 
 
-void destroyExpResources( ref VDrive_State vd ) {
+void destroyExpResources( ref VDrive_State app ) {
     // export resources
-    if( vd.ve.export_pso.is_constructed ) vd.destroy( vd.ve.export_pso );
-    if( vd.ve.export_memory.is_constructed ) vd.ve.export_memory.destroyResources;
-    if( vd.ve.export_buffer[0].is_constructed ) vd.ve.export_buffer[0].destroyResources;
-    if( vd.ve.export_buffer[1].is_constructed ) vd.ve.export_buffer[1].destroyResources;
-    if( vd.ve.export_buffer_view[0] != VK_NULL_HANDLE ) vd.destroy( vd.ve.export_buffer_view[0] );
-    if( vd.ve.export_buffer_view[1] != VK_NULL_HANDLE ) vd.destroy( vd.ve.export_buffer_view[1] );
+    if( app.exp.export_pso.is_constructed ) app.destroy( app.exp.export_pso );
+    if( app.exp.export_memory.is_constructed ) app.exp.export_memory.destroyResources;
+    if( app.exp.export_buffer[0].is_constructed ) app.exp.export_buffer[0].destroyResources;
+    if( app.exp.export_buffer[1].is_constructed ) app.exp.export_buffer[1].destroyResources;
+    if( app.exp.export_buffer_view[0] != VK_NULL_HANDLE ) app.destroy( app.exp.export_buffer_view[0] );
+    if( app.exp.export_buffer_view[1] != VK_NULL_HANDLE ) app.destroy( app.exp.export_buffer_view[1] );
 }

@@ -25,34 +25,34 @@ int main() {
     // compile time branch if gui is used or not 
     static if( USE_GUI ) {
         import gui;
-        VDrive_Gui_State vd;                        // VDrive Gui state struct wrapping VDrive State struct
-        vd.initImgui;                               // initialize imgui first, we raster additional fonts but currently don't install its glfw callbacks, they should be treated
+        VDrive_Gui_State app;                        // VDrive Gui state struct wrapping VDrive State struct
+        app.initImgui;                               // initialize imgui first, we raster additional fonts but currently don't install its glfw callbacks, they should be treated
     } else {
         import resources;
-        VDrive_State vd;                            // VDrive state struct
+        VDrive_State app;                            // VDrive state struct
     }
 
 
     // initialize vulkan
-    auto vkResult = vd.initVulkan( 1600, 900 );     // initialize instance and (physical) device
+    auto vkResult = app.initVulkan( 1600, 900 );     // initialize instance and (physical) device
     if( vkResult ) return vkResult;                 // exit if initialization failed, VK_SUCCESS = 0
 
-    vd.initTrackball;                               // initialize trackball with window size and default perspective projection data in VDrive State
-    vd.registerCallbacks;                           // register glfw callback functions 
-    vd.createCommandObjects;                        // create command pool and sync primitives
-    vd.createMemoryObjects;                         // create memory objects once used through out program lifetime
-    vd.createDescriptorSet;                         // create descriptor set
-    vd.createRenderResources;                       // configure swapchain, create renderpass and pipeline state object
-    vd.resizeRenderResources;                       // construct swapchain, create depth buffer and frambuffers
-    vd.setDefaultSimFuncs;                          // set default sim funcs, these can be overridden with gui commands
+    app.initTrackball;                               // initialize trackball with window size and default perspective projection data in VDrive State
+    app.registerCallbacks;                           // register glfw callback functions 
+    app.createCommandObjects;                        // create command pool and sync primitives
+    app.createMemoryObjects;                         // create memory objects once used through out program lifetime
+    app.createDescriptorSet;                         // create descriptor set
+    app.createRenderResources;                       // configure swapchain, create renderpass and pipeline state object
+    app.resizeRenderResources;                       // construct swapchain, create depth buffer and frambuffers
+    app.setDefaultSimFuncs;                          // set default sim funcs, these can be overridden with gui commands
 
     // branch once more dependent on gui usage
     static if( !USE_GUI ) {
-        vd.createResizedCommands;                   // create draw loop runtime commands, only used without gui
+        app.createResizedCommands;                   // create draw loop runtime commands, only used without gui
     }
 
     // initial draw
-    vd.drawInit;
+    app.drawInit;
 
 
     // record the first gui command buffer
@@ -61,7 +61,7 @@ int main() {
 
 
     //import vdrive.util.info;
-    //vd.gpu.listFeatures;
+    //app.gpu.listFeatures;
 
     // Todo(pp):
     //import core.thread;
@@ -72,7 +72,7 @@ int main() {
     import derelict.glfw3;
     double last_time = glfwGetTime();
     import core.stdc.stdio : sprintf;
-    while( !glfwWindowShouldClose( vd.window ))
+    while( !glfwWindowShouldClose( app.window ))
     {
         // compute fps
         ++frame_count;
@@ -80,25 +80,25 @@ int main() {
         if( delta_time >= 1.0 ) {
             sprintf( title.ptr, "Vulkan Erupted, FPS: %.2f", frame_count / delta_time );    // frames per second
             //sprintf( title.ptr, "Vulkan Erupted, FPS: %.2f", 1000.0 / frame_count );      // milli seconds per frame
-            glfwSetWindowTitle( vd.window, title.ptr );
+            glfwSetWindowTitle( app.window, title.ptr );
             last_time += delta_time;
             frame_count = 0;
         }
 
         // draw
-        vd.draw();
-        glfwSwapBuffers( vd.window );
+        app.draw();
+        glfwSwapBuffers( app.window );
 
         // poll events in remaining frame time
         glfwPollEvents();
     }
 
     import cpustate : cpuFree;
-    vd.cpuFree;
+    app.cpuFree;
 
     // drain work and destroy vulkan
-    vd.destroyResources;
-    vd.destroyVulkan;
+    app.destroyResources;
+    app.destroyVulkan;
 
     printf( "\n" );
     return 0;

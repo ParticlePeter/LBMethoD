@@ -54,32 +54,32 @@ struct VDrive_Simulate_State {
 //////////////////////////////////////////
 // create or recreate simulation buffer //
 //////////////////////////////////////////
-void createSimBuffer( ref VDrive_State vd ) {
+void createSimBuffer( ref VDrive_State app ) {
 
     // (re)create buffer and buffer view
-    if( vd.vs.sim_buffer.buffer   != VK_NULL_HANDLE ) {
-        vd.graphics_queue.vkQueueWaitIdle;
-        vd.vs.sim_buffer.destroyResources;          // destroy old buffer
+    if( app.sim.sim_buffer.buffer   != VK_NULL_HANDLE ) {
+        app.graphics_queue.vkQueueWaitIdle;
+        app.sim.sim_buffer.destroyResources;          // destroy old buffer
     }
-    if( vd.vs.sim_buffer_view     != VK_NULL_HANDLE ) {
-        vd.graphics_queue.vkQueueWaitIdle;
-        vd.destroy( vd.vs.sim_buffer_view );        // destroy old buffer view
+    if( app.sim.sim_buffer_view     != VK_NULL_HANDLE ) {
+        app.graphics_queue.vkQueueWaitIdle;
+        app.destroy( app.sim.sim_buffer_view );        // destroy old buffer view
     }
 
 
     // For D2Q9 we need 1 + 2 * 8 Shader Storage Buffers with sim_dim.x * sim_dim.y cells,
     // for 512 ^ 2 cells this means ( 1 + 2 * 8 ) * 4 * 512 * 512 = 17_825_792 bytes
     // create one buffer 1 + 2 * 8 buffer views into that buffer
-    uint32_t buffer_size = vd.vs.sim_layers * vd.vs.sim_domain[0] * vd.vs.sim_domain[1] * ( vd.use_3_dim ? vd.vs.sim_domain[2] : 1 );
-    uint32_t buffer_mem_size = buffer_size * ( vd.use_double ? double.sizeof : float.sizeof ).toUint;
+    uint32_t buffer_size = app.sim.sim_layers * app.sim.sim_domain[0] * app.sim.sim_domain[1] * ( app.use_3_dim ? app.sim.sim_domain[2] : 1 );
+    uint32_t buffer_mem_size = buffer_size * ( app.use_double ? double.sizeof : float.sizeof ).toUint;
 
-    vd.vs.sim_buffer( vd )
+    app.sim.sim_buffer( app )
         .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_mem_size )
         .createMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 
-    vd.vs.sim_buffer_view =
-        vd.createBufferView( vd.vs.sim_buffer.buffer,
-            vd.use_double ? VK_FORMAT_R32G32_UINT : VK_FORMAT_R32_SFLOAT, 0, buffer_mem_size );
+    app.sim.sim_buffer_view =
+        app.createBufferView( app.sim.sim_buffer.buffer,
+            app.use_double ? VK_FORMAT_R32G32_UINT : VK_FORMAT_R32_SFLOAT, 0, buffer_mem_size );
 
 }
 
@@ -88,9 +88,9 @@ void createSimBuffer( ref VDrive_State vd ) {
 /////////////////////////////////////////////////////////////////////////////////////////
 // create compute pipelines and compute command buffers to initialize and simulate LBM //
 /////////////////////////////////////////////////////////////////////////////////////////
-void createSimResources( ref VDrive_State vd ) {
-    vd.vs.compute_cache = vd.createPipelineCache;
-    vd.createBoltzmannPSO( true, true, true );
+void createSimResources( ref VDrive_State app ) {
+    app.sim.compute_cache = app.createPipelineCache;
+    app.createBoltzmannPSO( true, true, true );
 }
 
 
@@ -98,28 +98,28 @@ void createSimResources( ref VDrive_State vd ) {
 ///////////////////////////////////////////////////
 // create LBM init and loop PSOs helper function //
 ///////////////////////////////////////////////////
-private void createBoltzmannPSO( ref VDrive_State vd, ref Core_Pipeline pso, string shader_path ) {
+private void createBoltzmannPSO( ref VDrive_State app, ref Core_Pipeline pso, string shader_path ) {
 
     // create meta_Specialization struct to specify shader local work group size and algorithm
     Meta_SC!( 4 ) meta_sc;
     meta_sc
-        .addMapEntry( MapEntry32(  vd.vs.sim_work_group_size[0] ))                                     // default constantID is 0, next would be 1
-        .addMapEntry( MapEntry32(  vd.vs.sim_work_group_size[1] ))                                     // default constantID is 1, next would be 2
-        .addMapEntry( MapEntry32(  vd.vs.sim_work_group_size[2] ))                                     // default constantID is 2, next would be 3
-        .addMapEntry( MapEntry32(( vd.vs.sim_step_size << 8 ) + cast( uint32_t )vd.vs.sim_collision ))    // upper 24 bits is the step_size, lower 8 bits the algorithm
+        .addMapEntry( MapEntry32(  app.sim.sim_work_group_size[0] ))                                     // default constantID is 0, next would be 1
+        .addMapEntry( MapEntry32(  app.sim.sim_work_group_size[1] ))                                     // default constantID is 1, next would be 2
+        .addMapEntry( MapEntry32(  app.sim.sim_work_group_size[2] ))                                     // default constantID is 2, next would be 3
+        .addMapEntry( MapEntry32(( app.sim.sim_step_size << 8 ) + cast( uint32_t )app.sim.sim_collision ))    // upper 24 bits is the step_size, lower 8 bits the algorithm
         .construct;
 
     if( pso.is_constructed ) {
-        vd.graphics_queue.vkQueueWaitIdle;      // wait for queue idle, we need to destroy the pipeline
-        vd.destroy( pso );                      // possibly destroy old compute pipeline and layout
+        app.graphics_queue.vkQueueWaitIdle;      // wait for queue idle, we need to destroy the pipeline
+        app.destroy( pso );                      // possibly destroy old compute pipeline and layout
     }
 
     Meta_Compute meta_compute;                  // use temporary Meta_Compute struct to specify and create the pso
-    pso = meta_compute( vd )                    // extracting the core items after construction with reset call
-        .shaderStageCreateInfo( vd.createPipelineShaderStage( shader_path, & meta_sc.specialization_info ))
-        .addDescriptorSetLayout( vd.descriptor.descriptor_set_layout )
+    pso = meta_compute( app )                    // extracting the core items after construction with reset call
+        .shaderStageCreateInfo( app.createPipelineShaderStage( shader_path, & meta_sc.specialization_info ))
+        .addDescriptorSetLayout( app.descriptor.descriptor_set_layout )
         .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 8 )
-        .construct( vd.vs.compute_cache )       // construct using pipeline cache
+        .construct( app.sim.compute_cache )       // construct using pipeline cache
         .destroyShaderModule                    // destroy shader modules
         .reset;                                 // reset temporary Meta_Compute struct and extract core pipeline data
 }
@@ -129,11 +129,11 @@ private void createBoltzmannPSO( ref VDrive_State vd, ref Core_Pipeline pso, str
 ///////////////////////////////////
 // create LBM init and loop PSOs //
 ///////////////////////////////////
-void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool reset_sim ) {
+void createBoltzmannPSO( ref VDrive_State app, bool init_pso, bool loop_pso, bool reset_sim ) {
 
     // (re)create Boltzmann init PSO if required
     if( init_pso ) {
-        vd.createBoltzmannPSO( vd.vs.init_pso, vd.vs.init_shader );
+        app.createBoltzmannPSO( app.sim.init_pso, app.sim.init_shader );
     }
 
     if( reset_sim ) {
@@ -142,39 +142,39 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
         // initialize populations with compute pipeline //
         //////////////////////////////////////////////////
 
-        auto init_cmd_buffer = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
+        auto init_cmd_buffer = app.allocateCommandBuffer( app.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
         auto init_cmd_buffer_bi = createCmdBufferBI( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
         init_cmd_buffer.vkBeginCommandBuffer( &init_cmd_buffer_bi );
 
 
-        init_cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.vs.init_pso.pipeline ); // bind compute vd.vs.loop_pso
+        init_cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, app.sim.init_pso.pipeline ); // bind compute app.sim.loop_pso
         init_cmd_buffer.vkCmdBindDescriptorSets(// VkCommandBuffer              commandBuffer           // bind descriptor set
             VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
-            vd.vs.init_pso.pipeline_layout,     // VkPipelineLayout             layout
+            app.sim.init_pso.pipeline_layout,     // VkPipelineLayout             layout
             0,                                  // uint32_t                     firstSet
             1,                                  // uint32_t                     descriptorSetCount
-            &vd.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
+            &app.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
             0,                                  // uint32_t                     dynamicOffsetCount
             null                                // const( uint32_t )*           pDynamicOffsets
         );
 
-        // determine dispatch group X count from simulation domain vd.vs.sim_domain and compute work group size vd.vs.sim_work_group_size[0]
-        uint32_t dispatch_x = vd.vs.sim_domain[0] * vd.vs.sim_domain[1] * vd.vs.sim_domain[2] / vd.vs.sim_work_group_size[0];
+        // determine dispatch group X count from simulation domain app.sim.sim_domain and compute work group size app.sim.sim_work_group_size[0]
+        uint32_t dispatch_x = app.sim.sim_domain[0] * app.sim.sim_domain[1] * app.sim.sim_domain[2] / app.sim.sim_work_group_size[0];
         init_cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );      // dispatch compute command
         init_cmd_buffer.vkEndCommandBuffer;                     // finish recording and submit the command
         auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
-        vd.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
+        app.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
 
     }
 
 
     // (re)create compute pipeline for runtime loop
     if( loop_pso ) {
-        vd.createBoltzmannPSO( vd.vs.loop_pso, vd.vs.loop_shader );      // putting responsibility to use the right double shader into users hand
+        app.createBoltzmannPSO( app.sim.loop_pso, app.sim.loop_shader );      // putting responsibility to use the right double shader into users hand
     }
 
     // (re)create command buffers
-    vd.createComputeCommands;
+    app.createComputeCommands;
 }
 
 
@@ -182,39 +182,39 @@ void createBoltzmannPSO( ref VDrive_State vd, bool init_pso, bool loop_pso, bool
 /////////////////////////////////////////////////
 // create two reusable compute command buffers //
 /////////////////////////////////////////////////
-void createComputeCommands( ref VDrive_State vd ) nothrow {
+void createComputeCommands( ref VDrive_State app ) nothrow {
 
     // reset the command pool to start recording drawing commands
-    vd.graphics_queue.vkQueueWaitIdle;   // equivalent using a fence per Spec v1.0.48
-    vd.device.vkResetCommandPool( vd.vs.sim_cmd_pool, 0 ); // second argument is VkCommandPoolResetFlags
+    app.graphics_queue.vkQueueWaitIdle;   // equivalent using a fence per Spec v1.0.48
+    app.device.vkResetCommandPool( app.sim.sim_cmd_pool, 0 ); // second argument is VkCommandPoolResetFlags
 
     // two command buffers for compute loop, one ping and one pong buffer
-    vd.allocateCommandBuffers( vd.vs.sim_cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vd.vs.sim_cmd_buffers );
+    app.allocateCommandBuffers( app.sim.sim_cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, app.sim.sim_cmd_buffers );
     auto sim_cmd_buffers_bi = createCmdBufferBI;
 
     // work group count in X direction only
-    uint32_t dispatch_x = vd.vs.sim_domain[0] * vd.vs.sim_domain[1] * vd.vs.sim_domain[2] / vd.vs.sim_work_group_size[0];
+    uint32_t dispatch_x = app.sim.sim_domain[0] * app.sim.sim_domain[1] * app.sim.sim_domain[2] / app.sim.sim_work_group_size[0];
 
 
 
     //
     // record simple commands in loop, if sim_step_size is 1
     //
-    if( vd.vs.sim_step_size == 1 ) {
-        foreach( i, ref cmd_buffer; vd.vs.sim_cmd_buffers ) {
-            uint32_t[2] push_constant = [ i.toUint, vd.vs.sim_layers ];    // push constant to specify either 0-1 ping-pong and pass in the sim layer count
+    if( app.sim.sim_step_size == 1 ) {
+        foreach( i, ref cmd_buffer; app.sim.sim_cmd_buffers ) {
+            uint32_t[2] push_constant = [ i.toUint, app.sim.sim_layers ];    // push constant to specify either 0-1 ping-pong and pass in the sim layer count
             cmd_buffer.vkBeginCommandBuffer( &sim_cmd_buffers_bi );     // begin command buffer recording
-            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.vs.loop_pso.pipeline );    // bind compute vd.vs.loop_pso.pipeline
+            cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, app.sim.loop_pso.pipeline );    // bind compute app.sim.loop_pso.pipeline
             cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
                 VK_PIPELINE_BIND_POINT_COMPUTE,     // VkPipelineBindPoint          pipelineBindPoint
-                vd.vs.loop_pso.pipeline_layout,     // VkPipelineLayout             layout
+                app.sim.loop_pso.pipeline_layout,     // VkPipelineLayout             layout
                 0,                                  // uint32_t                     firstSet
                 1,                                  // uint32_t                     descriptorSetCount
-                &vd.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
+                &app.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
                 0,                                  // uint32_t                     dynamicOffsetCount
                 null                                // const( uint32_t )*           pDynamicOffsets
             );
-            cmd_buffer.vkCmdPushConstants( vd.vs.loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
+            cmd_buffer.vkCmdPushConstants( app.sim.loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
         //  cmd_buffer.vdCmdDispatch( work_group_count );       // dispatch compute command, forwards to vkCmdDispatch( cmd_buffer, dispatch_group_count.x, dispatch_group_count.y, dispatch_group_count.z );
             cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );       // dispatch compute command
             cmd_buffer.vkEndCommandBuffer;                      // finish recording and submit the command
@@ -230,7 +230,7 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
         dstAccessMask       : VK_ACCESS_SHADER_READ_BIT,
         srcQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
         dstQueueFamilyIndex : VK_QUEUE_FAMILY_IGNORED,
-        buffer              : vd.vs.sim_buffer.buffer,
+        buffer              : app.sim.sim_buffer.buffer,
         offset              : 0,
         size                : VK_WHOLE_SIZE,
     };
@@ -240,15 +240,15 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
     //
     // otherwise record complex commands with memory barriers in loop
     //
-    foreach( i, ref cmd_buffer; vd.vs.sim_cmd_buffers ) {
+    foreach( i, ref cmd_buffer; app.sim.sim_cmd_buffers ) {
         cmd_buffer.vkBeginCommandBuffer( &sim_cmd_buffers_bi );  // begin command buffer recording
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, vd.vs.loop_pso.pipeline );    // bind compute vd.vs.loop_pso.pipeline
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_COMPUTE, app.sim.loop_pso.pipeline );    // bind compute app.sim.loop_pso.pipeline
         cmd_buffer.vkCmdBindDescriptorSets(             // VkCommandBuffer              commandBuffer
             VK_PIPELINE_BIND_POINT_COMPUTE,             // VkPipelineBindPoint          pipelineBindPoint
-            vd.vs.loop_pso.pipeline_layout,             // VkPipelineLayout             layout
+            app.sim.loop_pso.pipeline_layout,             // VkPipelineLayout             layout
             0,                                          // uint32_t                     firstSet
             1,                                          // uint32_t                     descriptorSetCount
-            &vd.descriptor.descriptor_set,              // const( VkDescriptorSet )*    pDescriptorSets
+            &app.descriptor.descriptor_set,              // const( VkDescriptorSet )*    pDescriptorSets
             0,                                          // uint32_t                     dynamicOffsetCount
             null                                        // const( uint32_t )*           pDynamicOffsets
         );
@@ -257,9 +257,9 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
         //
         // Now do step_size count simulations
         //
-        foreach( s; 0 .. vd.vs.sim_step_size ) {
-            uint32_t[2] push_constant = [ s.toUint, vd.vs.sim_layers ];    // push constant to specify dispatch invocation counter and pass in the sim layer count
-            cmd_buffer.vkCmdPushConstants( vd.vs.loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
+        foreach( s; 0 .. app.sim.sim_step_size ) {
+            uint32_t[2] push_constant = [ s.toUint, app.sim.sim_layers ];    // push constant to specify dispatch invocation counter and pass in the sim layer count
+            cmd_buffer.vkCmdPushConstants( app.sim.loop_pso.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, push_constant.ptr ); // push constant
             cmd_buffer.vkCmdDispatch( dispatch_x, 1, 1 );   // dispatch compute command
 
             // buffer barrier to wait for all populations being written to memory
@@ -283,18 +283,18 @@ void createComputeCommands( ref VDrive_State vd ) nothrow {
 //////////////////////////////
 // destroy vulkan resources //
 //////////////////////////////
-void destroySimResources( ref VDrive_State vd ) {
+void destroySimResources( ref VDrive_State app ) {
 
-    vd.vs.compute_ubo_buffer.destroyResources;
+    app.sim.compute_ubo_buffer.destroyResources;
 
-    vd.vs.sim_image.destroyResources;
-    vd.destroy( vd.vs.nearest_sampler );
+    app.sim.sim_image.destroyResources;
+    app.destroy( app.sim.nearest_sampler );
 
-    vd.vs.sim_buffer.destroyResources;
-    vd.destroy( vd.vs.sim_buffer_view );
+    app.sim.sim_buffer.destroyResources;
+    app.destroy( app.sim.sim_buffer_view );
 
-    vd.destroy( vd.vs.sim_cmd_pool );
-    vd.destroy( vd.vs.init_pso );
-    vd.destroy( vd.vs.loop_pso );
-    vd.destroy( vd.vs.compute_cache );
+    app.destroy( app.sim.sim_cmd_pool );
+    app.destroy( app.sim.init_pso );
+    app.destroy( app.sim.loop_pso );
+    app.destroy( app.sim.compute_cache );
 }
