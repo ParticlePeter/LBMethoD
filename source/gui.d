@@ -79,7 +79,7 @@ struct VDrive_Gui_State {
 
     // Sim Display Struct is used to configure the lines display ueber shader
     // it is applied as push constant the struct must be std140 conform
-    struct Sim_Line_Display {
+    struct Vis_Line_Display {
       align( 1 ):
         uint[3]     sim_domain;
         Line_Type   line_type       = Line_Type.velocity;
@@ -92,7 +92,7 @@ struct VDrive_Gui_State {
         float       point_size      = 1;
     }
 
-    Sim_Line_Display sim_line_display;
+    Vis_Line_Display vis_line_display;
 
     // reflected compute parameters for gui editing
     // they are compared with those in VDrive_State when pressing the apply button
@@ -116,8 +116,8 @@ struct VDrive_Gui_State {
     // initial setting for Ghia et al. validation of lid driven cavity
     Ghia_Type   ghia_type           = Ghia_Type.re___100;
 
-    bool        use_double;
-    bool        use_3_dim;
+    bool        app_use_double;
+    bool        app_use_3_dim;
     bool        compute_dirty;
     bool        work_group_dirty;
     bool        draw_velocity_lines_as_points = false;
@@ -177,11 +177,11 @@ struct VDrive_Gui_State {
         io.RenderDrawListsFn    = & drawGuiData;    // called of ImGui.Render. Alternatively can be set this to null and call ImGui.GetDrawData() after ImGui.Render() to get the same ImDrawData pointer.
         io.SetClipboardTextFn   = & setClipboardString;
         io.GetClipboardTextFn   = & getClipboardString;
-        io.ClipboardUserData    = app.window;
+        io.ClipboardUserData    = window;
 
         // specify display size from vulkan data
-        io.DisplaySize.x = app.windowWidth;
-        io.DisplaySize.y = app.windowHeight;
+        io.DisplaySize.x = windowWidth;
+        io.DisplaySize.y = windowHeight;
 
 
         // define style
@@ -276,17 +276,18 @@ struct VDrive_Gui_State {
         compareShaderNamesAndReplace( shader_names_ptr[ loop_shader_start_index + loop_shader_index ], sim.loop_shader );
 
         // initialize VDrive_Gui_State member from VDrive_State member
-        sim_domain          = app.sim.sim_domain;
-        sim_typical_length  = app.sim.sim_domain[0];
-        sim_typical_vel     = app.sim.compute_ubo.wall_velocity;
-        sim_layers          = app.sim.sim_layers;
-        sim_work_group_size = app.sim.sim_work_group_size;
-        sim_step_size       = app.sim.sim_step_size;
-        use_double          = app.use_double;
-        use_3_dim           = app.use_3_dim;
-        sim_wall_velocity   = app.sim.compute_ubo.wall_velocity * app.sim.speed_of_sound * app.sim.speed_of_sound;
-        sim_relaxation_rate = 1 / app.sim.compute_ubo.collision_frequency;
-        sim_line_display.sim_domain  = app.sim.sim_domain;
+        app_use_3_dim       = app.use_3_dim;
+        app_use_double      = app.use_double;
+        sim_domain          = sim.sim_domain;
+        sim_typical_length  = sim.sim_domain[0];
+        sim_typical_vel     = sim.compute_ubo.wall_velocity;
+        sim_layers          = sim.sim_layers;
+        sim_work_group_size = sim.sim_work_group_size;
+        sim_step_size       = sim.sim_step_size;
+
+        sim_wall_velocity   = sim.compute_ubo.wall_velocity * sim.speed_of_sound * sim.speed_of_sound;
+        sim_relaxation_rate = 1 / sim.compute_ubo.collision_frequency;
+        vis_line_display.sim_domain  = sim.sim_domain;
 
         updateViscosity;
     }
@@ -341,9 +342,9 @@ struct VDrive_Gui_State {
             time = current_time;
 
             // Setup inputs
-            if( glfwGetWindowAttrib( app.window, GLFW_FOCUSED )) {
+            if( glfwGetWindowAttrib( window, GLFW_FOCUSED )) {
                 double mouse_x, mouse_y;
-                glfwGetCursorPos( app.window, &mouse_x, &mouse_y );
+                glfwGetCursorPos( window, &mouse_x, &mouse_y );
                 io.MousePos = ImVec2( cast( float )mouse_x, cast( float )mouse_y );   // Mouse position in screen coordinates (set to -1,-1 if no mouse / on another screen, etc.)
             } else {
                 io.MousePos = ImVec2( -1, -1 );
@@ -352,7 +353,7 @@ struct VDrive_Gui_State {
             // Handle mouse button data from callback
             for( int i = 0; i < 3; i++ ) {
                 // If a mouse press event came, always pass it as "mouse held this frame", so we don't miss click-release events that are shorter than 1 frame.
-                io.MouseDown[ i ] = mouse_pressed[ i ] || glfwGetMouseButton( app.window, i ) != 0;
+                io.MouseDown[ i ] = mouse_pressed[ i ] || glfwGetMouseButton( window, i ) != 0;
                 mouse_pressed[ i ] = false;
             }
 
@@ -361,13 +362,12 @@ struct VDrive_Gui_State {
             mouse_wheel = 0.0f;
 
             // Hide OS mouse cursor if ImGui is drawing it
-            glfwSetInputMode( app.window, GLFW_CURSOR, io.MouseDrawCursor ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL );
+            glfwSetInputMode( window, GLFW_CURSOR, io.MouseDrawCursor ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL );
 
             // Start the frame
             ImGui.NewFrame;
 
-
-
+            // possibly draw mini window to display the maximum size of the current color scale
             if( draw_scale && vis.display_property != VDrive_Visualize_State.Property.VEL_GRAD ) {
                 ImGui.SetNextWindowPos(  scale_win_pos,  ImGuiCond_Always );
                 ImGui.SetNextWindowSize( scale_win_size, ImGuiCond_Always );
@@ -375,14 +375,14 @@ struct VDrive_Gui_State {
                 ImGui.Begin( "Scale Window", null, window_flags );
                 if(( vis.display_property == VDrive_Visualize_State.Property.DENSITY )
                 || ( vis.display_property == VDrive_Visualize_State.Property.VEL_MAG ))
-                    ImGui.Text( " %.3f", 1 / vis.display_ubo.amplify_property );
+                    ImGui.Text( " %.3f",  1 / vis.display_ubo.amplify_property );
                 else
                     ImGui.Text( "+-%.3f", 1 / vis.display_ubo.amplify_property );
                 ImGui.End();
                 ImGui.PopStyleColor;
             }
 
-
+            // define main gui window position and size
             ImGui.SetNextWindowPos(  main_win_pos,  ImGuiCond_Always );
             ImGui.SetNextWindowSize( main_win_size, ImGuiCond_Always );
             ImGui.Begin( "Main Window", null, window_flags );
@@ -442,18 +442,18 @@ struct VDrive_Gui_State {
             ImGui.PushItemWidth( -1 );
             if( ImGui.Combo( "Device", & compute_device, device_names )) {
                 if( compute_device == 0 ) {
-                    app.cpuReset;
-                    app.setCpuSimFuncs;
-                    app.use_cpu = true;
-                    app.drawCmdBufferCount = sim_play_cmd_buffer_count = 1;
+                    this.cpuReset;
+                    this.setCpuSimFuncs;
+                    use_cpu = true;
+                    drawCmdBufferCount = sim_play_cmd_buffer_count = 1;
                 } else {
-                    app.setDefaultSimFuncs;
-                    app.use_cpu = false;
-                    use_double &= feature_shader_double;
-                    if( play_mode == Transport.play ) {      // in profile mode this must stay 1 (switches with play/pause )
-                        sim_play_cmd_buffer_count = 2;       // as we submitted compute and draw command buffers separately
-                        if( transport == Transport.play ) {  // if we are in play mode
-                            app.drawCmdBufferCount = 2;       // we must set this value immediately
+                    this.setDefaultSimFuncs;
+                    use_cpu = false;
+                    app_use_double &= feature_shader_double;
+                    if( play_mode == Transport.play ) {     // in profile mode this must stay 1 (switches with play/pause )
+                        sim_play_cmd_buffer_count = 2;      // as we submitted compute and draw command buffers separately
+                        if( transport == Transport.play ) { // if we are in play mode
+                            drawCmdBufferCount = 2;         // we must set this value immediately
                         }
                     }
                 }
@@ -493,7 +493,7 @@ struct VDrive_Gui_State {
                     ) {
                     if( init_shader_start_index != size_t.max ) {
                         if(!compareShaderNamesAndReplace( shader_names_ptr[ init_shader_start_index + init_shader_index ], sim.init_shader )) {
-                            app.createBoltzmannPSO( true, false, true );
+                            this.createBoltzmannPSO( true, false, true );
                         }
                     }
                 }
@@ -507,7 +507,7 @@ struct VDrive_Gui_State {
                         // the shader change would not be recognized
                         if( init_shader_start_index != size_t.max ) {     // might all have been deleted
                             if(!compareShaderNamesAndReplace( shader_names_ptr[ init_shader_start_index + init_shader_index ], sim.init_shader )) {
-                                app.createBoltzmannPSO( true, false, true );
+                                this.createBoltzmannPSO( true, false, true );
                             }
                         }
                     }
@@ -516,7 +516,7 @@ struct VDrive_Gui_State {
                 // parse init shader through context menu
                 if( ImGui.BeginPopupContextItem( "Init Shader Context Menu" )) {
                     if( ImGui.Selectable( "Parse Shader" )) {
-                        app.createBoltzmannPSO( true, false, true );
+                        this.createBoltzmannPSO( true, false, true );
                     } ImGui.EndPopup();
                 }
 
@@ -530,7 +530,7 @@ struct VDrive_Gui_State {
                     ) {
                     if( loop_shader_start_index != size_t.max ) {
                         if(!compareShaderNamesAndReplace( shader_names_ptr[ loop_shader_start_index + loop_shader_index ], sim.loop_shader )) {
-                            app.createBoltzmannPSO( false, true, false );
+                            this.createBoltzmannPSO( false, true, false );
                         }
                     }
                 }
@@ -541,7 +541,7 @@ struct VDrive_Gui_State {
                         parseShaderDirectory;   // see comment in IsItemHovered above
                         if( loop_shader_start_index != size_t.max ) {
                             if(!compareShaderNamesAndReplace( shader_names_ptr[ loop_shader_start_index + loop_shader_index ], sim.loop_shader )) {
-                                app.createBoltzmannPSO( false, true, false );
+                                this.createBoltzmannPSO( false, true, false );
                             }
                         }
                     }
@@ -550,7 +550,7 @@ struct VDrive_Gui_State {
                 // parse loop shader through context menu
                 if( ImGui.BeginPopupContextItem( "Loop Shader Context Menu" )) {
                     if( ImGui.Selectable( "Parse Shader" )) {
-                        app.createBoltzmannPSO( false, true, false );
+                        this.createBoltzmannPSO( false, true, false );
                     } ImGui.EndPopup();
                 }
 
@@ -575,19 +575,19 @@ struct VDrive_Gui_State {
             //
             // Radio 2D or 3D (simulation not implemented yet)
             //
-            int dimensions = use_3_dim;
+            int dimensions = app_use_3_dim;
 
             // 3D simulation is WIP
             /*
             if( ImGui.RadioButton( "2D", & dimensions, 0 )) {
-                use_3_dim = false;
+                app_use_3_dim = false;
                 sim_domain[2] = 1;
                 checkComputeParams;
             }
 
             ImGui.SameLine;
             ImGui.SetCursorPosX( main_win_size.x * 0.25 + 6 );
-            if( ImGui.RadioButton( "3D", & dimensions, 1 )) use_3_dim = true;
+            if( ImGui.RadioButton( "3D", & dimensions, 1 )) app_use_3_dim = true;
 
             ImGui.SameLine;
             ImGui.SetCursorPosX( main_win_size.x * 0.5 + 8 );
@@ -605,15 +605,15 @@ struct VDrive_Gui_State {
 
 
             // Specify precision
-            int precision = use_double;
+            int precision = app_use_double;
             ImGui.SameLine;
-            if( ImGui.Combo( "Per Cell Values", & precision, feature_shader_double || app.use_cpu ? "Float\0Double\0\0" : "Float\0\0" )) {
-                use_double = precision > 0;
+            if( ImGui.Combo( "Per Cell Values", & precision, feature_shader_double || use_cpu ? "Float\0Double\0\0" : "Float\0\0" )) {
+                app_use_double = precision > 0;
                 checkComputeParams;
             }
 
             // inform if double precision is not available or CPU mode is deactivated
-            if( !( feature_shader_double || app.use_cpu ))
+            if( !( feature_shader_double || use_cpu ))
                 showTooltip( "Shader double precision is not available on the selected device." );
 
             ImGui.PopItemWidth;
@@ -651,10 +651,10 @@ struct VDrive_Gui_State {
 
                         if( dimensions == 0 ) {
                             ImGui.Separator;
-                            sprintf( label.ptr, "Window Res %c",     dir[j] ); if( ImGui.Selectable( label.ptr )) { sim_domain[j] = ( j == 0 ? app.windowWidth : app.windowHeight );     checkComputeParams; }
-                            sprintf( label.ptr, "Window Res %c / 2", dir[j] ); if( ImGui.Selectable( label.ptr )) { sim_domain[j] = ( j == 0 ? app.windowWidth : app.windowHeight ) / 2; checkComputeParams; }
-                            sprintf( label.ptr, "Window Res %c / 4", dir[j] ); if( ImGui.Selectable( label.ptr )) { sim_domain[j] = ( j == 0 ? app.windowWidth : app.windowHeight ) / 4; checkComputeParams; }
-                            sprintf( label.ptr, "Window Res %c / 8", dir[j] ); if( ImGui.Selectable( label.ptr )) { sim_domain[j] = ( j == 0 ? app.windowWidth : app.windowHeight ) / 8; checkComputeParams; }
+                            sprintf( label.ptr, "Window Res %c",     dir[j] ); if( ImGui.Selectable( label.ptr )) { sim_domain[j] = ( j == 0 ? windowWidth : windowHeight );     checkComputeParams; }
+                            sprintf( label.ptr, "Window Res %c / 2", dir[j] ); if( ImGui.Selectable( label.ptr )) { sim_domain[j] = ( j == 0 ? windowWidth : windowHeight ) / 2; checkComputeParams; }
+                            sprintf( label.ptr, "Window Res %c / 4", dir[j] ); if( ImGui.Selectable( label.ptr )) { sim_domain[j] = ( j == 0 ? windowWidth : windowHeight ) / 4; checkComputeParams; }
+                            sprintf( label.ptr, "Window Res %c / 8", dir[j] ); if( ImGui.Selectable( label.ptr )) { sim_domain[j] = ( j == 0 ? windowWidth : windowHeight ) / 8; checkComputeParams; }
                         }
                     }
                 }
@@ -674,10 +674,10 @@ struct VDrive_Gui_State {
 
                     if( dimensions == 0 ) {
                         ImGui.Separator;
-                        if( ImGui.Selectable( "Window Res"     )) { sim_domain[0] = app.windowWidth;     sim_domain[1] = app.windowHeight;     checkComputeParams; }
-                        if( ImGui.Selectable( "Window Res / 2" )) { sim_domain[0] = app.windowWidth / 2; sim_domain[1] = app.windowHeight / 2; checkComputeParams; }
-                        if( ImGui.Selectable( "Window Res / 4" )) { sim_domain[0] = app.windowWidth / 4; sim_domain[1] = app.windowHeight / 4; checkComputeParams; }
-                        if( ImGui.Selectable( "Window Res / 8" )) { sim_domain[0] = app.windowWidth / 8; sim_domain[1] = app.windowHeight / 8; checkComputeParams; }
+                        if( ImGui.Selectable( "Window Res"     )) { sim_domain[0] = windowWidth;     sim_domain[1] = windowHeight;     checkComputeParams; }
+                        if( ImGui.Selectable( "Window Res / 2" )) { sim_domain[0] = windowWidth / 2; sim_domain[1] = windowHeight / 2; checkComputeParams; }
+                        if( ImGui.Selectable( "Window Res / 4" )) { sim_domain[0] = windowWidth / 4; sim_domain[1] = windowHeight / 4; checkComputeParams; }
+                        if( ImGui.Selectable( "Window Res / 8" )) { sim_domain[0] = windowWidth / 8; sim_domain[1] = windowHeight / 8; checkComputeParams; }
                     }
                 } ImGui.EndPopup();
             }
@@ -693,36 +693,36 @@ struct VDrive_Gui_State {
                 if( ImGui.Button( "Apply", button_size_2 )) {
 
                     // only if the sim domain changed we must ...
-                    if( app.sim.sim_domain != sim_domain ) {
-                        // recreate sim image and sim_line_display push constant data
-                        app.sim.sim_domain = sim_line_display.sim_domain = sim_domain;
-                        app.createSimImage;
+                    if( sim.sim_domain != sim_domain ) {
+                        // recreate sim image and vis_line_display push constant data
+                        sim.sim_domain = vis_line_display.sim_domain = sim_domain;
+                        this.createSimImage;
 
                         // recreate sim particle buffer
-                        app.vis.particle_count = sim_domain[0] * sim_domain[1] * sim_domain[2];
-                        app.createParticleBuffer;
+                        vis.particle_count = sim_domain[0] * sim_domain[1] * sim_domain[2];
+                        this.createParticleBuffer;
 
                         // update trackball
                         import input : initTrackball;
-                        app.initTrackball;
+                        this.initTrackball;
                     }
 
-                    compute_dirty               = work_group_dirty = false;
-                    app.sim.sim_work_group_size   = sim_work_group_size;
-                    app.sim.sim_step_size         = sim_step_size;
-                    app.sim.sim_layers            = sim_layers;
-                    app.use_double               = use_double;
+                    compute_dirty           = work_group_dirty = false;
+                    sim.sim_work_group_size = sim_work_group_size;
+                    sim.sim_step_size       = sim_step_size;
+                    sim.sim_layers          = sim_layers;
+                    app.use_double          = app_use_double;
 
                     // this must be after sim_domain_changed edits
-                    app.createSimBuffer;
+                    this.createSimBuffer;
 
                     // update descriptor, at least the sim buffer has changed, and possibly the sim image
-                    app.updateDescriptorSet;
+                    this.updateDescriptorSet;
 
                     // recreate Lattice Boltzmann pipeline with possibly new shaders
-                    app.createBoltzmannPSO( true, true, true );
+                    this.createBoltzmannPSO( true, true, true );
 
-                    if( app.use_cpu ) {
+                    if( use_cpu ) {
                         app.cpuReset;
                     }
                 }
@@ -731,18 +731,18 @@ struct VDrive_Gui_State {
 
             } else if( work_group_dirty ) {
                 if( ImGui.Button( "Apply", button_size_2 )) {
-                    work_group_dirty     = false;
-                    app.sim.sim_work_group_size   = sim_work_group_size;
-                    app.sim.sim_step_size         = sim_step_size;
-                    app.createBoltzmannPSO( true, true, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
+                    work_group_dirty        = false;
+                    sim.sim_work_group_size = sim_work_group_size;
+                    sim.sim_step_size       = sim_step_size;
+                    this.createBoltzmannPSO( true, true, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
                 }
                 ImGui.SameLine;
                 ImGui.Text( "Changes" );
 
-            } else if( app.sim.sim_step_size != sim_step_size ) {
+            } else if( sim.sim_step_size != sim_step_size ) {
                 if( ImGui.Button( "Apply", button_size_2 )) {
-                    app.sim.sim_step_size = sim_step_size;
-                    app.createBoltzmannPSO( false, true, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
+                    sim.sim_step_size = sim_step_size;
+                    this.createBoltzmannPSO( false, true, false );  // rebuild init pipeline, rebuild loop pipeline, reset domain
                 }
                 ImGui.SameLine;
                 ImGui.Text( "Changes" );
@@ -794,16 +794,16 @@ struct VDrive_Gui_State {
 
             // shortcut to set values
             if( ImGui.BeginPopupContextItem( "Step Size Context Menu" )) {
-                if( ImGui.Selectable( "1" ))     { app.sim.sim_step_size = sim_step_size = 1;     app.createBoltzmannPSO( false, true, false ); }
-                if( ImGui.Selectable( "5" ))     { app.sim.sim_step_size = sim_step_size = 5;     app.createBoltzmannPSO( false, true, false ); }
-                if( ImGui.Selectable( "10" ))    { app.sim.sim_step_size = sim_step_size = 10;    app.createBoltzmannPSO( false, true, false ); }
-                if( ImGui.Selectable( "50" ))    { app.sim.sim_step_size = sim_step_size = 50;    app.createBoltzmannPSO( false, true, false ); }
-                if( ImGui.Selectable( "100" ))   { app.sim.sim_step_size = sim_step_size = 100;   app.createBoltzmannPSO( false, true, false ); }
-                if( ImGui.Selectable( "500" ))   { app.sim.sim_step_size = sim_step_size = 500;   app.createBoltzmannPSO( false, true, false ); }
-                if( ImGui.Selectable( "1000" ))  { app.sim.sim_step_size = sim_step_size = 1000;  app.createBoltzmannPSO( false, true, false ); }
-                if( ImGui.Selectable( "5000" ))  { app.sim.sim_step_size = sim_step_size = 5000;  app.createBoltzmannPSO( false, true, false ); }
-                if( ImGui.Selectable( "10000" )) { app.sim.sim_step_size = sim_step_size = 10000; app.createBoltzmannPSO( false, true, false ); }
-                if( ImGui.Selectable( "50000" )) { app.sim.sim_step_size = sim_step_size = 50000; app.createBoltzmannPSO( false, true, false ); }
+                if( ImGui.Selectable( "1" ))     { sim.sim_step_size = sim_step_size = 1;     this.createBoltzmannPSO( false, true, false ); }
+                if( ImGui.Selectable( "5" ))     { sim.sim_step_size = sim_step_size = 5;     this.createBoltzmannPSO( false, true, false ); }
+                if( ImGui.Selectable( "10" ))    { sim.sim_step_size = sim_step_size = 10;    this.createBoltzmannPSO( false, true, false ); }
+                if( ImGui.Selectable( "50" ))    { sim.sim_step_size = sim_step_size = 50;    this.createBoltzmannPSO( false, true, false ); }
+                if( ImGui.Selectable( "100" ))   { sim.sim_step_size = sim_step_size = 100;   this.createBoltzmannPSO( false, true, false ); }
+                if( ImGui.Selectable( "500" ))   { sim.sim_step_size = sim_step_size = 500;   this.createBoltzmannPSO( false, true, false ); }
+                if( ImGui.Selectable( "1000" ))  { sim.sim_step_size = sim_step_size = 1000;  this.createBoltzmannPSO( false, true, false ); }
+                if( ImGui.Selectable( "5000" ))  { sim.sim_step_size = sim_step_size = 5000;  this.createBoltzmannPSO( false, true, false ); }
+                if( ImGui.Selectable( "10000" )) { sim.sim_step_size = sim_step_size = 10000; this.createBoltzmannPSO( false, true, false ); }
+                if( ImGui.Selectable( "50000" )) { sim.sim_step_size = sim_step_size = 50000; this.createBoltzmannPSO( false, true, false ); }
                 ImGui.EndPopup();
             }
 
@@ -842,7 +842,7 @@ struct VDrive_Gui_State {
                     updateComputeUBO;
                     if( sim.sim_collision != VDrive_Simulate_State.Collision.CSC_DRAG ) {
                         sim.sim_collision  = VDrive_Simulate_State.Collision.CSC_DRAG;
-                        app.createBoltzmannPSO( false, true, false );
+                        this.createBoltzmannPSO( false, true, false );
                     }
                 }
                 if( ImGui.Selectable( "Looow Viscosity" )) {
@@ -855,7 +855,7 @@ struct VDrive_Gui_State {
                     updateComputeUBO;
                     if( sim.sim_collision != VDrive_Simulate_State.Collision.CSC_DRAG ) {
                         sim.sim_collision  = VDrive_Simulate_State.Collision.CSC_DRAG;
-                        app.createBoltzmannPSO( false, true, false );
+                        this.createBoltzmannPSO( false, true, false );
                     }
                 }/*
                 if( ImGui.Selectable( "Crazy Cascades" )) {
@@ -868,7 +868,7 @@ struct VDrive_Gui_State {
                     updateComputeUBO;
                     if( sim.sim_collision != VDrive_Simulate_State.Collision.CSC_DRAG ) {
                         sim.sim_collision  = VDrive_Simulate_State.Collision.CSC_DRAG;
-                        app.createBoltzmannPSO( false, true, false );
+                        this.createBoltzmannPSO( false, true, false );
                     }
                     // set resolution to 1024 * 1024
 
@@ -899,7 +899,7 @@ struct VDrive_Gui_State {
 
             // collision algorithm
             if( ImGui.Combo( "Collision Algorithm", cast( int* )( & sim.sim_collision ), "SRT-LBGK\0TRT\0MRT\0Cascaded\0Cascaded Drag\0\0" )) {
-                app.createBoltzmannPSO( false, true, false );
+                this.createBoltzmannPSO( false, true, false );
             }
 
             ImGui.Separator;
@@ -1006,7 +1006,7 @@ struct VDrive_Gui_State {
 
             if( ImGui.BeginPopupContextItem( "Display Property Context Menu" )) {
                 if( ImGui.Selectable( "Parse Display Shader" )) {
-                    app.createDisplayPSO;
+                    this.createDisplayPSO;
                 } ImGui.EndPopup();
             }
 
@@ -1015,8 +1015,8 @@ struct VDrive_Gui_State {
                 "Display Property", cast( int* )( & vis.display_property ),
                 "Density\0Velocity X\0Velocity Y\0Velocity Magnitude\0Velocity Gradient\0Velocity Curl\0\0"
             ))  {
-                app.createDisplayPSO;
-                app.createScalePSO;
+                this.createDisplayPSO;
+                this.createScalePSO;
             }
 
             if( ImGui.DragFloat( "Amp Display Property", & vis.display_ubo.amplify_property, 0.001f, 0, 255 )) updateDisplayUBO;
@@ -1055,7 +1055,7 @@ struct VDrive_Gui_State {
             if( ImGui.DragInt( "Color Layers", cast( int* )( & vis.display_ubo.color_layers ), 0.1f, 0, 255 )) updateDisplayUBO;
 
             static int z_layer = 0;
-            if( use_3_dim ) {
+            if( app_use_3_dim ) {
                 if( ImGui.DragInt( "Z-Layer", & z_layer, 0.1f, 0, sim_domain[2] - 1 )) {
                     z_layer = 0 > z_layer ? 0 : z_layer >= sim_domain[2] ? sim_domain[2] - 1 : z_layer;
                     vis.display_ubo.z_layer = z_layer;
@@ -1078,41 +1078,41 @@ struct VDrive_Gui_State {
                 // set width of items and their label - aligned visually with 8 pixels
                 ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
 
-                int line_count = sim_line_display.repl_count;
-                if( ImGui.DragInt( "Velocity Line Count", & sim_line_display.repl_count, 0.1, 0, int.max ))
-                    sim_line_display.repl_count = sim_line_display.repl_count < 0 ? 0 : sim_line_display.repl_count;
+                int line_count = vis_line_display.repl_count;
+                if( ImGui.DragInt( "Velocity Line Count", & vis_line_display.repl_count, 0.1, 0, int.max ))
+                    vis_line_display.repl_count = vis_line_display.repl_count < 0 ? 0 : vis_line_display.repl_count;
 
-                ImGui.DragFloat2( "Line Offset / Spread", & sim_line_display.line_offset, 1.0f );  // next value in struct is repl_spread
+                ImGui.DragFloat2( "Line Offset / Spread", & vis_line_display.line_offset, 1.0f );  // next value in struct is repl_spread
 
                 ImGui.BeginGroup(); // Want to use popup on the following three items
                 {
                     const( char )* axis_label = "X\0Y\0Z\0\0";
-                    int axis = cast( int )sim_line_display.velocity_axis;
+                    int axis = cast( int )vis_line_display.velocity_axis;
                     if( ImGui.Combo( "Velocity Direction", & axis, axis_label ))
-                        sim_line_display.velocity_axis = cast( Line_Axis )axis;
+                        vis_line_display.velocity_axis = cast( Line_Axis )axis;
 
-                    axis = cast( int )sim_line_display.repl_axis;
+                    axis = cast( int )vis_line_display.repl_axis;
                     if( ImGui.Combo( "Replication Direction", & axis, axis_label ))
-                        sim_line_display.repl_axis = cast( Line_Axis )axis;
+                        vis_line_display.repl_axis = cast( Line_Axis )axis;
 
-                    axis = cast( int )sim_line_display.line_axis;
+                    axis = cast( int )vis_line_display.line_axis;
                     if( ImGui.Combo( "Line Direction", & axis, axis_label ))
-                        sim_line_display.line_axis = cast( Line_Axis )axis;
+                        vis_line_display.line_axis = cast( Line_Axis )axis;
                 }
                 ImGui.EndGroup();
 
                 // line axis setup shortcut for U- and V-Velocities
                 if( ImGui.BeginPopupContextItem( "Velocity Lines Context Menu" )) {
                     if( ImGui.Selectable( "U-Velocity" )) {
-                        sim_line_display.line_axis      = Line_Axis.Y;
-                        sim_line_display.repl_axis      = Line_Axis.X;
-                        sim_line_display.velocity_axis  = Line_Axis.X;
+                        vis_line_display.line_axis      = Line_Axis.Y;
+                        vis_line_display.repl_axis      = Line_Axis.X;
+                        vis_line_display.velocity_axis  = Line_Axis.X;
                     }
 
                     if( ImGui.Selectable( "V-Velocity" )) {
-                        sim_line_display.line_axis      = Line_Axis.X;
-                        sim_line_display.repl_axis      = Line_Axis.Y;
-                        sim_line_display.velocity_axis  = Line_Axis.Y;
+                        vis_line_display.line_axis      = Line_Axis.X;
+                        vis_line_display.repl_axis      = Line_Axis.Y;
+                        vis_line_display.velocity_axis  = Line_Axis.Y;
                     }
 
                     ImGui.EndPopup();
@@ -1155,13 +1155,13 @@ struct VDrive_Gui_State {
                 ImGui.SetCursorPosX( 160 );
                 if( ImGui.BeginPopupContextItem( "Particle Shader Context Menu" )) {
                     if( ImGui.Selectable( "Parse Shader" )) {
-                        app.createParticlePSO;
+                        this.createParticlePSO;
                     } ImGui.EndPopup();
                 }
 
                 // blend particles normally or additive
                 if( ImGui.Checkbox( "Additive Blend", & additive_particle_blend )) {
-                    app.createParticlePSO;
+                    this.createParticlePSO;
                 }
 
                 // particle color and alpha
@@ -1173,7 +1173,7 @@ struct VDrive_Gui_State {
                 // reset particle button, same as hotkey F8
                 auto button_sub_size_1 = ImVec2( 324, 20 );
                 if( ImGui.Button( "Reset Particles", button_sub_size_1 )) {
-                    app.resetParticleBuffer;
+                    this.resetParticleBuffer;
                 }
 
                 ImGui.PopItemWidth;
@@ -1233,7 +1233,7 @@ struct VDrive_Gui_State {
                     sim_play_cmd_buffer_count = 1;
                 } else {
                     play_mode = Transport.play;
-                    if( !app.use_cpu ) {
+                    if( !use_cpu ) {
                         sim_play_cmd_buffer_count = 2;
                     }
                 }
@@ -1260,7 +1260,7 @@ struct VDrive_Gui_State {
             sprintf( buffer.ptr, "%f", avg_per_step );
             ImGui.InputText( "Dur. / Step (hnsecs)", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
 
-            ulong  node_count = app.sim.sim_domain[0] * app.sim.sim_domain[1] * app.sim.sim_domain[2];
+            ulong  node_count = sim.sim_domain[0] * sim.sim_domain[1] * sim.sim_domain[2];
             double mlups = 10.0 * node_count * sim_profile_step_index / duration;
             sprintf( buffer.ptr, "%f", mlups );
             ImGui.InputText( "Average MLups", buffer.ptr, buffer.length, ImGuiInputTextFlags_ReadOnly );
@@ -1295,7 +1295,7 @@ struct VDrive_Gui_State {
                 // set width of items and their label - aligned visually with 8 pixels
                 ImGui.PushItemWidth( ImGui.GetContentRegionAvailWidth - main_win_size.x / 2 + 8 );
 
-                int axis = cast( int )( sim_line_display.velocity_axis ) % 2;
+                int axis = cast( int )( vis_line_display.velocity_axis ) % 2;
 
                 ImGui.SetCursorPosX( 160 );
 
@@ -1311,59 +1311,59 @@ struct VDrive_Gui_State {
                         sim_domain[2] = 1;
 
                         // only if the sim domain changed we must ...
-                        if( app.sim.sim_domain != sim_domain ) {
-                            // recreate sim image, update trackball and sim_line_display push constant data
-                            app.sim.sim_domain = sim_line_display.sim_domain = sim_domain;
-                            app.createSimImage;
+                        if( sim.sim_domain != sim_domain ) {
+                            // recreate sim image, update trackball and vis_line_display push constant data
+                            sim.sim_domain = vis_line_display.sim_domain = sim_domain;
+                            this.createSimImage;
                             update_descriptor = true;
                             import input : initTrackball;
-                            app.initTrackball;
+                            this.initTrackball;
                         }
 
                         sim_work_group_size[0] = 127;
-                        use_double             = false;
+                        app_use_double             = false;
                         sim_layers             = 17;
 
                         // only if work group size or sim layers don't correspond to shader requirement
-                        if( app.sim.sim_work_group_size[0] != 127 || app.sim.sim_layers  != 17 ) {
-                            app.sim.sim_work_group_size[0]  = sim_work_group_size[0] = 127;
-                            app.sim.sim_layers              = sim_layers             = 17;
+                        if( sim.sim_work_group_size[0] != 127 || sim.sim_layers  != 17 ) {
+                            sim.sim_work_group_size[0]  = sim_work_group_size[0] = 127;
+                            sim.sim_layers              = sim_layers             = 17;
 
                             // this must be after sim_domain_changed edits
-                            app.createSimBuffer;
+                            this.createSimBuffer;
                             update_descriptor = true;
 
                         }
 
                         // update descriptor if necessary
                         if( update_descriptor )
-                            app.updateDescriptorSet;
+                            this.updateDescriptorSet;
 
-                        bool update_pso = false;
+                        bool update_sim_psos = false;
 
                         if( app.use_double ) {
                             if( sim.init_shader != "shader\\init_D2Q9_double.comp" ) {
                                 sim.init_shader  = "shader\\init_D2Q9_double.comp";
-                                update_pso = true;
+                                update_sim_psos  = true;
                             }
                             if( sim.loop_shader != "shader\\loop_D2Q9_ldc_double.comp" ) {
                                 sim.loop_shader  = "shader\\loop_D2Q9_ldc_double.comp";
-                                update_pso = true;
+                                update_sim_psos  = true;
                             }
                         } else {
                             if( sim.init_shader != "shader\\init_D2Q9.comp" ) {
                                 sim.init_shader  = "shader\\init_D2Q9.comp";
-                                update_pso = true;
+                                update_sim_psos  = true;
                             }
                             if( sim.loop_shader != "shader\\loop_D2Q9_ldc.comp" ) {
                                 sim.loop_shader  = "shader\\loop_D2Q9_ldc.comp";
-                                update_pso = true;
+                                update_sim_psos  = true;
                             }
                         }
 
                         // possibly recreate lattice boltzmann pipeline
-                        if( update_pso || update_descriptor ) {
-                            app.createBoltzmannPSO( true, true, true );
+                        if( update_sim_psos || update_descriptor ) {
+                            this.createBoltzmannPSO( true, true, true );
                         }
 
                         // set additional gui data like velocity and reynolds number
@@ -1412,14 +1412,14 @@ struct VDrive_Gui_State {
                 ImGui.SetCursorPosX( 160 );
                 if( ImGui.Checkbox( "Draw Profile##1", & validate_poiseuille_flow )) {
                     if( validate_poiseuille_flow ) {
-                        sim_line_display.velocity_axis  = Line_Axis.X;
-                        sim_line_display.repl_axis      = Line_Axis.X;
-                        sim_line_display.line_axis      = Line_Axis.Y;
-                        sim_line_display.repl_count     = 5;
-                        sim_line_display.line_offset    = sim_domain[0] / 10;
-                        sim_line_display.repl_spread    = sim_domain[0] / 5;
+                        vis_line_display.velocity_axis  = Line_Axis.X;
+                        vis_line_display.repl_axis      = Line_Axis.X;
+                        vis_line_display.line_axis      = Line_Axis.Y;
+                        vis_line_display.repl_count     = 5;
+                        vis_line_display.line_offset    = sim_domain[0] / 10;
+                        vis_line_display.repl_spread    = sim_domain[0] / 5;
                     } else {
-                        sim_line_display.repl_count     = 0;
+                        vis_line_display.repl_count     = 0;
                     }
                 }
 
@@ -1460,7 +1460,7 @@ struct VDrive_Gui_State {
         if( ImGui.CollapsingHeader( "Export Ensight" )) {
             ImGui.Separator;
 
-            if( app.use_cpu ) {
+            if( use_cpu ) {
                 ImGui.Text( "Export from CPU is not available" );
             } else {
 
@@ -1528,7 +1528,7 @@ struct VDrive_Gui_State {
 
                     // create export related gpu data and setup export function
                     // gpu export is always float
-                    app.createExportResources;
+                    this.createExportResources;
 
                     // set the play mode to play, might have been set to profile before, and start the sim
                     play_mode = Transport.play;
@@ -1572,14 +1572,14 @@ struct VDrive_Gui_State {
     //
     void checkComputeParams() {
         compute_dirty =
-            ( app.use_double != use_double )
-        ||  ( app.use_3_dim  != use_3_dim )
-        ||  ( app.sim.sim_domain != sim_domain )
-        ||  ( app.sim.sim_layers != sim_layers );
+            ( app.use_double != app_use_double )
+        ||  ( app.use_3_dim  != app_use_3_dim )
+        ||  ( sim.sim_domain != sim_domain )
+        ||  ( sim.sim_layers != sim_layers );
     }
 
     void checkComputePSO() {
-        work_group_dirty = app.sim.sim_work_group_size != sim_work_group_size;
+        work_group_dirty = sim.sim_work_group_size != sim_work_group_size;
     }
 
     void updateTauOmega() {
@@ -1678,7 +1678,7 @@ struct VDrive_Gui_State {
         // with this we can list them in an ImGui.Combo and make them selectable
         import vdrive.util.info;
         size_t devices_char_count = 4;
-        auto gpus = app.instance.listPhysicalDevices( false );
+        auto gpus = this.instance.listPhysicalDevices( false );
         device_count += cast( ubyte )gpus.length;
         //devices_char_count += device_count * size_t.sizeof;  // sizeof( some_pointer );
 
@@ -1689,7 +1689,7 @@ struct VDrive_Gui_State {
             devices_char_count += strlen( gpu.listProperties.deviceName.ptr ) + 1;
         }
         /*/ // Use this code to append the selected device in module initialize
-        devices_char_count += strlen( app.gpu.listProperties.deviceName.ptr ) + 1;
+        devices_char_count += strlen( this.gpu.listProperties.deviceName.ptr ) + 1;
         //*/
 
         import core.stdc.stdlib : malloc;
@@ -1705,8 +1705,8 @@ struct VDrive_Gui_State {
             device_name_target += strlen( gpu.listProperties.deviceName.ptr ) + 1;
         }
         /*/ // Use this code to append the device name of the selected device in module initialize
-        strcpy( device_name_target, app.gpu.listProperties.deviceName.ptr );
-        device_name_target += strlen( app.gpu.listProperties.deviceName.ptr ) + 1;
+        strcpy( device_name_target, this.gpu.listProperties.deviceName.ptr );
+        device_name_target += strlen( this.gpu.listProperties.deviceName.ptr ) + 1;
         //*/
 
 
@@ -2093,7 +2093,7 @@ void registerCallbacks( ref VDrive_Gui_State gui ) {
 
     // first forward to input.registerCallbacks
     import input : input_registerCallbacks = registerCallbacks;
-    input_registerCallbacks( gui.app );   // here we use gui.app to ensure that only the wrapped VDrive State struct becomes the user pointer
+    input_registerCallbacks( gui.app ); // here we use gui.app to ensure that only the wrapped VDrive State struct becomes the user pointer
 
     // now overwrite some of the input callbacks (some of them also forward to input callbacks)
     glfwSetWindowSizeCallback(  gui.window, & guiWindowSizeCallback );
@@ -2130,7 +2130,7 @@ void resizeRenderResources( ref VDrive_Gui_State gui ) {
 
     // gui io display size from swapchain extent
     auto io = & ImGui.GetIO();
-    io.DisplaySize = ImVec2( gui.app.windowWidth, gui.app.windowHeight );
+    io.DisplaySize = ImVec2( gui.windowWidth, gui.windowHeight );
 }
 
 
@@ -2215,7 +2215,10 @@ void drawGuiData( ImDrawData* draw_data ) {
         elem_ptr += cmd_list.IdxBuffer.Size;
     }
 
-    VkMappedMemoryRange[ 2 ] flush_ranges = [ gui.gui_vtx_buffers[ gui.next_image_index ].createMappedMemoryRange, gui.gui_idx_buffers[ gui.next_image_index ].createMappedMemoryRange ];
+    VkMappedMemoryRange[ 2 ] flush_ranges = [ 
+        gui.gui_vtx_buffers[ gui.next_image_index ].createMappedMemoryRange,
+        gui.gui_idx_buffers[ gui.next_image_index ].createMappedMemoryRange
+    ];
     ( *gui ).flushMappedMemoryRanges( flush_ranges );
     gui.gui_vtx_buffers[ gui.next_image_index ].unmapMemory;
     gui.gui_idx_buffers[ gui.next_image_index ].unmapMemory;
@@ -2242,7 +2245,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     // Copy CPU buffer data to the gpu image
     //
-    if( gui.app.use_cpu && ( *gui ).isPlaying ) {
+    if( gui.use_cpu && ( *gui ).isPlaying ) {
 
         // record image layout transition to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         cmd_buffer.recordTransition(
@@ -2288,18 +2291,18 @@ void drawGuiData( ImDrawData* draw_data ) {
 
 
 
-
-
     // bind descriptor set - we do not have to rebind this for other pipelines as long as the pipeline layouts are compatible
-    cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
-        VK_PIPELINE_BIND_POINT_GRAPHICS,    // VkPipelineBindPoint          pipelineBindPoint
-        gui.vis.display_pso.pipeline_layout,  // VkPipelineLayout             layout
-        0,                                  // uint32_t                     firstSet
-        1,                                  // uint32_t                     descriptorSetCount
-        &gui.descriptor.descriptor_set,      // const( VkDescriptorSet )*    pDescriptorSets
-        0,                                  // uint32_t                     dynamicOffsetCount
-        null                                // const( uint32_t )*           pDynamicOffsets
+    cmd_buffer.vkCmdBindDescriptorSets(         // VkCommandBuffer              commandBuffer
+        VK_PIPELINE_BIND_POINT_GRAPHICS,        // VkPipelineBindPoint          pipelineBindPoint
+        gui.vis.display_pso.pipeline_layout,    // VkPipelineLayout             layout
+        0,                                      // uint32_t                     firstSet
+        1,                                      // uint32_t                     descriptorSetCount
+        & gui.descriptor.descriptor_set,        // const( VkDescriptorSet )*    pDescriptorSets
+        0,                                      // uint32_t                     dynamicOffsetCount
+        null                                    // const( uint32_t )*           pDynamicOffsets
     );
+
+
 
     // begin the render pass
     cmd_buffer.vkCmdBeginRenderPass( &gui.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
@@ -2361,13 +2364,13 @@ void drawGuiData( ImDrawData* draw_data ) {
     bool line_width_recorded = false;
     if( gui.draw_axis ) {
         bindPipeline( gui.vis.lines_pso[ 0 ] );
-        gui.sim_line_display.line_type = gui.Line_Type.axis;
+        gui.vis_line_display.line_type = gui.Line_Type.axis;
 
-        if( gui.app.feature_wide_lines ) {
+        if( gui.feature_wide_lines ) {
             cmd_buffer.vkCmdSetLineWidth( 1 );
             line_width_recorded = true;
         }
-        cmd_buffer.vkCmdPushConstants( gui.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, gui.sim_line_display.line_type.offsetof, uint32_t.sizeof, & gui.sim_line_display.line_type );
+        cmd_buffer.vkCmdPushConstants( gui.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, gui.vis_line_display.line_type.offsetof, uint32_t.sizeof, & gui.vis_line_display.line_type );
         cmd_buffer.vkCmdDraw( 2, 3, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
 
@@ -2376,21 +2379,21 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     if( gui.draw_grid ) {
         bindPipeline( gui.vis.lines_pso[ 0 ] );
-        gui.sim_line_display.line_type = gui.Line_Type.grid;
+        gui.vis_line_display.line_type = gui.Line_Type.grid;
 
-        if( gui.app.feature_wide_lines && !line_width_recorded ) {
+        if( gui.feature_wide_lines && !line_width_recorded ) {
             cmd_buffer.vkCmdSetLineWidth( 1 );
         }
 
         // draw lines repeating in X direction
-        gui.sim_line_display.line_axis = gui.Line_Axis.X;
-        cmd_buffer.vkCmdPushConstants( gui.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * uint32_t.sizeof, & gui.sim_line_display );
-        cmd_buffer.vkCmdDraw( 2, gui.sim_domain[0] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        gui.vis_line_display.line_axis = gui.Line_Axis.X;
+        cmd_buffer.vkCmdPushConstants( gui.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 4 * uint32_t.sizeof, & gui.vis_line_display );
+        cmd_buffer.vkCmdDraw( 2, gui.sim_domain[0] + 1, 0, 0 );     // vertex count, instance count, first vertex, first instance
 
         // draw lines repeating in Y direction
-        gui.sim_line_display.line_axis = gui.Line_Axis.Y;
-        cmd_buffer.vkCmdPushConstants( gui.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, gui.sim_line_display.line_type.offsetof, uint32_t.sizeof, & gui.sim_line_display.line_type );
-        cmd_buffer.vkCmdDraw( 2, gui.sim_domain[1] + 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        gui.vis_line_display.line_axis = gui.Line_Axis.Y;
+        cmd_buffer.vkCmdPushConstants( gui.current_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, gui.vis_line_display.line_type.offsetof, uint32_t.sizeof, & gui.vis_line_display.line_type );
+        cmd_buffer.vkCmdDraw( 2, gui.sim_domain[1] + 1, 0, 0 );     // vertex count, instance count, first vertex, first instance
     }
 
 
@@ -2398,11 +2401,11 @@ void drawGuiData( ImDrawData* draw_data ) {
     // set point size or line width dependent on the corresponding features exist and weather line or point drawing is active
     void setPointSizeLineWidth( size_t index ) {
         if( gui.draw_velocity_lines_as_points ) {
-            if( gui.app.feature_large_points ) {
-                gui.sim_line_display.point_size = gui.point_size_line_width[ index ];
+            if( gui.feature_large_points ) {
+                gui.vis_line_display.point_size = gui.point_size_line_width[ index ];
             }
         } else {
-            if( gui.app.feature_wide_lines ) {
+            if( gui.feature_wide_lines ) {
                 cmd_buffer.vkCmdSetLineWidth( gui.point_size_line_width[ index ] );
             }
         }
@@ -2426,82 +2429,82 @@ void drawGuiData( ImDrawData* draw_data ) {
         //
         // tempory store UI Values
         //
-        int          repl_count     = gui.sim_line_display.repl_count;
-        gui.Line_Axis line_axis      = gui.sim_line_display.line_axis;
-        gui.Line_Axis repl_axis      = gui.sim_line_display.repl_axis;
-        gui.Line_Axis velocity_axis  = gui.sim_line_display.velocity_axis;
-        float        line_offset    = gui.sim_line_display.line_offset;
+        int             repl_count      = gui.vis_line_display.repl_count;
+        gui.Line_Axis   line_axis       = gui.vis_line_display.line_axis;
+        gui.Line_Axis   repl_axis       = gui.vis_line_display.repl_axis;
+        gui.Line_Axis   velocity_axis   = gui.vis_line_display.velocity_axis;
+        float           line_offset     = gui.vis_line_display.line_offset;
 
 
         //
         // vertical lines
         //
-        gui.sim_line_display.repl_count      = cast( int )gui.ghia_type;  // choose Re
-        gui.sim_line_display.line_axis       = gui.Line_Axis.Y;
-        gui.sim_line_display.repl_axis       = gui.Line_Axis.X;
-        gui.sim_line_display.velocity_axis   = gui.Line_Axis.X;
-        gui.sim_line_display.line_offset     = 63;
+        gui.vis_line_display.repl_count     = cast( int )gui.ghia_type;  // choose Re
+        gui.vis_line_display.line_axis      = gui.Line_Axis.Y;
+        gui.vis_line_display.repl_axis      = gui.Line_Axis.X;
+        gui.vis_line_display.velocity_axis  = gui.Line_Axis.X;
+        gui.vis_line_display.line_offset    = 63;
         setPointSizeLineWidth( 0 );
 
-        // push constant the whole sim_line_display struct and draw
-        gui.sim_line_display.line_type = gui.Line_Type.ghia;
-        cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.Sim_Line_Display.sizeof, & gui.sim_line_display );
+        // push constant the whole vis_line_display struct and draw
+        gui.vis_line_display.line_type = gui.Line_Type.ghia;
+        cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.Vis_Line_Display.sizeof, & gui.vis_line_display );
         cmd_buffer.vkCmdDraw( 17, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
         if( gui.validate_velocity ) {
             // adjust push constants and draw velocity line
             setPointSizeLineWidth( 1 );
-            gui.sim_line_display.line_type = gui.Line_Type.velocity;
-            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.Sim_Line_Display.sizeof, & gui.sim_line_display );
-            cmd_buffer.vkCmdDraw( gui.sim.sim_domain[ gui.sim_line_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+            gui.vis_line_display.line_type = gui.Line_Type.velocity;
+            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.Vis_Line_Display.sizeof, & gui.vis_line_display );
+            cmd_buffer.vkCmdDraw( gui.sim.sim_domain[ gui.vis_line_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
 
         if( gui.validate_vel_base ) {
             setPointSizeLineWidth( 2 );
             // adjust push constants and draw velocity line
-            gui.sim_line_display.line_type = gui.Line_Type.vel_base;
-            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.Sim_Line_Display.sizeof, & gui.sim_line_display );
-            cmd_buffer.vkCmdDraw( gui.sim.sim_domain[ gui.sim_line_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+            gui.vis_line_display.line_type = gui.Line_Type.vel_base;
+            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.Vis_Line_Display.sizeof, & gui.vis_line_display );
+            cmd_buffer.vkCmdDraw( gui.sim.sim_domain[ gui.vis_line_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
 
 
         //
         // horizontal lines
         //
-        gui.sim_line_display.line_type       = gui.Line_Type.ghia;
-        gui.sim_line_display.velocity_axis   = gui.Line_Axis.Y;
-        gui.sim_line_display.repl_axis       = gui.Line_Axis.Y;
-        gui.sim_line_display.line_axis       = gui.Line_Axis.X;
+        gui.vis_line_display.line_type      = gui.Line_Type.ghia;
+        gui.vis_line_display.velocity_axis  = gui.Line_Axis.Y;
+        gui.vis_line_display.repl_axis      = gui.Line_Axis.Y;
+        gui.vis_line_display.line_axis      = gui.Line_Axis.X;
         setPointSizeLineWidth( 0 );
 
-        cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.Sim_Line_Display.sizeof, & gui.sim_line_display );
+        cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.Vis_Line_Display.sizeof, & gui.vis_line_display );
         cmd_buffer.vkCmdDraw( 17, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
 
         if( gui.validate_velocity ) {
             // adjust push constants and draw velocity line
             setPointSizeLineWidth( 1 );
-            gui.sim_line_display.line_type = gui.Line_Type.velocity;
-            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.Sim_Line_Display.sizeof, & gui.sim_line_display );
-            cmd_buffer.vkCmdDraw( gui.sim.sim_domain[ gui.sim_line_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+            gui.vis_line_display.line_type = gui.Line_Type.velocity;
+            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.Vis_Line_Display.sizeof, & gui.vis_line_display );
+            cmd_buffer.vkCmdDraw( gui.sim.sim_domain[ gui.vis_line_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
 
         if( gui.validate_vel_base ) {
             // adjust push constants and draw velocity base line
             setPointSizeLineWidth( 2 );
-            gui.sim_line_display.line_type = gui.Line_Type.vel_base;
-            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.Sim_Line_Display.sizeof, & gui.sim_line_display );
-            cmd_buffer.vkCmdDraw( gui.sim.sim_domain[ gui.sim_line_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+            gui.vis_line_display.line_type = gui.Line_Type.vel_base;
+            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.Vis_Line_Display.sizeof, & gui.vis_line_display );
+            cmd_buffer.vkCmdDraw( gui.sim.sim_domain[ gui.vis_line_display.line_axis ], 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
 
 
         //
         // restore UI values
         //
-        gui.sim_line_display.repl_count      = repl_count;
-        gui.sim_line_display.line_axis       = line_axis;
-        gui.sim_line_display.repl_axis       = repl_axis;
-        gui.sim_line_display.velocity_axis   = velocity_axis;
-        gui.sim_line_display.line_offset     = line_offset;
+        gui.vis_line_display.repl_count     = repl_count;
+        gui.vis_line_display.line_axis      = line_axis;
+        gui.vis_line_display.repl_axis      = repl_axis;
+        gui.vis_line_display.velocity_axis  = velocity_axis;
+        gui.vis_line_display.line_offset    = line_offset;
     }
 
 
@@ -2515,12 +2518,12 @@ void drawGuiData( ImDrawData* draw_data ) {
         bindPipeline( gui.vis.lines_pso[ gui.draw_velocity_lines_as_points.toUint ] );
         auto pipeline_layout = gui.current_pso.pipeline_layout;
 
-        // push constant the whole sim_line_display struct and draw
+        // push constant the whole vis_line_display struct and draw
         setPointSizeLineWidth( 0 );
-        gui.sim_line_display.line_type = gui.Line_Type.poiseuille;
-        cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.sim_line_display.sizeof, & gui.sim_line_display );
+        gui.vis_line_display.line_type = gui.Line_Type.poiseuille;
+        cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.vis_line_display.sizeof, & gui.vis_line_display );
         cmd_buffer.vkCmdDraw(
-            gui.sim.sim_domain[ gui.sim_line_display.line_axis ], gui.sim_line_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
+            gui.sim.sim_domain[ gui.vis_line_display.line_axis ], gui.vis_line_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
 
 
@@ -2528,26 +2531,26 @@ void drawGuiData( ImDrawData* draw_data ) {
     //
     // setup velocity and base lines drawing
     //
-    if( gui.sim_line_display.repl_count ) {
+    if( gui.vis_line_display.repl_count ) {
 
         // setup pipeline, either lines or points drawing
         bindPipeline( gui.vis.lines_pso[ gui.draw_velocity_lines_as_points.toUint ] );
         auto pipeline_layout = gui.current_pso.pipeline_layout;
 
         if( gui.draw_vel_base ) {
-            // push constant the whole sim_line_display struct
+            // push constant the whole vis_line_display struct
             setPointSizeLineWidth( 2 );
-            gui.sim_line_display.line_type = gui.Line_Type.vel_base;
-            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.sim_line_display.sizeof, & gui.sim_line_display );
+            gui.vis_line_display.line_type = gui.Line_Type.vel_base;
+            cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.vis_line_display.sizeof, & gui.vis_line_display );
             cmd_buffer.vkCmdDraw(
-                gui.sim.sim_domain[ gui.sim_line_display.line_axis ], gui.sim_line_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
+                gui.sim.sim_domain[ gui.vis_line_display.line_axis ], gui.vis_line_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
         }
 
-        // push constant the whole sim_line_display struct and draw
+        // push constant the whole vis_line_display struct and draw
         setPointSizeLineWidth( 1 );
-        gui.sim_line_display.line_type = gui.Line_Type.velocity;
-        cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.sim_line_display.sizeof, & gui.sim_line_display );
-        cmd_buffer.vkCmdDraw( gui.sim.sim_domain[ gui.sim_line_display.line_axis ], gui.sim_line_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
+        gui.vis_line_display.line_type = gui.Line_Type.velocity;
+        cmd_buffer.vkCmdPushConstants( pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, gui.vis_line_display.sizeof, & gui.vis_line_display );
+        cmd_buffer.vkCmdDraw( gui.sim.sim_domain[ gui.vis_line_display.line_axis ], gui.vis_line_display.repl_count, 0, 0 ); // vertex count, instance count, first vertex, first instance
     }
 
 
@@ -2574,7 +2577,7 @@ void drawGuiData( ImDrawData* draw_data ) {
     cmd_buffer.vkCmdBindIndexBuffer( gui.gui_idx_buffers[ gui.next_image_index ].buffer, 0, VK_INDEX_TYPE_UINT16 );
 
     // setup scale and translation
-    float[2] scale = [ 2.0f / gui.app.windowWidth, 2.0f / gui.app.windowHeight ];
+    float[2] scale = [ 2.0f / gui.windowWidth, 2.0f / gui.windowHeight ];
     float[2] trans = [ -1.0f, -1.0f ];
     cmd_buffer.vkCmdPushConstants( gui.gui_graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT,            0, scale.sizeof, scale.ptr );
     cmd_buffer.vkCmdPushConstants( gui.gui_graphics_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, scale.sizeof, trans.sizeof, trans.ptr );
@@ -2701,15 +2704,15 @@ void guiKeyCallback( GLFWwindow* window, int key, int scancode, int val, int mod
     auto gui = cast( VDrive_Gui_State* )io.UserData; // get VDrive_Gui_State pointer from ImGuiIO.UserData
 
     if( key == GLFW_KEY_KP_ENTER && mod == GLFW_MOD_ALT ) {
-        io.DisplaySize = ImVec2( gui.app.windowWidth, gui.app.windowHeight );
-        gui.main_win_size.y = gui.app.windowHeight;       // this sets the window gui height to the window height
+        io.DisplaySize = ImVec2( gui.windowWidth, gui.windowHeight );
+        gui.main_win_size.y = gui.windowHeight;       // this sets the window gui height to the window height
     } else
 
     // turn gui on or off with tab key
     switch( key ) {
-        case GLFW_KEY_F2    : gui.show_imgui_examples ^= 1;                              break;
-        case GLFW_KEY_P     : try { gui.app.createLinePSO;    } catch( Exception ) {}     break;
-        case GLFW_KEY_D     : try { gui.app.createDisplayPSO; } catch( Exception ) {}     break;
+        case GLFW_KEY_F2    : gui.show_imgui_examples ^= 1;                             break;
+        case GLFW_KEY_P     : try { gui.app.createLinePSO;    } catch( Exception ) {}   break;
+        case GLFW_KEY_D     : try { gui.app.createDisplayPSO; } catch( Exception ) {}   break;
         default             :                                                           break;
     }
 }
