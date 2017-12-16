@@ -26,7 +26,7 @@ void createCommandObjects( ref VDrive_State app, VkCommandPoolCreateFlags comman
     app.cmd_pool = app.createCommandPool( app.graphics_queue_family_index, command_pool_create_flags );
 
     // one for compute operations, not reset on window resize events
-    app.sim.sim_cmd_pool = app.createCommandPool( app.graphics_queue_family_index );
+    app.sim.cmd_pool = app.createCommandPool( app.graphics_queue_family_index );
 
 
 
@@ -42,8 +42,8 @@ void createCommandObjects( ref VDrive_State app, VkCommandPoolCreateFlags comman
 
     // rendering and presenting semaphores for VkSubmitInfo, VkPresentInfoKHR and vkAcquireNextImageKHR
     foreach( i; 0 .. app.MAX_FRAMES ) {
-        app.acquired_semaphore[i] = app.createSemaphore;    // signaled when a new swapchain image is acquired
-        app.rendered_semaphore[i] = app.createSemaphore;    // signaled when submitted command buffer(s) complete execution
+        app.acquired_semaphore[i] = app.createSemaphore;        // signaled when a new swapchain image is acquired
+        app.rendered_semaphore[i] = app.createSemaphore;        // signaled when submitted command buffer(s) complete execution
     }
 
 
@@ -56,9 +56,9 @@ void createCommandObjects( ref VDrive_State app, VkCommandPoolCreateFlags comman
     with( app.submit_info ) {
         waitSemaphoreCount      = 1;
         pWaitSemaphores         = & app.acquired_semaphore[0];
-        pWaitDstStageMask       = & app.submit_wait_stage_mask;  // configured before entering createResources func
+        pWaitDstStageMask       = & app.submit_wait_stage_mask; // configured before entering createResources func
         commandBufferCount      = 1;
-    //  pCommandBuffers         = & app.cmd_buffers[ i ];        // set before submission, choosing cmd_buffers[0/1]
+    //  pCommandBuffers         = & app.cmd_buffers[ i ];       // set before submission, choosing cmd_buffers[0/1]
         signalSemaphoreCount    = 1;
         pSignalSemaphores       = & app.rendered_semaphore[0];
     }
@@ -119,15 +119,15 @@ void createMemoryObjects( ref VDrive_State app ) {
     // cast the mapped memory pointer without offset into our transformation matrix
     app.xform_ubo = cast( VDrive_State.XForm_UBO* )mapped_memory;                       // cast to mat4
     app.xform_ubo_flush = app.xform_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the wvpm ubo
-    app.updateProjection;    // update projection matrix from member data _fovy, _near, _far and aspect of the swapchain extent
-    app.updateWVPM;          // multiply projection with trackball (view) matrix and upload to uniform buffer
+    app.updateProjection;   // update projection matrix from member data _fovy, _near, _far and aspect of the swapchain extent
+    app.updateWVPM;         // multiply projection with trackball (view) matrix and upload to uniform buffer
 
 
     // cast the mapped memory pointer with its offset into the backing memory to our compute ubo struct and init_pso the memory
     app.sim.compute_ubo = cast( VDrive_Simulate_State.Compute_UBO* )( mapped_memory + app.sim.compute_ubo_buffer.memOffset );
     app.sim.compute_ubo_flush = app.sim.compute_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the compute ubo
     app.sim.compute_ubo.collision_frequency = 1 / 0.504;
-    app.sim.compute_ubo.wall_velocity  = 0.005 * 3; //0.25 * 3;// / app.sim.speed_of_sound / app.sim.speed_of_sound;
+    app.sim.compute_ubo.wall_velocity  = 0.005 * 3;     //0.25 * 3;// / app.sim.speed_of_sound / app.sim.speed_of_sound;
     app.sim.compute_ubo.wall_thickness = 3;
     app.sim.compute_ubo.comp_index = 0;
     app.updateComputeUBO;
@@ -157,9 +157,9 @@ void createMemoryObjects( ref VDrive_State app ) {
 void createSimImage( ref VDrive_State app ) {
 
     // 1) (re)create Image
-    if( app.sim.sim_image.image != VK_NULL_HANDLE ) {
+    if( app.sim.macro_image.image != VK_NULL_HANDLE ) {
         app.graphics_queue.vkQueueWaitIdle;
-        app.sim.sim_image.destroyResources( false );  // destroy old image and its view, keeping the sampler
+        app.sim.macro_image.destroyResources( false );  // destroy old image and its view, keeping the sampler
     }
 
     // Todo(pp): the format should be choose-able
@@ -178,13 +178,13 @@ void createSimImage( ref VDrive_State app ) {
         baseMipLevel    : cast( uint32_t )0,
         levelCount      : 1,
         baseArrayLayer  : cast( uint32_t )0,
-        layerCount      : app.sim.sim_domain[2],
+        layerCount      : app.sim.domain[2],
     };
-    app.sim.sim_image( app )
+    app.sim.macro_image( app )
         .create(
             image_format,
-            app.sim.sim_domain[0], app.sim.sim_domain[1], 0,      // through the 0 we request a VK_IMAGE_TYPE_2D
-            1, app.sim.sim_domain[2],                        // mip levels and array layers
+            app.sim.domain[0], app.sim.domain[1], 0,    // through the 0 we request a VK_IMAGE_TYPE_2D
+            1, app.sim.domain[2],                       // mip levels and array layers
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_SAMPLE_COUNT_1_BIT,
             VK_IMAGE_TILING_OPTIMAL     // : VK_IMAGE_TILING_LINEAR
@@ -200,8 +200,8 @@ void createSimImage( ref VDrive_State app ) {
 
     // record image layout transition to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
     init_cmd_buffer.recordTransition(
-        app.sim.sim_image.image,
-        app.sim.sim_image.subresourceRange,
+        app.sim.macro_image.image,
+        app.sim.macro_image.subresourceRange,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL,
         0,  // no access mask required here
@@ -209,24 +209,23 @@ void createSimImage( ref VDrive_State app ) {
         VK_PIPELINE_STAGE_HOST_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
 
-    init_cmd_buffer.vkEndCommandBuffer;                     // finish recording and submit the command
-    auto submit_info = init_cmd_buffer.queueSubmitInfo;     // submit the command buffer
+    init_cmd_buffer.vkEndCommandBuffer;                 // finish recording and submit the command
+    auto submit_info = init_cmd_buffer.queueSubmitInfo; // submit the command buffer
     app.graphics_queue.vkQueueSubmit( 1, & submit_info, VK_NULL_HANDLE ).vkAssert;
 
     // staging buffer for cpu computed velocity copy to the sim_image
     if( app.cpu.sim_stage_buffer.is_constructed ) {
         app.graphics_queue.vkQueueWaitIdle;
-        app.cpu.sim_stage_buffer.destroyResources;  // destroy old image and its view, keeping the sampler
+        app.cpu.sim_stage_buffer.destroyResources;      // destroy old image and its view, keeping the sampler
     }
 
-    uint32_t buffer_size = 4 * app.sim.sim_domain[0] * app.sim.sim_domain[1];     // only in 2D and with VK_FORMAT_R32G32B32A32_SFLOAT
+    uint32_t buffer_size = 4 * app.sim.domain[0] * app.sim.domain[1];   // only in 2D and with VK_FORMAT_R32G32B32A32_SFLOAT
     uint32_t buffer_mem_size = buffer_size * float.sizeof.toUint;
 
     app.cpu.sim_image_ptr = cast( float* )( app.cpu.sim_stage_buffer( app )
         .create( VK_BUFFER_USAGE_TRANSFER_SRC_BIT, buffer_mem_size )
         .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
         .mapMemory );
-
 }
 
 
@@ -261,7 +260,7 @@ void createDescriptorSet( ref VDrive_State app, Meta_Descriptor* meta_descriptor
 
 
     Meta_Sampler meta_sampler;
-    app.sim.sim_image.sampler = meta_sampler( app )
+    app.sim.macro_image.sampler = meta_sampler( app )
     //  .addressMode( VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER )
         .unnormalizedCoordinates( VK_TRUE )
         .construct
@@ -285,16 +284,16 @@ void createDescriptorSet( ref VDrive_State app, Meta_Descriptor* meta_descriptor
 
         // Main Compute Buffer for populations
         .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
-        .addTexelBufferView( app.sim.sim_buffer_view )
+        .addTexelBufferView( app.sim.popul_buffer_view )
 
         // Image to store macroscopic variables ( velocity, density ) from simulation compute shader
         .addLayoutBinding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT )
-        .addImageInfo( app.sim.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
+        .addImageInfo( app.sim.macro_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
 
         // Sampler to read from macroscopic image in lines, display and export shader
         .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT )
-        .addImageInfo( app.sim.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, app.sim.sim_image.sampler )
-        .addImageInfo( app.sim.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, app.sim.nearest_sampler )        // additional sampler if we want to examine each node
+        .addImageInfo( app.sim.macro_image.image_view, VK_IMAGE_LAYOUT_GENERAL, app.sim.macro_image.sampler )
+        .addImageInfo( app.sim.macro_image.image_view, VK_IMAGE_LAYOUT_GENERAL, app.sim.nearest_sampler )        // additional sampler if we want to examine each node
 
         // Compute UBO for compute parameter
         .addLayoutBinding( 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT )
@@ -329,14 +328,14 @@ void createDescriptorSet( ref VDrive_State app, Meta_Descriptor* meta_descriptor
     // necessary when we recreate resources and have to rebind them to our descriptors
     app.sim_descriptor_update( app )
         .addBindingUpdate( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
-        .addTexelBufferView( app.sim.sim_buffer_view )
+        .addTexelBufferView( app.sim.popul_buffer_view )
 
         .addBindingUpdate( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE )
-        .addImageInfo( app.sim.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
+        .addImageInfo( app.sim.macro_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
 
         .addBindingUpdate/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ) // immutable does not filter properly, module descriptor bug
-        .addImageInfo( app.sim.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, app.sim.sim_image.sampler )
-        .addImageInfo( app.sim.sim_image.image_view, VK_IMAGE_LAYOUT_GENERAL, app.sim.nearest_sampler )
+        .addImageInfo( app.sim.macro_image.image_view, VK_IMAGE_LAYOUT_GENERAL, app.sim.macro_image.sampler )
+        .addImageInfo( app.sim.macro_image.image_view, VK_IMAGE_LAYOUT_GENERAL, app.sim.nearest_sampler )
 
         .addBindingUpdate( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
         .addTexelBufferView( app.vis.particle_buffer_view )
@@ -361,11 +360,11 @@ void createDescriptorSet( ref VDrive_State app, Meta_Descriptor* meta_descriptor
 void updateDescriptorSet( ref VDrive_State app ) {
 
     // update the descriptor
-    app.sim_descriptor_update.texel_buffer_views[0]    = app.sim.sim_buffer_view;             // populations buffer and optionally other data like temperature
-    app.sim_descriptor_update.image_infos[0].imageView = app.sim.sim_image.image_view;        // image view for writing from compute shader
-    app.sim_descriptor_update.image_infos[1].imageView = app.sim.sim_image.image_view;        // image view for reading in display fragment shader with linear  sampling
-    app.sim_descriptor_update.image_infos[2].imageView = app.sim.sim_image.image_view;        // image view for reading in display fragment shader with nearest sampling
-    app.sim_descriptor_update.texel_buffer_views[1] = app.vis.particle_buffer_view;       // particles to visualize LBM velocity
+    app.sim_descriptor_update.texel_buffer_views[0]     = app.sim.popul_buffer_view;        // populations buffer and optionally other data like temperature
+    app.sim_descriptor_update.image_infos[0].imageView  = app.sim.macro_image.image_view;   // image view for writing from compute shader
+    app.sim_descriptor_update.image_infos[1].imageView  = app.sim.macro_image.image_view;   // image view for reading in display fragment shader with linear  sampling
+    app.sim_descriptor_update.image_infos[2].imageView  = app.sim.macro_image.image_view;   // image view for reading in display fragment shader with nearest sampling
+    app.sim_descriptor_update.texel_buffer_views[1]     = app.vis.particle_buffer_view;     // particles to visualize LBM velocity
     app.sim_descriptor_update.update;
 
     // Note(pp):
@@ -519,10 +518,10 @@ void resizeRenderResources( ref VDrive_State app ) {
             typeof( app.framebuffers ),
             app.framebuffers.fb_count + render_targets.length.toUint
             )(
-            app.render_pass.render_pass,                 // specify render pass COMPATIBILITY
-            app.swapchain.imageExtent,                   // extent of the framebuffer
+            app.render_pass.render_pass,                // specify render pass COMPATIBILITY
+            app.swapchain.imageExtent,                  // extent of the framebuffer
             render_targets,                             // first ( static ) attachments which will not change ( here only )
-            app.swapchain.present_image_views.data,      // next one dynamic attachment ( swapchain ) which changes per command buffer
+            app.swapchain.present_image_views.data,     // next one dynamic attachment ( swapchain ) which changes per command buffer
             [], false );                                // if we are recreating we do not want to destroy clear values ...
 
     // ... we should keep the clear values, they might have been edited by the gui
@@ -585,14 +584,14 @@ void createResizedCommands( ref VDrive_State app ) nothrow {
         cmd_buffer.vkCmdSetScissor(  0, 1, & app.scissors );
 
         // bind descriptor set
-        cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
-            VK_PIPELINE_BIND_POINT_GRAPHICS,    // VkPipelineBindPoint          pipelineBindPoint
-            app.vis.display_pso.pipeline_layout,     // VkPipelineLayout             layout
-            0,                                  // uint32_t                     firstSet
-            1,                                  // uint32_t                     descriptorSetCount
-            & app.descriptor.descriptor_set,     // const( VkDescriptorSet )*    pDescriptorSets
-            0,                                  // uint32_t                     dynamicOffsetCount
-            null                                // const( uint32_t )*           pDynamicOffsets
+        cmd_buffer.vkCmdBindDescriptorSets(         // VkCommandBuffer              commandBuffer
+            VK_PIPELINE_BIND_POINT_GRAPHICS,        // VkPipelineBindPoint          pipelineBindPoint
+            app.vis.display_pso.pipeline_layout,    // VkPipelineLayout             layout
+            0,                                      // uint32_t                     firstSet
+            1,                                      // uint32_t                     descriptorSetCount
+            & app.descriptor.descriptor_set,        // const( VkDescriptorSet )*    pDescriptorSets
+            0,                                      // uint32_t                     dynamicOffsetCount
+            null                                    // const( uint32_t )*           pDynamicOffsets
         );
 
         // begin the render pass
@@ -604,7 +603,7 @@ void createResizedCommands( ref VDrive_State app ) nothrow {
             cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, app.vis.display_pso.pipeline );
 
             // push constant the sim display scale
-            float[2] sim_domain = [ app.sim.sim_domain[0], app.sim.sim_domain[1] ];
+            float[2] sim_domain = [ app.sim.domain[0], app.sim.domain[1] ];
             cmd_buffer.vkCmdPushConstants( app.vis.display_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sim_domain.sizeof, sim_domain.ptr );
 
             // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
@@ -615,7 +614,7 @@ void createResizedCommands( ref VDrive_State app ) nothrow {
         if( app.draw_particles ) {
             cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, app.vis.particle_pso.pipeline );
             cmd_buffer.vkCmdPushConstants( app.vis.particle_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, app.vis.particle_pc.sizeof, & app.vis.particle_pc );
-            cmd_buffer.vkCmdDraw( app.vis.particle_count, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
+            cmd_buffer.vkCmdDraw( app.vis.particle_count, 1, 0, 0 );    // vertex count, instance count, first vertex, first instance
         }
 
         // end the render pass
@@ -643,10 +642,10 @@ void destroyResources( ref VDrive_State app ) {
     app.device.vkDeviceWaitIdle;
 
     // destroy vulkan category resources
-    app.destroyVisResources; // Visualize
-    app.destroySimResources; // Simulate
-    app.destroyExpResources; // Export
-    app.destroyCpuResources; // Cpu
+    app.destroyVisResources;    // Visualize
+    app.destroySimResources;    // Simulate
+    app.destroyExpResources;    // Export
+    app.destroyCpuResources;    // Cpu
 
     // surface, swapchain and present image views
     app.swapchain.destroyResources;

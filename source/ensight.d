@@ -364,7 +364,7 @@ void ensRawWriteBinaryVarFile( void[] data_with_header, char[] file_name, uint i
             // write binary data file
             if( options.format == Export_Format.binary ) {
                 // write the file without additional conversion
-                file.rawWrite(( &varData.front())[0..varData.length] );
+                file.rawWrite(( & varData.front())[0..varData.length] );
             } else {
                 // convert the header and float data into an ascii OutBuffer, the floats as %12.5e format
                 auto velData = scoped!OutBuffer;

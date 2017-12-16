@@ -54,8 +54,8 @@ void initTrackball( ref VDrive_State app ) {
 
     import std.math : tan;
     enum deg2rad = 0.0174532925199432957692369076849f;
-    home_pos_x = - 0.5f * app.sim.sim_domain[0];     // Todo(pp): this seems to be a bug in the trackball manipulator
-    home_pos_y = - 0.5f * app.sim.sim_domain[1];     // both the values should be positive, confirm if we are creating an inverse matrix
+    home_pos_x = - 0.5f * app.sim.domain[0];    // Todo(pp): this seems to be a bug in the trackball manipulator
+    home_pos_y = - 0.5f * app.sim.domain[1];    // both the values should be positive, confirm if we are creating an inverse matrix
     home_pos_z = 0.5 / tan( 0.5 * deg2rad * app.projection_fovy );   // this is not finished yet and will be scaled bellow
     home_trg_x = home_pos_x;
     home_trg_y = home_pos_y;
@@ -63,10 +63,10 @@ void initTrackball( ref VDrive_State app ) {
 
     // if the aspect of the sim domain is smaller than the aspect of the window
     // we fit the height of the display plane to the window, otherwise the width of the plane
-    if( cast( float )app.sim.sim_domain[0] / app.sim.sim_domain[1] < cast( float )app.windowWidth / app.windowHeight ) {
-        home_pos_z *= app.sim.sim_domain[1];
+    if( cast( float )app.sim.domain[0] / app.sim.domain[1] < cast( float )app.windowWidth / app.windowHeight ) {
+        home_pos_z *= app.sim.domain[1];
     } else {
-        home_pos_z *= app.sim.sim_domain[0] * cast( float )app.windowHeight / app.windowWidth;
+        home_pos_z *= app.sim.domain[0] * cast( float )app.windowHeight / app.windowWidth;
     }
 
     app.tbb.camHome;
@@ -112,7 +112,7 @@ extern( C ) void mouseButtonCallback( GLFWwindow * window, int button, int val, 
 
     // set trackball reference if any mouse button is pressed
     double xpos, ypos;
-    glfwGetCursorPos( window, &xpos, &ypos );
+    glfwGetCursorPos( window, & xpos, & ypos );
     app.tbb.reference( xpos, ypos );
 }
 
@@ -166,8 +166,8 @@ void toggleFullscreen( GLFWwindow * window ) nothrow @nogc {
         glfwSetWindowMonitor( window, null, win_x, win_y, win_w, win_h, GLFW_DONT_CARE );
     } else {
         fb_fullscreen = true;
-        glfwGetWindowPos(  window, &win_x, &win_y );
-        glfwGetWindowSize( window, &win_w, &win_h );
+        glfwGetWindowPos(  window, & win_x, & win_y );
+        glfwGetWindowSize( window, & win_w, & win_h );
         auto monitor = glfwGetPrimaryMonitor();
         auto vidmode = glfwGetVideoMode( monitor );
         glfwSetWindowPos(  window, 0, 0 );

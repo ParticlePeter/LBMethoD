@@ -26,7 +26,7 @@ struct VDrive_Cpu_State {
     float*      sim_export_ptr;
 
     import vdrive.memory;
-    Meta_Buffer sim_stage_buffer;       // Todo(pp): this belongs into VDrive_Cpu_State
+    Meta_Buffer sim_stage_buffer;
 
 }
 
@@ -65,13 +65,9 @@ void cpuInit( ref VDrive_State app ) {
         }
     }
 
-    //app.device.vkFlushMappedMemoryRanges( 1, &sim_image_flush );
     import vdrive.memory;
-    app.sim.sim_image.flushMappedMemoryRange;
-
-    //app.sim.sim_index = 0;
+    app.sim.macro_image.flushMappedMemoryRange;
     app.exp.store_index = -1;
-
 }
 
 
@@ -82,8 +78,8 @@ void cpuReset( ref VDrive_State app ) {
     assert( !( app.cpu.popul_buffer_f !is null && app.cpu.popul_buffer_d !is null ));
 
     auto old_cell_count = app.cpu.cell_count;
-    app.cpu.cell_count = app.sim.sim_domain[0] * app.sim.sim_domain[1] * app.sim.sim_domain[2];
-    size_t buffer_size = app.cpu.cell_count * app.sim.sim_layers;
+    app.cpu.cell_count = app.sim.domain[0] * app.sim.domain[1] * app.sim.domain[2];
+    size_t buffer_size = app.cpu.cell_count * app.sim.layers;
     size_t old_buffer_mem_size = app.cpu.current_buffer_mem_size;
     app.cpu.current_buffer_mem_size = buffer_size * ( app.use_double ? double.sizeof : float.sizeof );
     if( app.cpu.current_buffer_mem_size < old_buffer_mem_size )
@@ -173,8 +169,8 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State app ) nothrow @system {
 
     float    omega = app.sim.compute_ubo.collision_frequency;
     float    wall_velocity = app.sim.compute_ubo.wall_velocity;
-    int      D_x = app.sim.sim_domain[0];
-    int      D_y = app.sim.sim_domain[1];
+    int      D_x = app.sim.domain[0];
+    int      D_y = app.sim.domain[1];
 
     static if( is( T == double )) {
         assert( app.cpu.popul_buffer_d !is null );
@@ -192,7 +188,7 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State app ) nothrow @system {
     try {
         static if( PROFILE ) app.startStopWatch;
         import std.range : iota;
-        foreach( I; parallel( iota( 0, app.cpu.cell_count, 1 ), app.sim.sim_work_group_size[0] )) {
+        foreach( I; parallel( iota( 0, app.cpu.cell_count, 1 ), app.sim.work_group_size[0] )) {
 
             // load populations
             T[9] f = [
@@ -277,7 +273,7 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State app ) nothrow @system {
     app.cpu.sim_stage_buffer.flushMappedMemoryRange;
 
     // increment indexes
-    ++app.sim.sim_index;
+    ++app.sim.index;
     ++app.sim.compute_ubo.comp_index;
 
     // display the result

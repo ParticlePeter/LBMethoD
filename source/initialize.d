@@ -65,7 +65,7 @@ auto initVulkan( ref VDrive_State app, uint32_t win_w = 1600, uint32_t win_h = 9
 
     // get vulkan extensions which are required by glfw
     uint32_t extension_count;
-    auto glfw_required_extensions = glfwGetRequiredInstanceExtensions( &extension_count );
+    auto glfw_required_extensions = glfwGetRequiredInstanceExtensions( & extension_count );
 
 
     // we know that glfw requires only two extensions
@@ -119,10 +119,10 @@ auto initVulkan( ref VDrive_State app, uint32_t win_w = 1600, uint32_t win_h = 9
     debug {
         VkDebugReportCallbackCreateInfoEXT callbackCreateInfo = {
             flags       : VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-            pfnCallback : &debugReport,
+            pfnCallback : & debugReport,
             pUserData   : null,
         };
-        vkCreateDebugReportCallbackEXT( app.instance, &callbackCreateInfo, app.allocator, &app.debugReportCallback );
+        vkCreateDebugReportCallbackEXT( app.instance, & callbackCreateInfo, app.allocator, & app.debugReportCallback );
     }
 
 
@@ -200,11 +200,11 @@ auto initVulkan( ref VDrive_State app, uint32_t win_w = 1600, uint32_t win_h = 9
         filtered_queues[0].priority( 0 ) = 1;
 
         // initialize the logical device
-        app.initDevice( filtered_queues, deviceExtensions, layers, &features );
+        app.initDevice( filtered_queues, deviceExtensions, layers, & features );
 
         // get device queues
-        app.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &app.graphics_queue );
-        app.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &app.swapchain.present_queue );
+        app.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, & app.graphics_queue );
+        app.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, & app.swapchain.present_queue );
 
         // store queue family index, required for command pool creation
         app.graphics_queue_family_index = filtered_queues[0].family_index;
@@ -229,11 +229,11 @@ auto initVulkan( ref VDrive_State app, uint32_t win_w = 1600, uint32_t win_h = 9
         ];
 
         // initialize the logical device
-        app.initDevice( filtered_queues, deviceExtensions, layers, &features );
+        app.initDevice( filtered_queues, deviceExtensions, layers, & features );
 
         // get device queues
-        app.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &app.graphics_queue );
-        app.device.vkGetDeviceQueue( filtered_queues[1].family_index, 0, &app.swapchain.present_queue );
+        app.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, & app.graphics_queue );
+        app.device.vkGetDeviceQueue( filtered_queues[1].family_index, 0, & app.swapchain.present_queue );
 
         // store queue family index, required for command pool creation
         // family_index of presentation queue seems not to be required later on

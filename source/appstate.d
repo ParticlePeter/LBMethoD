@@ -209,7 +209,7 @@ struct VDrive_State {
             sim_profile_step_index = sim_profile_step_limit = 0;
         }
         resetStopWatch;
-        sim.sim_index = sim.compute_ubo.comp_index = 0;
+        sim.index = sim.compute_ubo.comp_index = 0;
         try {
             if( use_cpu ) {
                 import cpustate : cpuInit;
@@ -247,18 +247,18 @@ struct VDrive_State {
     }
 
 
-    /// Scale the display based on the aspect(s) of sim.sim_domain
+    /// Scale the display based on the aspect(s) of sim.domain
     /// Parameter signals dimension count, 2D sim 3D
     /// Params:
     ///     app = reference to this modules VDrive_State struct
     ///     dim = the current dimensions
     /// Returns: scale factor for the plane or box, in the fomer case result[2] should be ignored
     float[3] simDisplayScale( int dim ) {
-        float scale =  sim.sim_domain[0] < sim.sim_domain[1] ?  sim.sim_domain[0] : sim.sim_domain[1];
-        if( dim > 2 && sim.sim_domain[2] < sim.sim_domain[0] && sim.sim_domain[2] < sim.sim_domain[1] )
-            scale = sim.sim_domain[2];
+        float scale =  sim.domain[0] < sim.domain[1] ?  sim.domain[0] : sim.domain[1];
+        if( dim > 2 && sim.domain[2] < sim.domain[0] && sim.domain[2] < sim.domain[1] )
+            scale = sim.domain[2];
         float[3] result;
-        result[] = sim.sim_domain[] / scale;
+        result[] = sim.domain[] / scale;
         return result;
     }
 
@@ -354,7 +354,7 @@ struct VDrive_State {
 
     // increments profile counter and calls draw_func_profile function pointer, which is setable
     void drawProfile() @system {
-        sim_profile_step_index += sim.sim_step_size;
+        sim_profile_step_index += sim.step_size;
         this.draw_func_profile;
 
         if( 0 < sim_profile_step_count && sim_profile_step_limit <= sim_profile_step_index ) {
@@ -367,7 +367,7 @@ struct VDrive_State {
     void drawSim() @system {
 
         // sellect and draw command buffers
-        VkCommandBuffer[2] cmd_buffers = [ cmd_buffers[ next_image_index ], sim.sim_cmd_buffers[ sim.sim_ping_pong ]];
+        VkCommandBuffer[2] cmd_buffers = [ cmd_buffers[ next_image_index ], sim.cmd_buffers[ sim.ping_pong ]];
         submit_info.pCommandBuffers = cmd_buffers.ptr;
         graphics_queue.vkQueueSubmit( 1, & submit_info, submit_fence[ next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
 
@@ -420,26 +420,26 @@ nothrow:
 
 // compute ping pong, increment sim counter and draw the sim result
 void playSim( ref VDrive_State app ) @system {
-    app.sim.sim_ping_pong = app.sim.sim_index % 2;                // compute new ping_pong value
-    app.sim.compute_ubo.comp_index += app.sim.sim_step_size;      // increase shader compute counter
-    if( app.sim.sim_step_size > 1 ) app.updateComputeUBO;     // we need this value in compute shader if its greater than 1
-    ++app.sim.sim_index;                                     // increment the compute buffer submission count
-    app.drawSim;                                         // let vulkan dance
+    app.sim.ping_pong = app.sim.index % 2;                  // compute new ping_pong value
+    app.sim.compute_ubo.comp_index += app.sim.step_size;    // increase shader compute counter
+    if( app.sim.step_size > 1 ) app.updateComputeUBO;       // we need this value in compute shader if its greater than 1
+    ++app.sim.index;                                        // increment the compute buffer submission count
+    app.drawSim;                                            // let vulkan dance
 }
 
 // similar to playSim but with profiling facility for compute work
 void profileSim( ref VDrive_State app ) @system {
 
-    app.sim.sim_ping_pong = app.sim.sim_index % 2;                // compute new ping_pong value
-    app.sim.compute_ubo.comp_index += app.sim.sim_step_size;      // increase shader compute counter
-    if( app.sim.sim_step_size > 1 ) app.updateComputeUBO;     // we need this value in compute shader if its greater than 1
-    ++app.sim.sim_index;                                     // increment the compute buffer submission count
+    app.sim.ping_pong = app.sim.index % 2;                  // compute new ping_pong value
+    app.sim.compute_ubo.comp_index += app.sim.step_size;    // increase shader compute counter
+    if( app.sim.step_size > 1 ) app.updateComputeUBO;       // we need this value in compute shader if its greater than 1
+    ++app.sim.index;                                        // increment the compute buffer submission count
 
     // edit submit info for compute work
     with( app.submit_info ) {
         signalSemaphoreCount    = 0;
         pSignalSemaphores       = null;
-        pCommandBuffers = & app.sim.sim_cmd_buffers[ app.sim.sim_ping_pong ];
+        pCommandBuffers = & app.sim.cmd_buffers[ app.sim.ping_pong ];
     }
 
     // profile compute work

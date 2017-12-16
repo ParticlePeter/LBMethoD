@@ -85,16 +85,16 @@ void createDisplayPSO( ref VDrive_State app ) {
         .addShaderStageCreateInfo( app.createPipelineShaderStage( "shader/draw_display.vert" ))
         .addShaderStageCreateInfo( app.createPipelineShaderStage( "shader/draw_display.frag", & meta_sc.specialization_info ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
-        .addViewportAndScissors( VkOffset2D( 0, 0 ), app.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), app.swapchain.imageExtent )    // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
         .depthState                                                                 // set depth state - enable depth test with default attributes
         .addColorBlendState( VK_FALSE )                                             // color blend state - append common (default) color blend attachment state
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
         .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
-        .addDescriptorSetLayout( app.descriptor.descriptor_set_layout )              // describe pipeline layout
+        .addDescriptorSetLayout( app.descriptor.descriptor_set_layout )             // describe pipeline layout
         .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 8 )                   // specify push constant range
-        .renderPass( app.render_pass.render_pass )                                   // describe compatible render pass
-        .construct( app.vis.graphics_cache )                                          // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
+        .renderPass( app.render_pass.render_pass )                                  // describe compatible render pass
+        .construct( app.vis.graphics_cache )                                        // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct
 }
@@ -124,16 +124,16 @@ void createScalePSO( ref VDrive_State app ) {
         .addShaderStageCreateInfo( app.createPipelineShaderStage( "shader/draw_scale.vert" ))
         .addShaderStageCreateInfo( app.createPipelineShaderStage( "shader/draw_scale.frag", & meta_sc.specialization_info ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP )                      // set the inputAssembly
-        .addViewportAndScissors( VkOffset2D( 0, 0 ), app.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), app.swapchain.imageExtent )    // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
         .depthState                                                                 // set depth state - enable depth test with default attributes
         .addColorBlendState( VK_FALSE )                                             // color blend state - append common (default) color blend attachment state
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
         .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
-        .addDescriptorSetLayout( app.descriptor.descriptor_set_layout )              // describe pipeline layout
+        .addDescriptorSetLayout( app.descriptor.descriptor_set_layout )             // describe pipeline layout
         .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 8 )                   // specify push constant range
-        .renderPass( app.render_pass.render_pass )                                   // describe compatible render pass
-        .construct( app.vis.graphics_cache )                                          // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
+        .renderPass( app.render_pass.render_pass )                                  // describe compatible render pass
+        .construct( app.vis.graphics_cache )                                        // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct
 }
@@ -188,7 +188,7 @@ void createParticleResetCmdBuffer( ref VDrive_State app ) nothrow {
 //////////////////////////////////////////
 void resetParticleBuffer( ref VDrive_State app ) nothrow {
     auto submit_info = app.vis.particle_reset_cmd_buffer.queueSubmitInfo;
-    app.graphics_queue.vkQueueSubmit( 1, &submit_info, VK_NULL_HANDLE ).vkAssert;
+    app.graphics_queue.vkQueueSubmit( 1, & submit_info, VK_NULL_HANDLE ).vkAssert;
 }
 
 
@@ -212,14 +212,14 @@ void createParticlePSO( ref VDrive_State app ) {
         .addShaderStageCreateInfo( app.createPipelineShaderStage( "shader/particle.vert" ))
         .addShaderStageCreateInfo( app.createPipelineShaderStage( "shader/particle.frag" ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_POINT_LIST )                          // set the inputAssembly
-        .addViewportAndScissors( VkOffset2D( 0, 0 ), app.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), app.swapchain.imageExtent )    // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
     //  .depthState                                                                 // set depth state - enable depth test with default attributes
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
         .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
-        .addDescriptorSetLayout( app.descriptor.descriptor_set_layout )              // describe pipeline layout
+        .addDescriptorSetLayout( app.descriptor.descriptor_set_layout )             // describe pipeline layout
         .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT , 0, 24 )                 // specify push constant range
-        .renderPass( app.render_pass.render_pass );                                  // describe compatible render pass
+        .renderPass( app.render_pass.render_pass );                                 // describe compatible render pass
 
     if( app.additive_particle_blend ) {
         meta_graphics
@@ -230,7 +230,7 @@ void createParticlePSO( ref VDrive_State app ) {
     }
 
     app.vis.particle_pso = meta_graphics
-        .construct( app.vis.graphics_cache )                                          // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
+        .construct( app.vis.graphics_cache )                                        // construct the Pipleine Layout and Pipleine State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct
 }
@@ -256,16 +256,16 @@ void createLinePSO( ref VDrive_State app ) {
         .addShaderStageCreateInfo( app.createPipelineShaderStage( "shader/draw_axis.vert" ))
         .addShaderStageCreateInfo( app.createPipelineShaderStage( "shader/draw_line.frag" ))
         .inputAssembly( VK_PRIMITIVE_TOPOLOGY_POINT_LIST )                          // set the inputAssembly
-        .addViewportAndScissors( VkOffset2D( 0, 0 ), app.swapchain.imageExtent )     // add viewport and scissor state, necessary even if we use dynamic state
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), app.swapchain.imageExtent )    // add viewport and scissor state, necessary even if we use dynamic state
         .cullMode( VK_CULL_MODE_BACK_BIT )                                          // set rasterization state
     //  .depthState                                                                 // set depth state - enable depth test with default attributes
         .addColorBlendState( VK_TRUE )                                              // color blend state - append common (default) color blend attachment state
         .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
         .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
-        .addDescriptorSetLayout( app.descriptor.descriptor_set_layout )              // describe pipeline layout
+        .addDescriptorSetLayout( app.descriptor.descriptor_set_layout )             // describe pipeline layout
         .addPushConstantRange( VK_SHADER_STAGE_VERTEX_BIT, 0, 32 )                  // specify push constant range
-        .renderPass( app.render_pass.render_pass )                                   // describe compatible render pass
-        .construct( app.vis.graphics_cache )                                          // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
+        .renderPass( app.render_pass.render_pass )                                  // describe compatible render pass
+        .construct( app.vis.graphics_cache )                                        // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
         .extractCore;                                                               // extract core data into Core_Pipeline struct
 
     // now edit the Meta_Pipeline to create an alternate points PSO
@@ -275,7 +275,7 @@ void createLinePSO( ref VDrive_State app ) {
         meta_graphics.addDynamicState( VK_DYNAMIC_STATE_LINE_WIDTH );
 
     app.vis.lines_pso[ 0 ] = meta_graphics
-        .construct( app.vis.graphics_cache )                                          // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
+        .construct( app.vis.graphics_cache )                                        // construct the Pipeline Layout and Pipeline State Object (PSO) with a Pipeline Cache
         .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
         .reset;                                                                     // extract core data into Core_Pipeline struct and delete temporary data
 }

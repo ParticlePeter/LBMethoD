@@ -25,30 +25,30 @@ int main() {
     // compile time branch if gui is used or not 
     static if( USE_GUI ) {
         import gui;
-        VDrive_Gui_State app;                        // VDrive Gui state struct wrapping VDrive State struct
-        app.initImgui;                               // initialize imgui first, we raster additional fonts but currently don't install its glfw callbacks, they should be treated
+        VDrive_Gui_State app;                       // VDrive Gui state struct wrapping VDrive State struct
+        app.initImgui;                              // initialize imgui first, we raster additional fonts but currently don't install its glfw callbacks, they should be treated
     } else {
         import resources;
-        VDrive_State app;                            // VDrive state struct
+        VDrive_State app;                           // VDrive state struct
     }
 
 
     // initialize vulkan
-    auto vkResult = app.initVulkan( 1600, 900 );     // initialize instance and (physical) device
+    auto vkResult = app.initVulkan( 1600, 900 );    // initialize instance and (physical) device
     if( vkResult ) return vkResult;                 // exit if initialization failed, VK_SUCCESS = 0
 
-    app.initTrackball;                               // initialize trackball with window size and default perspective projection data in VDrive State
-    app.registerCallbacks;                           // register glfw callback functions 
-    app.createCommandObjects;                        // create command pool and sync primitives
-    app.createMemoryObjects;                         // create memory objects once used through out program lifetime
-    app.createDescriptorSet;                         // create descriptor set
-    app.createRenderResources;                       // configure swapchain, create renderpass and pipeline state object
-    app.resizeRenderResources;                       // construct swapchain, create depth buffer and frambuffers
-    app.setDefaultSimFuncs;                          // set default sim funcs, these can be overridden with gui commands
+    app.initTrackball;                              // initialize trackball with window size and default perspective projection data in VDrive State
+    app.registerCallbacks;                          // register glfw callback functions 
+    app.createCommandObjects;                       // create command pool and sync primitives
+    app.createMemoryObjects;                        // create memory objects once used through out program lifetime
+    app.createDescriptorSet;                        // create descriptor set
+    app.createRenderResources;                      // configure swapchain, create renderpass and pipeline state object
+    app.resizeRenderResources;                      // construct swapchain, create depth buffer and frambuffers
+    app.setDefaultSimFuncs;                         // set default sim funcs, these can be overridden with gui commands
 
     // branch once more dependent on gui usage
     static if( !USE_GUI ) {
-        app.createResizedCommands;                   // create draw loop runtime commands, only used without gui
+        app.createResizedCommands;                  // create draw loop runtime commands, only used without gui
     }
 
     // initial draw
