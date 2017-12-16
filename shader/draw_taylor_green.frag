@@ -1,22 +1,14 @@
 #version 450
 
-// Todo(pp): split into seperate draw_scale shader and draw_taylor_green shader 
-// latter could be selectable in Display Parameter
+// Todo(pp): create validation ui to further paremtrize this shader (draw compute, procedural, diff) 
 
+
+// rastered vertex attributes
 layout( location = 0 ) in   vec2 vs_tex_coord;  // input from vertex shader
 layout( location = 0 ) out  vec4 fs_color;      // output from fragment shader
 
-layout( binding = 4 ) uniform sampler2DArray vel_rho_tex[2];      // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
 
-// uniform buffer
-layout( std140, binding = 5 ) uniform Compute_UBO {
-    float   omega;            // collision frequency
-    float   wall_velocity;
-    int     wall_thickness;
-    int     comp_index;
-};
-
-// uniform buffer
+// display uniform buffer
 layout( std140, binding = 6 ) uniform Display_UBO {
     float   amplify_property;
     uint    color_layers;
@@ -24,11 +16,33 @@ layout( std140, binding = 6 ) uniform Display_UBO {
 };
 
 
+// compute uniform buffer
+layout( std140, binding = 5 ) uniform Compute_UBO {
+    float   omega;            // collision frequency
+    float   wall_velocity;
+    int     wall_thickness;
+    int     comp_index;
+};
 
+
+// image and sampler
+layout( binding = 4 ) uniform sampler2DArray vel_rho_tex[2];      // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+
+
+// specialization constant for display property
+#define DENSITY     0
+#define VEL_X       1
+#define VEL_Y       2
+#define VEL_MAG     3
+#define VEL_GRAD    4
+#define VEL_CURL    5
+layout( constant_id = 0 ) const uint PROPERTY = VEL_MAG;
+
+
+// ramp values
 // R: 0 0 0 0 1 1
 // G: 0 0 1 1 1 0
 // B: 0 1 1 0 0 0
-
 const vec3[] ramp = {
     vec3( 0, 0, 0 ),
     vec3( 0, 0, 1 ),
@@ -39,7 +53,7 @@ const vec3[] ramp = {
 };
 
 
-
+// ramp value interpolator
 vec3 colorRamp( float t ) {
     t *= ( ramp.length() - 1 );
     ivec2 i = ivec2( floor( min( vec2( t, t + 1 ), vec2( ramp.length() - 1 ))));
@@ -94,13 +108,13 @@ void main() {
 
         case DISPLAY_VELOCITY_X :
             if( color_layers == 0 ) vel_rho *= amplify_property;
-            else vel_rho = trunc( vel_rho * color_layers * amplify_property ) / color_layers;
+            else vel_rho = round( vel_rho * color_layers * amplify_property ) / color_layers;
             fs_color = vec4( max( 0, vel_rho.x ), max( 0, - vel_rho.x ), 0, 1 );
         break;
 
         case DISPLAY_VELOCITY_Y :
             if( color_layers == 0 ) vel_rho *= amplify_property;
-            else vel_rho = trunc( vel_rho * color_layers * amplify_property ) / color_layers;
+            else vel_rho = round( vel_rho * color_layers * amplify_property ) / color_layers;
             fs_color = vec4( max( 0, vel_rho.y ), max( 0, - vel_rho.y ), 0, 1 );
         break;
 
@@ -129,7 +143,7 @@ void main() {
                 curl = dFdx( vel_rho.y ) - dFdy( vel_rho.x );  // compute 2D curl
             } else {
                 vel_rho *= color_layers * amplify_property;
-                curl = trunc( dFdx( vel_rho.y ) - dFdy( vel_rho.x )) / color_layers;  // compute 2D curl
+                curl = round( dFdx( vel_rho.y ) - dFdy( vel_rho.x )) / color_layers;  // compute 2D curl
             }
             fs_color = vec4( max( 0, curl ), max( 0, -curl ), 0, 1 );
         } break;

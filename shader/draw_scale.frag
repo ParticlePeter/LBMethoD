@@ -1,7 +1,17 @@
 #version 450
 
-layout( location = 0 ) in   vec2 vs_tex_coord;   // input from vertex shader
+// rastered vertex attributes
+layout( location = 0 ) in   vec2 vs_tex_coord;  // input from vertex shader
 layout( location = 0 ) out  vec4 fs_color;      // output from fragment shader
+
+
+// uniform buffer
+layout( std140, binding = 6 ) uniform Display_UBO {
+    float   amplify_property;
+    uint    color_layers;
+    uint    z_layer;
+};
+
 
 // specialization constant for display property
 #define DENSITY     0
@@ -12,10 +22,11 @@ layout( location = 0 ) out  vec4 fs_color;      // output from fragment shader
 #define VEL_CURL    5
 layout( constant_id = 0 ) const uint PROPERTY = VEL_MAG;
 
+
+// ramp values
 // R: 0 0 0 0 1 1
 // G: 0 0 1 1 1 0
 // B: 0 1 1 0 0 0
-
 const vec3[] ramp = {
     vec3( 0, 0, 0 ),
     vec3( 0, 0, 1 ),
@@ -26,6 +37,7 @@ const vec3[] ramp = {
 };
 
 
+// ramp value interpolator
 vec3 colorRamp( float t ) {
     t *= ( ramp.length() - 1 );
     ivec2 i = ivec2( floor( min( vec2( t, t + 1 ), vec2( ramp.length() - 1 ))));
@@ -40,13 +52,23 @@ void main() {
 
         case DENSITY :
         case VEL_MAG :
-            fs_color = vec4( colorRamp( vs_tex_coord.y ), 1 );
+            if( color_layers == 0 ) {
+                fs_color = vec4( colorRamp( vs_tex_coord.y ), 1 );
+            } else {
+                float ty = floor( color_layers * vs_tex_coord.y ) / color_layers;
+                fs_color = vec4( colorRamp( ty ), 1 );
+            }
         break;
 
         case VEL_X :
         case VEL_Y :
         case VEL_CURL :
-            fs_color = vec4( max( 0, 2 * vs_tex_coord.y - 1 ), max( 0, 1 - 2 * vs_tex_coord.y ), 0, 1 );
+            if( color_layers == 0 ) {
+                fs_color = vec4( max( 0, 2 * vs_tex_coord.y - 1 ), max( 0, 1 - 2 * vs_tex_coord.y ), 0, 1 );
+            } else {
+                float ty = round( color_layers * vs_tex_coord.y ) / color_layers;
+                fs_color = vec4( max( 0, 2 * ty - 1 ), max( 0, 1 - 2 * ty ), 0, 1 );
+            }
         break;
 
         case VEL_GRAD : {
