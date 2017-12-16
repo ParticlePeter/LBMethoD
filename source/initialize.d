@@ -39,7 +39,7 @@ mixin DerelictGLFW3_VulkanBind;
 // Todo(pp): if initialization fails an error should be returned
 // programm termination would than happen gracefully in module main
 // pass Vulkan struct as reference parameter into this function
-auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 900 ) {
+auto initVulkan( ref VDrive_State app, uint32_t win_w = 1600, uint32_t win_h = 900 ) {
 
     // Initialize GLFW3 and Vulkan related glfw functions
     DerelictGLFW3.load( "glfw3_64.dll" );   // load the lib found in system path
@@ -49,7 +49,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
 
     // set glfw window attributes and store it in the VDrive_State appstate
     glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
-    vd.window = glfwCreateWindow( win_w, win_h, "Vulkan Erupted", null, null );
+    app.window = glfwCreateWindow( win_w, win_h, "Vulkan Erupted", null, null );
 
 
     // first load all global level instance functions
@@ -112,7 +112,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
 
 
     // initialize the vulkan instance, pass the correct slice into the extension array
-    vd.initInstance( extensions[ 0..extension_count ], layers[ 0..layer_count ] );
+    app.initInstance( extensions[ 0..extension_count ], layers[ 0..layer_count ] );
 
 
     // setup debug report callback
@@ -122,18 +122,18 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
             pfnCallback : &debugReport,
             pUserData   : null,
         };
-        vkCreateDebugReportCallbackEXT( vd.instance, &callbackCreateInfo, vd.allocator, &vd.debugReportCallback );
+        vkCreateDebugReportCallbackEXT( app.instance, &callbackCreateInfo, app.allocator, &app.debugReportCallback );
     }
 
 
     // create the window VkSurfaceKHR with the instance, surface is stored in the state object
     import vdrive.swapchain;
-    glfwCreateWindowSurface( vd.instance, vd.window, vd.allocator, vd.swapchain.surface_ptr ).vkAssert;
-    vd.swapchain.create_info.imageExtent = VkExtent2D( win_w, win_h );    // Set the desired swapchain extent, this might change at swapchain creation
+    glfwCreateWindowSurface( app.instance, app.window, app.allocator, app.swapchain.surface_ptr ).vkAssert;
+    app.swapchain.create_info.imageExtent = VkExtent2D( win_w, win_h );     // Set the desired swapchain extent, this might change at swapchain creation
 
 
     // enumerate gpus
-    auto gpus = vd.instance.listPhysicalDevices( false );
+    auto gpus = app.instance.listPhysicalDevices( false );
 
 
     // get some useful info from the physical devices
@@ -145,7 +145,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
         //gpu.listFeatures;
         //gpu.listLayers;
         //gpu.listExtensions;
-        //printf( "Present supported: %u\n", gpu.presentSupport( vd.swapchain ));
+        //printf( "Present supported: %u\n", gpu.presentSupport( app.swapchain ));
     }
 
 
@@ -154,9 +154,9 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
     // - gpu must support the VK_KHR_swapchain extension
     bool presentation_supported = false;
     foreach( ref gpu; gpus ) {
-        if( gpu.presentSupport( vd.swapchain.surface )) {
+        if( gpu.presentSupport( app.swapchain.surface )) {
             presentation_supported = true;
-            vd.gpu = gpu;
+            app.gpu = gpu;
             break;
         }
     }
@@ -165,7 +165,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
     if( !presentation_supported ) {
         // Todo(pp): print to error stream
         printf( "No GPU with presentation capability detected. Terminating!" );
-        vd.destroyInstance;
+        app.destroyInstance;
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -175,22 +175,22 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
 
     // enabling shader clip and cull distance is not required if gl_PerVertex is (re)defined
     VkPhysicalDeviceFeatures features;
-    auto available_features = vd.gpu.listFeatures( false );
+    auto available_features = app.gpu.listFeatures( false );
     //features.fillModeNonSolid = available_features.fillModeNonSolid;
     //features.shaderClipDistance = available_features.shaderClipDistance;
     //features.shaderCullDistance = available_features.shaderCullDistance;
     //features.tessellationShader = available_features.tessellationShader;
     features.shaderStorageImageExtendedFormats = available_features.shaderStorageImageExtendedFormats;
-    vd.feature_shader_double    = 0 < ( features.shaderFloat64 = available_features.shaderFloat64 );
-    vd.feature_large_points     = 0 < ( features.largePoints = available_features.largePoints );
-    vd.feature_wide_lines       = 0 < ( features.wideLines = available_features.wideLines );
+    app.feature_shader_double    = 0 < ( features.shaderFloat64 = available_features.shaderFloat64 );
+    app.feature_large_points     = 0 < ( features.largePoints = available_features.largePoints );
+    app.feature_wide_lines       = 0 < ( features.wideLines = available_features.wideLines );
 
 
     // Todo(pp): the filtering bellow is not lazy and also allocates, change both to lazy range based
-    auto queue_families = listQueueFamilies( vd.gpu, false, vd.swapchain.surface );   // last param is optional and only for printing
+    auto queue_families = listQueueFamilies( app.gpu, false, app.swapchain.surface );   // last param is optional and only for printing
     auto graphic_queues = queue_families
         .filterQueueFlags( VK_QUEUE_GRAPHICS_BIT )                  // .filterQueueFlags( include, exclude )
-        .filterPresentSupport( vd.gpu, vd.swapchain.surface );      // .filterPresentSupport( gpu, swapchain )
+        .filterPresentSupport( app.gpu, app.swapchain.surface );    // .filterPresentSupport( gpu, swapchain )
 
 
     // treat the case of combined graphics and presentation queue first
@@ -200,14 +200,14 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
         filtered_queues[0].priority( 0 ) = 1;
 
         // initialize the logical device
-        vd.initDevice( filtered_queues, deviceExtensions, layers, &features );
+        app.initDevice( filtered_queues, deviceExtensions, layers, &features );
 
         // get device queues
-        vd.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &vd.graphics_queue );
-        vd.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &vd.swapchain.present_queue );
+        app.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &app.graphics_queue );
+        app.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &app.swapchain.present_queue );
 
         // store queue family index, required for command pool creation
-        vd.graphics_queue_family_index = filtered_queues[0].family_index;
+        app.graphics_queue_family_index = filtered_queues[0].family_index;
 
 
     } else {
@@ -217,7 +217,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
         if( graphic_queues.length == 0 ) {
             // Todo(pp): print to error stream
             printf( "No queue with VK_QUEUE_GRAPHICS_BIT found. Terminating!" );
-            vd.destroyInstance;
+            app.destroyInstance;
             return VK_ERROR_INITIALIZATION_FAILED;
         }
 
@@ -225,19 +225,19 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
         // take the first available presentation queue
         Queue_Family[2] filtered_queues = [
             graphic_queues.front,
-            queue_families.filterPresentSupport( vd.gpu, vd.swapchain.surface ).front // .filterPresentSupport( gpu, swapchain
+            queue_families.filterPresentSupport( app.gpu, app.swapchain.surface ).front // .filterPresentSupport( gpu, swapchain
         ];
 
         // initialize the logical device
-        vd.initDevice( filtered_queues, deviceExtensions, layers, &features );
+        app.initDevice( filtered_queues, deviceExtensions, layers, &features );
 
         // get device queues
-        vd.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &vd.graphics_queue );
-        vd.device.vkGetDeviceQueue( filtered_queues[1].family_index, 0, &vd.swapchain.present_queue );
+        app.device.vkGetDeviceQueue( filtered_queues[0].family_index, 0, &app.graphics_queue );
+        app.device.vkGetDeviceQueue( filtered_queues[1].family_index, 0, &app.swapchain.present_queue );
 
         // store queue family index, required for command pool creation
         // family_index of presentation queue seems not to be required later on
-        vd.graphics_queue_family_index = filtered_queues[0].family_index;
+        app.graphics_queue_family_index = filtered_queues[0].family_index;
     }
 
     return VK_SUCCESS;
@@ -259,13 +259,13 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
 
 
 
-void destroyVulkan( ref VDrive_State vd ) {
+void destroyVulkan( ref VDrive_State app ) {
 
-    vd.destroyDevice;
+    app.destroyDevice;
 
-    debug vd.destroy( vd.debugReportCallback );
-    vd.destroyInstance;
+    debug app.destroy( app.debugReportCallback );
+    app.destroyInstance;
 
-    glfwDestroyWindow( vd.window );
+    glfwDestroyWindow( app.window );
     glfwTerminate();
 }
