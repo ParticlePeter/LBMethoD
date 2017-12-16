@@ -42,9 +42,9 @@ struct VDrive_Gui_State {
     Core_Pipeline   current_pso;        // with this we keep track which pso is active to avoid rebinding of the
     Meta_Image      gui_font_tex;
 
-    alias                               GUI_QUEUED_FRAMES = app.MAX_FRAMES;
-    Meta_Buffer[ GUI_QUEUED_FRAMES ]    gui_vtx_buffers;
-    Meta_Buffer[ GUI_QUEUED_FRAMES ]    gui_idx_buffers;
+    // MAX_FRAMES is the maximum storage for these buffers and also swapchains. We should only construct swapchain count resources
+    Meta_Buffer[ app.MAX_FRAMES ]   gui_vtx_buffers;
+    Meta_Buffer[ app.MAX_FRAMES ]   gui_idx_buffers;
 
     VkCommandBufferBeginInfo gui_cmd_buffer_bi = {
         flags : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
@@ -1915,7 +1915,7 @@ void createMemoryObjects( ref VDrive_Gui_State gui ) {
 
 
     // Initialize gui draw buffers
-    foreach( i; 0 .. gui.GUI_QUEUED_FRAMES ) {
+    foreach( i; 0 .. gui.MAX_FRAMES ) {
         gui.gui_vtx_buffers[ i ] = gui;
         gui.gui_idx_buffers[ i ] = gui;
     }
@@ -2144,7 +2144,7 @@ void destroyResources( ref VDrive_Gui_State gui ) {
     resources.destroyResources( gui );
 
     // now destroy all remaining gui resources
-    foreach( i; 0 .. gui.GUI_QUEUED_FRAMES ) {
+    foreach( i; 0 .. gui.MAX_FRAMES ) {
         gui.gui_vtx_buffers[ i ].destroyResources;
         gui.gui_idx_buffers[ i ].destroyResources;
     }
@@ -2179,7 +2179,7 @@ void drawGuiData( ImDrawData* draw_data ) {
 
     // one of the cmd_buffers is currently submitted
     // here we record into the other one
-    //gui.next_image_index = ( gui.next_image_index + 1 ) % gui.GUI_QUEUED_FRAMES;
+    //gui.next_image_index = ( gui.next_image_index + 1 ) % gui.MAX_FRAMES;
 
     // Todo(pp): for some reasons there is a vertex buffer per swapchain
     // as well as one memory object per vertex buffer
