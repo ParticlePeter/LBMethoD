@@ -1013,11 +1013,34 @@ struct VDrive_Gui_State {
 
             if( ImGui.DragFloat( "Amp Display Property", & vv.display_ubo.amplify_property, 0.001f, 0, 255 )) updateDisplayUBO;
 
-            if( ImGui.BeginPopupContextItem( "Amp Display Property Context Menu" )) {
-                if( ImGui.Selectable( "1" ))    { vv.display_ubo.amplify_property = 1;      updateDisplayUBO; }
-                if( ImGui.Selectable( "10" ))   { vv.display_ubo.amplify_property = 10;     updateDisplayUBO; }
-                if( ImGui.Selectable( "100" ))  { vv.display_ubo.amplify_property = 100;    updateDisplayUBO; }
-                if( ImGui.Selectable( "1000" )) { vv.display_ubo.amplify_property = 1000;   updateDisplayUBO; }
+            if( ImGui.BeginPopupContextItem( "Amp Display Context " )) {
+                ImGui.PushItemWidth( 60 );
+
+                if( ImGui.DragFloat( " * ##Amp_0",  & vv.display_ubo.amplify_property, 0.001f, 0, 255 ))    updateDisplayUBO;
+                ImGui.SameLine;
+                if( ImGui.Selectable( "0.001" ))    { vv.display_ubo.amplify_property = 0.001;              updateDisplayUBO; }
+
+                if( ImGui.DragFloat( " * ##Amp_1",  & vv.display_ubo.amplify_property, 0.01f,  0, 255 ))    updateDisplayUBO;
+                ImGui.SameLine;
+                if( ImGui.Selectable( "0.01" ))     { vv.display_ubo.amplify_property = 0.01;               updateDisplayUBO; }
+
+                if( ImGui.DragFloat( " * ##Amp_2",  & vv.display_ubo.amplify_property, 0.1f,   0, 255 ))    updateDisplayUBO;
+                ImGui.SameLine;
+                if( ImGui.Selectable( "0.1" ))      { vv.display_ubo.amplify_property = 0.1;                updateDisplayUBO; }
+
+                if( ImGui.DragFloat( " * ##Amp_3",  & vv.display_ubo.amplify_property, 1.0f,   0, 255 ))    updateDisplayUBO;
+                ImGui.SameLine;
+                if( ImGui.Selectable( "1.0" ))      { vv.display_ubo.amplify_property = 1.0;                updateDisplayUBO; }
+
+                if( ImGui.DragFloat( " * ##Amp_4",  & vv.display_ubo.amplify_property, 10.0f,  0, 255 ))    updateDisplayUBO;
+                ImGui.SameLine;
+                if( ImGui.Selectable( "10.0" ))     { vv.display_ubo.amplify_property = 10.0;               updateDisplayUBO; }
+
+                if( ImGui.DragFloat( " * ##Amp_5",  & vv.display_ubo.amplify_property, 100.0f, 0, 255 ))    updateDisplayUBO;
+                ImGui.SameLine;
+                if( ImGui.Selectable( "100.0" ))    { vv.display_ubo.amplify_property = 100.0;              updateDisplayUBO; }
+
+                ImGui.PopItemWidth;
                 ImGui.EndPopup();
             }
 
