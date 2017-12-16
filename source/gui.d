@@ -2098,6 +2098,7 @@ void registerCallbacks( ref VDrive_Gui_State vg ) {
     // now overwrite some of the input callbacks (some of them also forward to input callbacks)
     glfwSetWindowSizeCallback(  vg.window, & guiWindowSizeCallback );
     glfwSetMouseButtonCallback( vg.window, & guiMouseButtonCallback );
+    glfwSetCursorPosCallback(   vg.window, & guiCursorPosCallback );
     glfwSetScrollCallback(      vg.window, & guiScrollCallback );
     glfwSetCharCallback(        vg.window, & guiCharCallback );
     glfwSetKeyCallback(         vg.window, & guiKeyCallback );
@@ -2732,4 +2733,14 @@ void guiWindowSizeCallback( GLFWwindow * window, int w, int h ) {
     // the extent might change at swapchain creation when the specified extent is not usable
     vg.swapchainExtent( w, h );
     vg.window_resized = true;
+}
+
+/// Callback Function for capturing mouse motion events
+void guiCursorPosCallback( GLFWwindow * window, double x, double y ) {
+    auto io = & ImGui.GetIO();
+    if( !io.WantCaptureMouse ) {
+        // forward to input.cursorPosCallback
+        import input : cursorPosCallback;
+        cursorPosCallback( window, x, y );
+    }
 }
