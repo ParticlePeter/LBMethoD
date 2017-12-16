@@ -603,8 +603,7 @@ void createResizedCommands( ref VDrive_State app ) nothrow {
             cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, app.vis.display_pso.pipeline );
 
             // push constant the sim display scale
-            float[2] sim_domain = [ app.sim.domain[0], app.sim.domain[1] ];
-            cmd_buffer.vkCmdPushConstants( app.vis.display_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sim_domain.sizeof, sim_domain.ptr );
+            cmd_buffer.vkCmdPushConstants( app.vis.display_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 2 * uint32_t.sizeof, app.sim.domain.ptr );
 
             // buffer-less draw with build in gl_VertexIndex exclusively to generate position and tex_coord data
             cmd_buffer.vkCmdDraw( 4, 1, 0, 0 ); // vertex count, instance count, first vertex, first instance
