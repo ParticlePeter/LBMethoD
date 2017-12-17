@@ -24,6 +24,11 @@ struct TrackballButton {
     ubyte button;
 }
 
+// gather mouse movement (position and velocity)
+struct MouseMove {
+    float pos_x = 0, pos_y = 0;
+    float vel_x = 0, vel_y = 0;
+}
 
 void initTrackball(
     ref     VDrive_State app,
@@ -87,12 +92,25 @@ extern( C ) void windowSizeCallback( GLFWwindow * window, int w, int h ) nothrow
 /// Callback Function for capturing mouse motion events
 extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) nothrow {
     auto app = cast( VDrive_State* )window.glfwGetWindowUserPointer;
-    if( app.tbb.button == 0 || glfwGetKey( window, GLFW_KEY_LEFT_ALT ) != GLFW_PRESS ) return;
-    switch( app.tbb.button ) {
-        case 1  : /*if( app.sim_use_3_dim )*/ app.tbb.orbit( x, y ); break;
-        case 2  : app.tbb.xform( x, y ); break;
-        case 4  : app.tbb.dolly( x, y ); break;
-        default : break;
+
+    // Todo(pp): move this into trackball - Trackball reference should then take no args and get a snapshot of these values
+    // get mouse position and compute mouse velocity
+    app.mouse.vel_x = x - app.mouse.pos_x;
+    app.mouse.vel_y = y - app.mouse.pos_y;
+    app.mouse.pos_x = x;
+    app.mouse.pos_y = y;
+
+    if( glfwGetKey( window, GLFW_KEY_LEFT_ALT ) == GLFW_PRESS ) {
+        // update camera matrix
+        switch( app.tbb.button ) {
+            case 1  : /*if( app.use_3_dim )*/ app.tbb.orbit( x, y ); break;
+            case 2  : app.tbb.xform( x, y ); break;
+            case 4  : app.tbb.dolly( x, y ); break;
+            default : break;
+        }
+    } else {
+        // apply force on plane at mouse click location
+        //app.mouseForce;
     }
 }
 
@@ -111,9 +129,7 @@ extern( C ) void mouseButtonCallback( GLFWwindow * window, int button, int val, 
     if( app.tbb.button == 0 ) return;
 
     // set trackball reference if any mouse button is pressed
-    double xpos, ypos;
-    glfwGetCursorPos( window, & xpos, & ypos );
-    app.tbb.reference( xpos, ypos );
+    app.tbb.reference( app.mouse.pos_x, app.mouse.pos_y );
 }
 
 
@@ -131,7 +147,7 @@ extern( C ) void keyCallback( GLFWwindow * window, int key, int scancode, int va
     // use key press results only
     if( val != GLFW_PRESS ) return;
     import visualize : resetParticleBuffer;
-    import resources : createResizedCommands; 
+    import resources : createResizedCommands;
     switch( key ) {
         case GLFW_KEY_ESCAPE    : glfwSetWindowShouldClose( window, GLFW_TRUE );        break;
         case GLFW_KEY_HOME      : app.tbb.camHome;                                        break;
@@ -155,8 +171,8 @@ bool fb_fullscreen = false;                 // keep track if we are in fullscree
 int win_x, win_y, win_w, win_h;             // remember position and size of window when switching to fullscreen mode
 
 // set camera back to its initial state
-void camHome( ref TrackballButton tbb ) nothrow @nogc {
-    tbb.lookAt( home_pos_x, home_pos_y, home_pos_z, home_trg_x, home_trg_y, home_trg_z );
+void camHome( ref TrackballButton tb ) nothrow @nogc {
+    tb.lookAt( home_pos_x, home_pos_y, home_pos_z, home_trg_x, home_trg_y, home_trg_z );
 }
 
 // toggle fullscreen state of window

@@ -32,8 +32,9 @@ struct VDrive_State {
         float       time_step = 0.0;
     }
 
-    // trackball
+    // trackball and mouse
     TrackballButton             tbb;                        // Trackball manipulator updating View Matrix
+    MouseMove                   mouse;
     XForm_UBO*                  xform_ubo;                  // World View Projection Matrix
     mat4                        projection;                 // Projection Matrix
     float                       projection_fovy =    60;    // Projection Field Of View in Y dimension
@@ -243,6 +244,27 @@ struct VDrive_State {
     void updateDisplayUBO() {
         // data will be updated elsewhere
         vk.device.vkFlushMappedMemoryRanges( 1, & vis.display_ubo_flush );
+    }
+
+    // compute mouse force and update compute UBO
+    void mouseForce() {
+        import core.stdc.stdio : printf;
+        printf( "Mouse: px = %f, py = %f, vx = %f, vy = %f\n", mouse.pos_x, mouse.pos_y, mouse.vel_x, mouse.vel_y );
+
+        import dlsl.vector;
+        auto mat = tb.matrix;
+        auto dir = vec3( mat[0].z, mat[1].z, mat[2].z );
+        auto eye = tb.eye;
+
+        //printf( "Eye: %f, %f, %f   Dir: %f, %f, %f\n", eye.x, eye.y, eye.z, dir.x, dir.y, dir.z );
+
+        //float top = near * tan( projection_fovy * ( PI / 360.0 ));
+        //float bottom = - top;
+        //float right = top * aspect;
+        //float left = - right;
+
+
+
     }
 
 
