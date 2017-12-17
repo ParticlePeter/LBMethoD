@@ -19,8 +19,8 @@ void registerCallbacks( ref VDrive_State app ) {
 
 // wrap dlsl.Trackball and extracted glfw mouse buttons
 struct TrackballButton {
-    Trackball tbb;
-    alias tbb this;
+    Trackball tb;
+    alias tb this;
     ubyte button;
 }
 
