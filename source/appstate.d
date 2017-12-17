@@ -435,11 +435,11 @@ void profileSim( ref VDrive_State app ) @system {
     ++app.sim.index;                                        // increment the compute buffer submission count
 
     // edit submit info for compute work
-    with( app.submit_info ) {
-        signalSemaphoreCount    = 0;
-        pSignalSemaphores       = null;
-        pCommandBuffers = & app.sim.cmd_buffers[ app.sim.ping_pong ];
-    }
+    // we don't want to signal any semaphore
+    // we use a fence to measure the time between submission and compleation on the cpu
+    // however, we do wait for the swapchain image acquired semaphore
+    app.submit_info.signalSemaphoreCount    = 0;
+    app.submit_info.pCommandBuffers         = & app.sim.cmd_buffers[ app.sim.ping_pong ];
 
     // profile compute work
     app.startStopWatch;
@@ -449,14 +449,12 @@ void profileSim( ref VDrive_State app ) @system {
     app.device.vkResetFences( 1, & app.submit_fence[ app.next_image_index ] ).vkAssert;
 
     // edit submmit info for display work
-    with( app.submit_info ) {
-        waitSemaphoreCount      = 0;
-        pWaitSemaphores         = null;
-        pWaitDstStageMask       = null;
-        signalSemaphoreCount    = 1;
-        pSignalSemaphores       = & app.rendered_semaphore[ app.next_image_index ];
-        pCommandBuffers         = & app.cmd_buffers[ app.next_image_index ];
-    }
+    // this time we do not wait for the acquired semaphore
+    // as we did it in the previous step which is guarded by a fence
+    // but we do signal the rendering finished semaphore, which is consumed by vkQueuePresentKHR 
+    app.submit_info.waitSemaphoreCount      = 0;
+    app.submit_info.signalSemaphoreCount    = 1;
+    app.submit_info.pCommandBuffers         = & app.cmd_buffers[ app.next_image_index ];
 
     // submit graphics work
     app.graphics_queue.vkQueueSubmit( 1, & app.submit_info, app.submit_fence[ app.next_image_index ] );  // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
@@ -464,6 +462,15 @@ void profileSim( ref VDrive_State app ) @system {
     // present rendered image
     app.present_info.pImageIndices = & app.next_image_index;
     app.swapchain.present_queue.vkQueuePresentKHR( & app.present_info );
+
+    // edit submmit info to default settings
+    // as we multi-buffer semaphores (as well as fences) we need to patch the submit and present infos
+    // with the new set of semaphores
+    // wait and signal semaphore count must be set both to one, we might be leaving profile mode after any call
+    app.submit_info.waitSemaphoreCount      = 1;
+    app.submit_info.pWaitSemaphores         = & app.acquired_semaphore[ app.next_image_index ];
+    app.submit_info.pSignalSemaphores       = & app.rendered_semaphore[ app.next_image_index ];
+    app.present_info.pWaitSemaphores        = & app.rendered_semaphore[ app.next_image_index ];
 
     // check if window was resized and handle the case
     if( app.window_resized ) {
@@ -477,14 +484,6 @@ void profileSim( ref VDrive_State app ) @system {
 
     // acquire next swapchain image
     app.device.vkAcquireNextImageKHR( app.swapchain.swapchain, uint64_t.max, app.acquired_semaphore[ app.next_image_index ], VK_NULL_HANDLE, & app.next_image_index );
-
-    // edit submmit info to default settings
-    with( app.submit_info ) {
-        waitSemaphoreCount  = 1;
-        pWaitSemaphores     = & app.acquired_semaphore[ app.next_image_index ];
-        pWaitDstStageMask   = & app.submit_wait_stage_mask;   // configured before entering createResources func
-    }
-    app.present_info.pWaitSemaphores = & app.rendered_semaphore[ app.next_image_index ];
 
     // wait for finished drawing
     app.device.vkWaitForFences( 1, & app.submit_fence[ app.next_image_index ], VK_TRUE, uint64_t.max );
