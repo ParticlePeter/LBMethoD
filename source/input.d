@@ -110,7 +110,7 @@ extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) no
         }
     } else {
         // apply force on plane at mouse click location
-        //app.mouseForce;
+        app.mouseForce;
     }
 }
 
