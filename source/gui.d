@@ -430,6 +430,8 @@ struct VDrive_Gui_State {
             ImGui.Text( "Refresh minimum %.3f ms/frame (%.1f FPS)", 1000.0f / minFramerate, minFramerate );
             ImGui.Text( "Refresh maximum %.3f ms/frame (%.1f FPS)", 1000.0f / maxFramerate, maxFramerate );
             ImGui.Separator;
+            ImGui.DragFloat3( "Mouse Plane Hit", app.hit.ptr );
+            ImGui.Separator;
         }
 
 
@@ -2741,9 +2743,9 @@ void guiWindowSizeCallback( GLFWwindow * window, int w, int h ) {
 /// Callback Function for capturing mouse motion events
 void guiCursorPosCallback( GLFWwindow * window, double x, double y ) {
     auto io = & ImGui.GetIO();
-    if( !io.WantCaptureMouse ) {
+    //if( !io.WantCaptureMouse ) {
         // forward to input.cursorPosCallback
         import input : cursorPosCallback;
         cursorPosCallback( window, x, y );
-    }
+    //}
 }
