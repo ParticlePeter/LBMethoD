@@ -40,6 +40,7 @@ struct VDrive_State {
     float                       projection_fovy =    60;    // Projection Field Of View in Y dimension
     float                       projection_near =   0.1;    // Projection near plane distance
     float                       projection_far  = 10000;    // Projection  far plane distance
+    float                       projection_aspect;          // Projection aspect, will be computed from window dim, when updateProjection is called
     // Todo(pp): calculate best possible near and far clip planes when manipulating the trackball
 
     // surface and swapchain
@@ -246,15 +247,64 @@ struct VDrive_State {
         vk.device.vkFlushMappedMemoryRanges( 1, & vis.display_ubo_flush );
     }
 
+    import dlsl.vector;
+    vec3 hit;
+
     // compute mouse force and update compute UBO
     void mouseForce() {
         import core.stdc.stdio : printf;
-        printf( "Mouse: px = %f, py = %f, vx = %f, vy = %f\n", mouse.pos_x, mouse.pos_y, mouse.vel_x, mouse.vel_y );
+        import std.math : tan;
+        //printf( "Mouse: px = %f, py = %f, vx = %f, vy = %f\n", mouse.pos_x, mouse.pos_y, mouse.vel_x, mouse.vel_y );
 
-        import dlsl.vector;
-        auto mat = tb.matrix;
-        auto dir = vec3( mat[0].z, mat[1].z, mat[2].z );
-        auto eye = tb.eye;
+        float   hry = 2.0f / ( windowHeight - 1 );
+        auto    mat = ( mat3( tbb.matrix ));
+        auto    eye = tbb.eye;
+        
+        float   top = tan( projection_fovy * 0.00872664625997164788461845384244 /* PI / 360.0 */ );
+        auto    dir = ( 
+                    - mat[2]
+                    - top * mat[1]                      + top * hry * mouse.pos_y * mat[1]
+                    + top * projection_aspect * mat[0]  - top * hry * mouse.pos_x * mat[0] 
+                    ).normalize;
+
+        hit  =  eye.z / dir.z * dir - eye;
+
+
+
+        auto    nrm = vec3( 0, 0, 1 );
+        auto    org = vec3( 0 );
+        float   den = dot( nrm, dir );
+        float   t = - dot( org - eye, nrm ) / den;
+        //hit  =  eye + t * dir;
+        //hit  =  dir;
+
+        //float   den = dir.z;                        // dot( nrm, dir );
+        //float   t = - eye.z / dir.z;                // dot( org - eye, nrm ) / den
+        //hit = - ( 0.5 * windowHeight * eye.z / dir.z ) * dir;    // t * dir;
+        //hit = vec3( mouse.pos_x, mouse.pos_y, mouse.vel_x );
+        //hit = dir;
+        //printf( "Mouse: px = %f, py = %f, pz = %f\n", hit.x, hit.y, hit.z );
+
+
+        /*
+        bool intersectPlane(const Vec3f &nrm, const Vec3f &org, const Vec3f &eye, const Vec3f &l, float &t)
+        {
+            // assuming vectors are all normalized
+            float denom = dotProduct(nrm, dir);
+            if( denom > 1e-6 ) {
+                Vec3f org_eye = org - eye;
+                t = dotProduct( org_eye, nrm ) / denom;
+                return ( t >= 0 );
+            }
+
+            return false;
+        }
+        */
+
+
+
+
+
 
         //printf( "Eye: %f, %f, %f   Dir: %f, %f, %f\n", eye.x, eye.y, eye.z, dir.x, dir.y, dir.z );
 
@@ -318,7 +368,8 @@ struct VDrive_State {
     // and the swapchain extent converted to aspect
     void updateProjection() {
         import dlsl.projection;
-        projection = vkPerspective( projection_fovy, cast( float )windowWidth / windowHeight, projection_near, projection_far );
+        projection_aspect = cast( float )windowWidth / windowHeight;
+        projection = vkPerspective( projection_fovy, projection_aspect, projection_near, projection_far );
     }
 
     //
