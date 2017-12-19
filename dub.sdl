@@ -8,11 +8,12 @@ authors             "Peter Particle"
 license             "MIT"
 
 dependency          "derelict-glfw3"    version = "~>3.1.0"
-dependency          "dlsl"              version = "~>0.1.2"
+//dependency          "dlsl"              version = "~>0.1"
 //dependency          "erupted"           version = "~>1.6.0"
 dependency          "erupted"           path    = "../ErupteD"
 dependency          "vdrive"            path    = "../V-Drive"
 dependency          "imgui_lib"         path    = "../../Lib_CPP/imgui_lib"
+dependency          "dlsl"              path    = "../../DLang/projects/DLSL"
 
 libs                "../../Lib_CPP/imgui_lib/project/Release/imgui"     // this should not be required or should simply be "imgui"
 
