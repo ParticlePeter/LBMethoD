@@ -32,8 +32,6 @@ struct MouseMove {
 
 void initTrackball(
     ref     VDrive_State app,
-    float   perspective_fovy    = 60,
-    float   window_height       = 1080,
     float   cam_pos_x           =  3,
     float   cam_pos_y           =  3,
     float   cam_pos_z           = -6,
@@ -49,8 +47,7 @@ void initTrackball(
     home_trg_z = cam_target_z;
 
     app.tbb.camHome;
-    app.tbb.perspectiveFovyWindowHeight( perspective_fovy, window_height );
-    //app.registerCallbacks;
+    app.tbb.perspectiveFovyWindowHeight( app.projection_fovy, app.windowHeight );
 }
 
 
@@ -59,9 +56,9 @@ void initTrackball( ref VDrive_State app ) {
 
     import std.math : tan;
     enum deg2rad = 0.0174532925199432957692369076849f;
-    home_pos_x = - 0.5f * app.sim.domain[0];    // Todo(pp): this seems to be a bug in the trackball manipulator
-    home_pos_y = - 0.5f * app.sim.domain[1];    // both the values should be positive, confirm if we are creating an inverse matrix
-    home_pos_z = 0.5 / tan( 0.5 * deg2rad * app.projection_fovy );   // this is not finished yet and will be scaled bellow
+    home_pos_x = 0.5f * app.sim.domain[0];    // Todo(pp): this seems to be a bug in the trackball manipulator
+    home_pos_y = 0.5f * app.sim.domain[1];    // both the values should be positive, confirm if we are creating an inverse matrix
+    home_pos_z = - 0.5 / tan( 0.5 * deg2rad * app.projection_fovy );   // this is not finished yet and will be scaled bellow
     home_trg_x = home_pos_x;
     home_trg_y = home_pos_y;
     home_trg_z = 0;
@@ -103,9 +100,9 @@ extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) no
     if( glfwGetKey( window, GLFW_KEY_LEFT_ALT ) == GLFW_PRESS ) {
         // update camera matrix
         switch( app.tbb.button ) {
-            case 1  : /*if( app.use_3_dim )*/ app.tbb.orbit( x, y ); break;
-            case 2  : app.tbb.xform( x, y ); break;
-            case 4  : app.tbb.dolly( x, y ); break;
+            case 1  : app.tbb.orbit( x, y ); app.updateWVPM; break;
+            case 2  : app.tbb.xform( x, y ); app.updateWVPM; break;
+            case 4  : app.tbb.dolly( x, y ); app.updateWVPM; break;
             default : break;
         }
     } else {

@@ -230,7 +230,7 @@ struct VDrive_State {
 
     // update world view projection matrix UBO
     void updateWVPM() {
-        xform_ubo.wvpm = projection * tbb.matrix;
+        xform_ubo.wvpm = projection * tbb.worldTransform;
         xform_ubo.eyep = tbb.eye;
         vk.device.vkFlushMappedMemoryRanges( 1, & xform_ubo_flush );
     }
@@ -398,8 +398,6 @@ struct VDrive_State {
             recreateSwapchain;
             import resources : createResizedCommands;
             this.createResizedCommands;
-        } else if( tbb.dirty ) {
-            updateWVPM;  // this happens anyway in recreateSwapchain
         }
 
         // acquire next swapchain image, we use semaphore[0] which is also the first one on which we wait before our first real draw
@@ -458,8 +456,6 @@ struct VDrive_State {
             recreateSwapchain;
             import resources : createResizedCommands;
             this.createResizedCommands;
-        } else if( tbb.dirty ) {
-            updateWVPM;  // this happens anyway in recreateSwapchain
         }
 
         // acquire next swapchain image
@@ -551,8 +547,6 @@ void profileSim( ref VDrive_State app ) @system {
         app.recreateSwapchain;
         import resources : createResizedCommands;
         app.createResizedCommands;
-    } else if( app.tbb.dirty ) {
-        app.updateWVPM;  // this happens anyway in recreateSwapchain
     }
 
     // acquire next swapchain image
