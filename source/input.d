@@ -86,9 +86,9 @@ extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) no
     auto app = cast( VDrive_State* )window.glfwGetWindowUserPointer;
     if( app.tbb.button == 0 || glfwGetKey( window, GLFW_KEY_LEFT_ALT ) != GLFW_PRESS ) return;
     switch( app.tbb.button ) {
-        case 1  : /*if( app.sim_use_3_dim )*/ app.tbb.orbit( x, y ); break;
-        case 2  : app.tbb.xform( x, y ); break;
-        case 4  : app.tbb.dolly( x, y ); break;
+        case 1  : app.tbb.orbit( x, y ); app.updateWVPM; break;
+        case 2  : app.tbb.xform( x, y ); app.updateWVPM; break;
+        case 4  : app.tbb.dolly( x, y ); app.updateWVPM; break;
         default : break;
     }
 }

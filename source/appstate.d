@@ -325,8 +325,6 @@ struct VDrive_State {
             recreateSwapchain;
             import resources : createResizedCommands;
             this.createResizedCommands;
-        } else if( tbb.dirty ) {
-            updateWVPM;  // this happens anyway in recreateSwapchain
         }
 
         // acquire next swapchain image, we use semaphore[0] which is also the first one on which we wait before our first real draw
@@ -385,8 +383,6 @@ struct VDrive_State {
             recreateSwapchain;
             import resources : createResizedCommands;
             this.createResizedCommands;
-        } else if( tbb.dirty ) {
-            updateWVPM;  // this happens anyway in recreateSwapchain
         }
 
         // acquire next swapchain image
@@ -478,8 +474,6 @@ void profileSim( ref VDrive_State app ) @system {
         app.recreateSwapchain;
         import resources : createResizedCommands;
         app.createResizedCommands;
-    } else if( app.tbb.dirty ) {
-        app.updateWVPM;  // this happens anyway in recreateSwapchain
     }
 
     // acquire next swapchain image
