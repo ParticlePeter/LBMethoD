@@ -27,8 +27,6 @@ struct TrackballButton {
 
 void initTrackball(
     ref     VDrive_State app,
-    float   perspective_fovy    = 60,
-    float   window_height       = 1080,
     float   cam_pos_x           =  3,
     float   cam_pos_y           =  3,
     float   cam_pos_z           = -6,
@@ -44,8 +42,7 @@ void initTrackball(
     home_trg_z = cam_target_z;
 
     app.tbb.camHome;
-    app.tbb.perspectiveFovyWindowHeight( perspective_fovy, window_height );
-    //app.registerCallbacks;
+    app.tbb.perspectiveFovyWindowHeight( app.projection_fovy, app.windowHeight );
 }
 
 
