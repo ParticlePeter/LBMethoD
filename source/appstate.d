@@ -228,7 +228,7 @@ struct VDrive_State {
 
     // update world view projection matrix UBO
     void updateWVPM() {
-        xform_ubo.wvpm = projection * tbb.matrix;
+        xform_ubo.wvpm = projection * tbb.worldTransform;
         xform_ubo.eyep = tbb.eye;
         vk.device.vkFlushMappedMemoryRanges( 1, & xform_ubo_flush );
     }
