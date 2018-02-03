@@ -13,6 +13,9 @@ layout( std140, binding = 5 ) uniform Compute_UBO {
     float   wall_velocity;
     int     wall_thickness;
     int     comp_index;
+    vec2    mouse;
+    vec2    force;
+    int     force_type;
 };
 
 // specialization constants for local work group size
@@ -50,6 +53,9 @@ layout( binding = 3, rgba32f ) uniform restrict /*writeonly*/ image2DArray vel_r
 
 // population weights:  R       E       N       W       S       NE      NW      SW      SE
 const float[9] pw = {   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 };
+const vec2[9]  pd = {   vec2(0), 
+                        vec2(1, 0), vec2( 0,-1), vec2(-1,0), vec2(0,1), 
+                        vec2(1,-1), vec2(-1,-1), vec2(-1,1), vec2(1,1) };
 
 
 ////////////////////////////////////////////////////////
@@ -163,12 +169,31 @@ void main( void ) {
     // compute macroscopic density before applying wall velocity (should be the same before and after)
     float rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8];
 
+
+    // mouse force
+    if( force_type > 0 ) {
+        
+        float   force_rad = 32;
+        vec2    force_dir = vec2( X, Y ) - mouse;
+        float   force_mag = max( 0, force_rad - dot( force_dir, force_dir )) / ( force_rad * force_rad );
+
+        f[1]  += force_mag * 2 * pw[1] * rho * dot( pd[1], force );
+        f[2]  += force_mag * 2 * pw[2] * rho * dot( pd[2], force );
+        f[3]  += force_mag * 2 * pw[3] * rho * dot( pd[3], force );
+        f[4]  += force_mag * 2 * pw[4] * rho * dot( pd[4], force );
+        f[5]  += force_mag * 2 * pw[5] * rho * dot( pd[5], force );
+        f[6]  += force_mag * 2 * pw[6] * rho * dot( pd[6], force );
+        f[7]  += force_mag * 2 * pw[7] * rho * dot( pd[7], force );
+        f[8]  += force_mag * 2 * pw[8] * rho * dot( pd[8], force );
+
+    }
+
     // 6 2 5 //
     //  \|/  //
     // 3-0-1 //
     //  /|\  //
     // 7 4 8 //
-    //*
+
     // Ladd's momentum correction for moving walls, applied to reflected populations not perpendicular to wall velocity
     if( Y >= D.y - wall_thickness ) {   // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
         f[5] += 2 * pw[5] * rho * wall_velocity;

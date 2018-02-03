@@ -17,6 +17,9 @@ struct VDrive_Simulate_State {
         float               wall_velocity       = 0;    // sim param for lid driven cavity
         uint32_t            wall_thickness      = 1;
         uint32_t            comp_index          = 0;
+        float[2]            mouse_xy            = [ 0, 0 ];
+        float[2]            force_xy            = [ 0, 0 ];
+        int32_t             force_type          = 0;
     } Compute_UBO*      compute_ubo;
     Meta_Buffer         compute_ubo_buffer;
     VkMappedMemoryRange compute_ubo_flush;
