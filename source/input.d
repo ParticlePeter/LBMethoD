@@ -46,8 +46,8 @@ void initTrackball(
     home_trg_y = cam_target_y;
     home_trg_z = cam_target_z;
 
-    app.tbb.camHome;
     app.tbb.perspectiveFovyWindowHeight( app.projection_fovy, app.windowHeight );
+    app.camHome;
 }
 
 
@@ -71,9 +71,8 @@ void initTrackball( ref VDrive_State app ) {
         home_pos_z *= app.sim.domain[0] * cast( float )app.windowHeight / app.windowWidth;
     }
 
-    app.tbb.camHome;
     app.tbb.perspectiveFovyWindowHeight( app.projection_fovy, app.windowHeight );
-    //app.registerCallbacks;
+    app.camHome;
 }
 
 
@@ -142,6 +141,7 @@ extern( C ) void scrollCallback( GLFWwindow * window, double x, double y ) nothr
     auto app = cast( VDrive_State* )window.glfwGetWindowUserPointer;
     app.tbb.reference( 0, 0 );
     app.tbb.dolly( 5 * x, - 10 * y );
+    app.updateWVPM;
 }
 
 
@@ -154,15 +154,15 @@ extern( C ) void keyCallback( GLFWwindow * window, int key, int scancode, int va
     import resources : createResizedCommands;
     switch( key ) {
         case GLFW_KEY_ESCAPE    : glfwSetWindowShouldClose( window, GLFW_TRUE );        break;
-        case GLFW_KEY_HOME      : app.tbb.camHome;                                        break;
+        case GLFW_KEY_HOME      : (*app).camHome;                                       break;
         case GLFW_KEY_KP_ENTER  : if( mod == GLFW_MOD_ALT ) window.toggleFullscreen;    break;
-        case GLFW_KEY_F1        : app.draw_gui ^= 1 ; (*app).createResizedCommands;       break;
-        case GLFW_KEY_F5        : if( app.isPlaying ) app.simPause; else app.simPlay;      break;
-        case GLFW_KEY_F6        : app.simStep;                                           break;
-        case GLFW_KEY_F7        : app.simReset;                                          break;
-        case GLFW_KEY_F8        : (*app).resetParticleBuffer;                            break;
-        case GLFW_KEY_F9        : app.draw_particles ^= 1; (*app).createResizedCommands;  break;
-        case GLFW_KEY_F12       : app.draw_display ^= 1; (*app).createResizedCommands;    break;
+        case GLFW_KEY_F1        : app.draw_gui ^= 1 ; (*app).createResizedCommands;     break;
+        case GLFW_KEY_F5        : if( app.isPlaying ) app.simPause; else app.simPlay;   break;
+        case GLFW_KEY_F6        : app.simStep;                                          break;
+        case GLFW_KEY_F7        : app.simReset;                                         break;
+        case GLFW_KEY_F8        : (*app).resetParticleBuffer;                           break;
+        case GLFW_KEY_F9        : app.draw_particles ^= 1; (*app).createResizedCommands;break;
+        case GLFW_KEY_F12       : app.draw_display ^= 1; (*app).createResizedCommands;  break;
         default                 :                                                       break;
     }
 }
@@ -175,8 +175,9 @@ bool fb_fullscreen = false;                 // keep track if we are in fullscree
 int win_x, win_y, win_w, win_h;             // remember position and size of window when switching to fullscreen mode
 
 // set camera back to its initial state
-void camHome( ref TrackballButton tb ) nothrow @nogc {
-    tb.lookAt( home_pos_x, home_pos_y, home_pos_z, home_trg_x, home_trg_y, home_trg_z );
+void camHome( ref VDrive_State app ) nothrow @nogc {
+    app.tbb.lookAt( home_pos_x, home_pos_y, home_pos_z, home_trg_x, home_trg_y, home_trg_z );
+    app.updateWVPM;
 }
 
 // toggle fullscreen state of window
