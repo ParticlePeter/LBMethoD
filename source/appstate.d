@@ -169,8 +169,8 @@ struct VDrive_State {
     nothrow:
 
     // return window width and height stored in Meta_Swapchain struct
-    auto windowWidth()  { return swapchain.imageExtent.width;  }
-    auto windowHeight() { return swapchain.imageExtent.height; }
+    auto windowWidth()  @nogc { return swapchain.imageExtent.width;  }
+    auto windowHeight() @nogc { return swapchain.imageExtent.height; }
 
 
     //
@@ -229,20 +229,20 @@ struct VDrive_State {
     //
 
     // update world view projection matrix UBO
-    void updateWVPM() {
+    void updateWVPM() @nogc {
         xform_ubo.wvpm = projection * tbb.worldTransform;
         xform_ubo.eyep = tbb.eye;
         vk.device.vkFlushMappedMemoryRanges( 1, & xform_ubo_flush );
     }
 
     // update LBM compute UBO
-    void updateComputeUBO() {
+    void updateComputeUBO() @nogc {
         // data will be updated elsewhere
         vk.device.vkFlushMappedMemoryRanges( 1, & sim.compute_ubo_flush );
     }
 
     // update display UBO of velocity and density data
-    void updateDisplayUBO() {
+    void updateDisplayUBO() @nogc {
         // data will be updated elsewhere
         vk.device.vkFlushMappedMemoryRanges( 1, & vis.display_ubo_flush );
     }
@@ -254,8 +254,8 @@ struct VDrive_State {
     /// Params:
     ///     app = reference to this modules VDrive_State struct
     ///     dim = the current dimensions
-    /// Returns: scale factor for the plane or box, in the fomer case result[2] should be ignored
-    float[3] simDisplayScale( int dim ) {
+    /// Returns: scale factor for the plane or box, in the former case result[2] should be ignored
+    float[3] simDisplayScale( int dim ) @nogc {
         float scale =  sim.domain[0] < sim.domain[1] ?  sim.domain[0] : sim.domain[1];
         if( dim > 2 && sim.domain[2] < sim.domain[0] && sim.domain[2] < sim.domain[1] )
             scale = sim.domain[2];
@@ -282,7 +282,7 @@ struct VDrive_State {
         try {
             //swapchain.create_info.imageExtent  = VkExtent2D( win_w, win_h );  // Set the desired swapchain extent, this might change at swapchain creation
             import resources : resizeRenderResources;
-            this.resizeRenderResources;   // destroy old and recreate window size dependant resources
+            this.resizeRenderResources;   // destroy old and recreate window size dependent resources
 
         } catch( Exception ) {}
     }
@@ -367,7 +367,7 @@ struct VDrive_State {
     // draw the simulation display and step ahead in the simulation itself (if in play or profile mode)
     void drawSim() @system {
 
-        // sellect and draw command buffers
+        // select and draw command buffers
         VkCommandBuffer[2] cmd_buffers = [ cmd_buffers[ next_image_index ], sim.cmd_buffers[ sim.ping_pong ]];
         submit_info.pCommandBuffers = cmd_buffers.ptr;
         graphics_queue.vkQueueSubmit( 1, & submit_info, submit_fence[ next_image_index ] );   // or VK_NULL_HANDLE, fence is only required if syncing to CPU for e.g. UBO updates per frame
@@ -376,7 +376,7 @@ struct VDrive_State {
         present_info.pImageIndices = & next_image_index;
         swapchain.present_queue.vkQueuePresentKHR( & present_info );
 
-        // edit semaphore attachement
+        // edit semaphore attachment
         submit_info.pWaitSemaphores     = & acquired_semaphore[ next_image_index ];
         submit_info.pSignalSemaphores   = & rendered_semaphore[ next_image_index ];
         present_info.pWaitSemaphores    = & rendered_semaphore[ next_image_index ];
