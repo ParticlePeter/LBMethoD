@@ -105,8 +105,11 @@ extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) no
             case 4  : app.tbb.dolly( x, y ); app.updateWVPM; break;
             default : break;
         }
-    } else {
+    } 
+
+    else if( app.tbb.button > 0 ) {
         // apply force on plane at mouse click location
+        import simulate : mouseForce;
         app.mouseForce;
     }
 }
@@ -123,10 +126,14 @@ extern( C ) void mouseButtonCallback( GLFWwindow * window, int button, int val, 
         default : app.tbb.button  = 0;
     }
 
-    if( app.tbb.button == 0 ) return;
+    // trigger always as the button code corresponds to the force type, null being none
+    import simulate : mouseForceReference;
+    app.mouseForceReference;
 
     // set trackball reference if any mouse button is pressed
-    app.tbb.reference( app.mouse.pos_x, app.mouse.pos_y );
+    if( app.tbb.button != 0 ) {
+        app.tbb.reference( app.mouse.pos_x, app.mouse.pos_y );
+    }
 }
 
 

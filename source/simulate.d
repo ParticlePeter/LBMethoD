@@ -50,8 +50,40 @@ struct VDrive_Simulate_State {
     enum Collision      : uint32_t {SRT, TRT, MRT, CSC, CSC_DRAG };
     Collision           collision           = Collision.CSC_DRAG;
     uint32_t            index               = 0;
+
+    // mouse force reference parameter
+    float[2] force_reference;
 }
 
+
+// compute mouse force and update compute UBO
+private auto planeHit( VDrive_State* app, float x, float y ) nothrow @nogc {
+    import dlsl.vector, dlsl.matrix, std.math : tan;
+    float   half_res_y = 2.0f / ( app.windowHeight - 1 );
+    float   top = tan( app.projection_fovy * 0.00872664625997164788461845384244 /* PI / 360.0 */ );
+    auto    mat = ( mat3( app.tbb.worldTransform )).transpose;
+    auto    dir = ( 
+                mat[2]
+                + top * mat[1] * (                     1 - half_res_y * app.mouse.pos_y )
+                - top * mat[0] * ( app.projection_aspect - half_res_y * app.mouse.pos_x ) 
+                ).normalize;
+    auto    eye = app.tbb.eye;
+    return  ( eye.xy - eye.z / dir.z * dir.xy ).data;
+}
+
+// compute mouse force from current hit on plane and previous, used with mouse click-drag event
+void mouseForce( VDrive_State* app ) nothrow @nogc {
+    app.sim.compute_ubo.mouse_xy = app.planeHit( app.mouse.vel_x, app.mouse.vel_y );
+    app.sim.compute_ubo.force_xy = app.sim.compute_ubo.mouse_xy[] - app.sim.force_reference[];
+    app.sim.force_reference = app.sim.compute_ubo.mouse_xy;
+}
+
+// set reference on plane for force computation, used with mouse click event
+void mouseForceReference( VDrive_State* app ) nothrow @nogc {
+    app.sim.compute_ubo.force_xy[] = 0;
+    app.sim.force_reference = app.sim.compute_ubo.mouse_xy = app.planeHit( app.mouse.vel_x, app.mouse.vel_y );
+    app.sim.compute_ubo.force_type = app.tbb.button;
+}
 
 
 //////////////////////////////////////////
