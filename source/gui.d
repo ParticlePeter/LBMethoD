@@ -832,47 +832,13 @@ struct VDrive_Gui_State {
                     updateViscosity;
                     updateComputeUBO;
                 }
-                if( ImGui.Selectable( "Low Viscosity" )) {
-                    sim_wall_velocity = 0.005;
-                    updateWallVelocity;
-                    sim.compute_ubo.wall_thickness = 3;
-                    sim_relaxation_rate = 0.504;
-                    sim.compute_ubo.collision_frequency = 1 / sim_relaxation_rate;
-                    updateViscosity;
-                    updateComputeUBO;
-                    if( sim.collision != VDrive_Simulate_State.Collision.CSC_DRAG ) {
-                        sim.collision  = VDrive_Simulate_State.Collision.CSC_DRAG;
-                        this.createBoltzmannPSO( false, true, false );
-                    }
-                }
-                if( ImGui.Selectable( "Looow Viscosity" )) {
-                    sim_wall_velocity = 0.001;
-                    updateWallVelocity;
-                    sim.compute_ubo.wall_thickness = 3;
-                    sim_relaxation_rate = 0.5001;
-                    sim.compute_ubo.collision_frequency = 1 / sim_relaxation_rate;
-                    updateViscosity;
-                    updateComputeUBO;
-                    if( sim.collision != VDrive_Simulate_State.Collision.CSC_DRAG ) {
-                        sim.collision  = VDrive_Simulate_State.Collision.CSC_DRAG;
-                        this.createBoltzmannPSO( false, true, false );
-                    }
-                }/*
-                if( ImGui.Selectable( "Crazy Cascades" )) {
-                    sim_wall_velocity = 0.5;
-                    updateWallVelocity;
-                    sim.compute_ubo.wall_thickness = 3;
-                    sim.compute_ubo.collision_frequency = 0.8;
-                    sim_relaxation_rate = 1.25;
-                    updateViscosity;
-                    updateComputeUBO;
-                    if( sim.collision != VDrive_Simulate_State.Collision.CSC_DRAG ) {
-                        sim.collision  = VDrive_Simulate_State.Collision.CSC_DRAG;
-                        this.createBoltzmannPSO( false, true, false );
-                    }
-                    // set resolution to 1024 * 1024
 
-                }*/ ImGui.EndPopup();
+                if( ImGui.Selectable( "Low Viscosity" ))        lowSimSettings( 0.005,  0.504   ); 
+                if( ImGui.Selectable( "Looow Viscosity" ))      lowSimSettings( 0.001,  0.5001  );
+                if( ImGui.Selectable( "Zero Visco-Velocity" ))  lowSimSettings( 0.0,    0.5     );
+                //if( ImGui.Selectable( "Crazy Cascades" ))     lowSimSettings( 0.5,    0.8     );  // set resolution to 1024 * 1024
+
+                ImGui.EndPopup();
             }
 
             ImGui.Separator;
@@ -1600,6 +1566,20 @@ struct VDrive_Gui_State {
     void updateViscosity() {
         //sim_viscosity = sim.speed_of_sound * sim.speed_of_sound * ( sim_relaxation_rate / sim.unit_temporal - 0.5 );
         sim_viscosity = 1.0 / 6 * ( 2 * sim_relaxation_rate - 1 );
+    }
+
+    void lowSimSettings( float wall_velocity, float relaxation_rate ) {
+        sim_wall_velocity = wall_velocity;
+        updateWallVelocity;
+        sim.compute_ubo.wall_thickness = 3;
+        sim_relaxation_rate = relaxation_rate;
+        sim.compute_ubo.collision_frequency = 1 / sim_relaxation_rate;
+        updateViscosity;
+        updateComputeUBO;
+        if( sim.collision != VDrive_Simulate_State.Collision.CSC_DRAG ) {
+            sim.collision  = VDrive_Simulate_State.Collision.CSC_DRAG;
+            this.createBoltzmannPSO( false, true, false );
+        }
     }
 
     void pushButtonStyleDisable() {
