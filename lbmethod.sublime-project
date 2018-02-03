@@ -214,6 +214,24 @@
 				"Debug",
 				"Release"
 			],
+			"name": "gl3n",
+			"path": "E:\\Code\\DLang\\Github\\GL3N\\gl3n"
+		},
+		{
+			"file_exclude_patterns":
+			[
+				"*.exe",
+				"*.exe_cv",
+				"*.visualdproj",
+				"*.lnk"
+			],
+			"folder_exclude_patterns":
+			[
+				".dub",
+				"lib",
+				"Debug",
+				"Release"
+			],
 			"name": "dlsl",
 			"path": "E:\\Code\\DLang\\projects\\DLSL\\source\\dlsl"
 		},
