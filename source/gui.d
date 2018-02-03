@@ -430,8 +430,6 @@ struct VDrive_Gui_State {
             ImGui.Text( "Refresh minimum %.3f ms/frame (%.1f FPS)", 1000.0f / minFramerate, minFramerate );
             ImGui.Text( "Refresh maximum %.3f ms/frame (%.1f FPS)", 1000.0f / maxFramerate, maxFramerate );
             ImGui.Separator;
-            ImGui.DragFloat3( "Mouse Plane Hit", app.hit.ptr );
-            ImGui.Separator;
         }
 
 
