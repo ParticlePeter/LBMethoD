@@ -37,7 +37,6 @@ int main() {
     auto vkResult = app.initVulkan( 1600, 900 );    // initialize instance and (physical) device
     if( vkResult ) return vkResult;                 // exit if initialization failed, VK_SUCCESS = 0
 
-    app.initTrackball;                              // initialize trackball with window size and default perspective projection data in VDrive State
     app.registerCallbacks;                          // register glfw callback functions 
     app.createCommandObjects;                       // create command pool and sync primitives
     app.createMemoryObjects;                        // create memory objects once used through out program lifetime
@@ -45,6 +44,7 @@ int main() {
     app.createRenderResources;                      // configure swapchain, create renderpass and pipeline state object
     app.resizeRenderResources;                      // construct swapchain, create depth buffer and frambuffers
     app.setDefaultSimFuncs;                         // set default sim funcs, these can be overridden with gui commands
+    app.initTrackball;                              // initialize trackball with window size and default perspective projection data in VDrive State
 
     // branch once more dependent on gui usage
     static if( !USE_GUI ) {
