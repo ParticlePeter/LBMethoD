@@ -1,372 +1,148 @@
 {
-	"folders":
-	[
+	"folders": [
 		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release"
-			],
-			"name": "vulkan docs",
-			"path": "E:\\Code\\Vulkan\\Vulkan-Docs\\src"
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release"
-			],
-			"name": "lbm_gpu_cpp",
-			"path": "E:\\Uni\\___Master\\Code\\lbm_gpu_cpp\\source"
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk",
-				"*.opendb",
-				"*.sln",
-				"*.vcx*"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release",
-				".vs"
-			],
-			"name": "imgui",
-			"path": "E:\\Code\\Lib_CPP\\imgui"
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk",
-				"*.opendb",
-				"*.sln",
-				"*.vcx*"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release",
-				".vs"
-			],
-			"name": "imgui_lib",
-			"path": "E:\\Code\\Lib_CPP\\imgui_lib"
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release"
-			],
-			"name": "DLSL",
-			"path": "E:\\Code\\DLang\\projects\\DLSL"
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release"
-			],
-			"name": "ErupteD",
-			"path": "E:\\Code\\Vulkan\\ErupteD"
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release",
-				"source",
-				"example"
-			],
-			"name": "V-Drive",
-			"path": "E:\\Code\\Vulkan\\V-Drive"
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk",
-				"*.spv"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release",
-				"source"
-			],
-			"name": "V-Drive-Develop",
-			"path": "E:\\Code\\Vulkan\\V-Drive-Develop"
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk",
-				"*.spv"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release",
-				"source",
-				"shader"
-			],
-			"name": "Engine LBM",
-			"path": "E:\\Code\\DLang\\engineProjectsDSA\\lbm"
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.spv",
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release",
-				"source",
-				"shader"
-			],
-			"name": "LBMethoD",
-			"path": "."
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release"
-			],
-			"name": "gl3n",
-			"path": "E:\\Code\\DLang\\Github\\GL3N\\gl3n"
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release"
-			],
-			"name": "dlsl",
-			"path": "E:\\Code\\DLang\\projects\\DLSL\\source\\dlsl"
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release"
-			],
-			"name": "erupted",
-			"path": "E:\\Code\\Vulkan\\ErupteD\\source\\erupted"
-		},
-		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release"
-			],
 			"name": "vdrive",
-			"path": "E:\\Code\\Vulkan\\V-Drive\\source\\vdrive"
+			"path": "E:/Code/Vulkan/V-Drive/source/vdrive",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
 		},
 		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk",
-				"*.spv"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release",
-				"imgui"
-			],
+			"name": "dlang source",
+			"path": "D:/Code/DLang/dmd2/src",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "vulkan docs",
+			"path": "E:/Code/Vulkan/Vulkan-Docs",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "lbm_gpu_cpp",
+			"path": "E:/Uni/___Master/Code/lbm_gpu_cpp/source",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "imgui",
+			"path": "E:/Code/Lib_CPP/imgui",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.opendb", "*.sln", "*.vcx*" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release", ".vs" ]
+		},
+		{
+			"name": "imgui_lib",
+			"path": "E:/Code/Lib_CPP/imgui_lib",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.opendb", "*.sln", "*.vcx*" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release", ".vs" ]
+		},
+		{
+			"name": "DLSL",
+			"path": "E:/Code/DLang/projects/DLSL",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ "source", ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "ErupteD",
+			"path": "E:/Code/Vulkan/ErupteD",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ "source", ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "ErupteD-V2",
+			"path": "E:/Code/Vulkan/ErupteD-V2",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ "source", ".dub", "lib", "Debug", "Release", "V-Erupt" ]
+		},
+		{
+			"name": "V-Erupt",
+			"path": "E:/Code/Vulkan/ErupteD-V2/V-Erupt",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ "source", ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "V-Drive",
+			"path": "E:/Code/Vulkan/V-Drive",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ "source", ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "V-Drive-Develop",
+			"path": "E:/Code/Vulkan/V-Drive-Develop",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
+			"folder_exclude_patterns": [ "source", ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "Engine LBM",
+			"path": "E:/Code/DLang/engineProjectsDSA/lbm",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release", "source", "shader" ]
+		},
+		{
+			"name": "LBMethoD",
+			"path": ".",
+			"file_exclude_patterns": [ "*.spv", "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ "source", "shader", ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "gl3n",
+			"path": "E:/Code/DLang/Github/GL3N/gl3n",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "dlsl",
+			"path": "E:/Code/DLang/projects/DLSL/source/dlsl",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "erupted",
+			"path": "E:/Code/Vulkan/ErupteD/source/erupted",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "erupted_v2",
+			"path": "E:/Code/Vulkan/ErupteD-V2/source/erupted",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
+		},
+		{
+			"name": "vdrive",
+			"path": "E:/Code/Vulkan/V-Drive/source/vdrive",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
+		},
+		{
 			"name": "vd develop",
-			"path": "E:\\Code\\Vulkan\\V-Drive-Develop\\source"
+			"path": "E:/Code/Vulkan/V-Drive-Develop/source",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release", "imgui" ]
 		},
 		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk",
-				"*.spv"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release"
-			],
 			"name": "vd example",
-			"path": "E:\\Code\\Vulkan\\V-Drive\\example"
+			"path": "E:/Code/Vulkan/V-Drive/example",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
 		},
 		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk",
-				"*.spv"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release"
-			],
 			"name": "elbm shader",
-			"path": "E:\\Code\\DLang\\engineProjectsDSA\\lbm\\shader"
+			"path": "E:/Code/DLang/engineProjectsDSA/lbm/shader",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
 		},
 		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk",
-				"*.spv"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release"
-			],
 			"name": "lbmd shader",
-			"path": "shader"
+			"path": "shader",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.spv" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
 		},
 		{
-			"file_exclude_patterns":
-			[
-				"*.exe",
-				"*.exe_cv",
-				"*.visualdproj",
-				"*.lnk",
-				"*.deps",
-				"*.dbuildstat"
-			],
-			"folder_exclude_patterns":
-			[
-				".dub",
-				"lib",
-				"Debug",
-				"Release"
-			],
 			"name": "lbmd",
-			"path": "source"
+			"path": "source",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.deps", "*.dbuildstat" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release" ]
 		}
 	],
 	"settings":
