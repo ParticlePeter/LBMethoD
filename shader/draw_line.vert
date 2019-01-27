@@ -49,13 +49,14 @@ layout( location = 0 ) out vec4 vs_color;
 
 
 // specialization constants for init or loop phase
-#define DISPLAY_VELOCITY    0
+#define DISPLAY_VEL_CURVES  0
 #define DISPLAY_VEL_BASE    1
 #define DISPLAY_AXIS        2
 #define DISPLAY_GRID        3
 #define DISPLAY_BOUNDS      4
 #define DISPLAY_GHIA        5
 #define DISPLAY_POISEUILLE  6
+#define DISPLAY_VELOCITY    7
 
 
 const float[2][17] ghia_idx = {
@@ -80,7 +81,7 @@ const float[2][7][17] ghia_uv = {
     },
 
     {
-        
+
         { 0, -0.05906, -0.07391, -0.08864, -0.10313, -0.16914, -0.22445, -0.24533,  0.05454,  0.17527,  0.17507,  0.16077,  0.12317,  0.10890,  0.10091,  0.09233, 0 },
         { 0, -0.12146, -0.15663, -0.19254, -0.22847, -0.23827, -0.44993, -0.38598,  0.05188,  0.30174,  0.30203,  0.28124,  0.22965,  0.20920,  0.19713,  0.18360, 0 },
         { 0, -0.21388, -0.27669, -0.33714, -0.39188, -0.51550, -0.42665, -0.31966,  0.02526,  0.32235,  0.33075,  0.37095,  0.32627,  0.30353,  0.29012,  0.27485, 0 },
@@ -91,7 +92,7 @@ const float[2][7][17] ghia_uv = {
     }
 };
 
-//layout( constant_id = 0 ) const uint DISPLAY_TYPE = DISPLAY_VELOCITY;
+//layout( constant_id = 0 ) const uint DISPLAY_TYPE = DISPLAY_VEL_CURVES
 uint DISPLAY_TYPE = pc.line_type___line_axis___repl_axis___velocity_axis & 0xff;
 uint LA = ( pc.line_type___line_axis___repl_axis___velocity_axis >>  8 ) & 0xff;
 uint RA = ( pc.line_type___line_axis___repl_axis___velocity_axis >> 16 ) & 0xff;
@@ -105,9 +106,11 @@ uint VA = ( pc.line_type___line_axis___repl_axis___velocity_axis >> 24 ) & 0xff;
 #define VI gl_VertexIndex
 #define II gl_InstanceIndex
 
-#define DI imageSize( vel_rho_img )
-
 #define SD pc.sim_domain
+
+#define D textureSize( vel_rho_tex, 0 )
+
+
 
 
 
@@ -123,12 +126,14 @@ void main() {
     vec4 pos = vec4( 0, 0, 0, 1 );
 
     switch( DISPLAY_TYPE ) {
-    case DISPLAY_VELOCITY :
+
+
+    case DISPLAY_VEL_CURVES :
         vs_color = vec4( 1, 1, 0, 1 );
         pos[ LA ] += 0.5 + VI;
     //  pos[ LA ] += 0.5 + vel_idx[ LA ][ min( VI, 16 ) ];
         pos[ RA ] += 0.5 + II * pc.repl_spread + pc.line_offset;
-        pos[ VA ] += texture( vel_rho_tex, pos.xyz )[ VA ] * pc.sim_domain[ LA ] * vec3( 1, -1, 1 )[ VA ];  // latter param is fixing 
+        pos[ VA ] += texture( vel_rho_tex, pos.xyz )[ VA ] * pc.sim_domain[ LA ] * vec3( 1, -1, 1 )[ VA ];  // latter param is fixing
         break;
 
 
@@ -136,22 +141,36 @@ void main() {
         vs_color = vec4( 0.375 );
         pos[ LA ] += 0.5 + VI;
         pos[ RA ] += 0.5 + II * pc.repl_spread + pc.line_offset;
-        //pos[ VA ] += texture( vel_rho_tex, pos.xyz )[ VA ] * pc.sim_domain[ VA ] * vec3( 1, -1, 1 )[ VA ];  // latter param is fixing 
         break;
 
 
     case DISPLAY_AXIS :
-        const vec4[3] colors = { vec4( 1, 0, 0, 1 ), vec4( 0, 1, 0, 1 ), vec4( 0, 0, 1, 1 ) };
-        vs_color = colors[ II ];
-        pos = vec4( VI * vs_color.rgb, 1 );
+        pos[ II ] = 1;
+        vs_color = pos;
+        pos.xyz *= VI;
         break;
 
 
     case DISPLAY_GRID :
         vs_color = vec4( 0.25 );
-        //vs_color = vec3( 1, 0, 0 );
         pos[ LA ] = float( II );
         pos[ 1 - LA ] = float( VI * SD[ 1 - LA ] );
+        break;
+
+
+    case DISPLAY_BOUNDS :
+        vs_color = vec4( 0.5 );
+
+        int II_and_1 = II & 1;                      // 1. bit set ? 1 : 0
+        int II_and_2 = II & 2;                      // 2. bit set ? 2 : 0
+        int II_and_2_rshift_1 = II_and_2 >> 1;      // 2. bit set ? 1 : 0
+        int II_and_4_rshift_2 = ( II & 4 ) >> 2;    // 3. bit set ? 1 : 0
+
+        pos.rgb = vec3( II_and_1, II_and_2_rshift_1, II >> 3 );                                     // x and y are produced by the first two bits [0..4), z by the 4th bit [8..12)
+        pos[ II_and_1 ^ II_and_2_rshift_1 ] += VI * ( 1 - II_and_2 ) * ( 1 - II_and_4_rshift_2 );   // VI is added to x or y when the second bit is 0 and subtracted when it is 1
+        pos.z += VI * II_and_4_rshift_2;                                                            // VI is added to z when the 3rd bit is 1 [4..8) producing lines in z-direction
+
+        pos.xyz *= pc.sim_domain;
         break;
 
 
@@ -171,8 +190,23 @@ void main() {
         float H_2 = 0.25 * pc.sim_domain[ LA ] * pc.sim_domain[ LA ];
         pos[ VA ] -= 1.5 * wall_velocity / H_2 * ( Y_1 * Y_1 - H_2 ) * pc.sim_domain[ LA ] / 3; // 2.84;
         break;
-    }
 
+
+
+    case DISPLAY_VELOCITY :
+        vs_color = 5 * vec4( 0, 0.1, 0.2, 1 );
+        const int LI = VI >> 1;
+        const int X = (  LI % D.x );
+        const int Y = (( LI / D.x ) % D.y  );
+        const int Z = (  LI / ( D.x * D.y ));
+        pos.xyz  = 0.5 + vec3( X, Y, Z );
+        if(( gl_VertexIndex & 1 ) > 0 ) {
+            pos.xyz += 5 * texelFetch( vel_rho_tex, ivec3( X, Y, Z ), 0 ).xyz;
+            //vs_color.rgb *= 4;
+        }
+
+        break;
+    }
 
     gl_Position = WVPM * pos;
 }
