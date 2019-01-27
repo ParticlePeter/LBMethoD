@@ -46,7 +46,7 @@ vec3 colorRamp( float t ) {
     t *= ( ramp.length() - 1 );
     ivec2 i = ivec2( floor( min( vec2( t, t + 1 ), vec2( ramp.length() - 1 ))));
     float f = fract( t );
-    return mix( ramp[ i.x ], ramp[ i.y], f );
+    return mix( ramp[ i.x ], ramp[ i.y ], f );
 }
 
 

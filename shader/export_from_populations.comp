@@ -83,7 +83,7 @@ const int[9]  inv = {   0, 3, 4, 1, 2, 7, 8, 5, 6 };
 #define I int( UI )
 
 // derived total count of nodes
-int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
+int cell_count = int( gl_NumWorkGroups.x * gl_WorkGroupSize.x );
 
 
 
