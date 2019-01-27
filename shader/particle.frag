@@ -8,5 +8,7 @@ void main() {
     // round particle appereance through discarding fragments
     float dist = 1 - smoothstep( 0.4, 0.5, length( gl_PointCoord.st - 0.5 ));
     if ( dist < 0.01 ) discard;
-    fs_color = vs_color;
+    fs_color = dist * vs_color;
+
+    //fs_color = vs_color;
 }
