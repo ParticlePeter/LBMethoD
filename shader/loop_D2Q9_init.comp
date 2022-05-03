@@ -1,0 +1,152 @@
+// --- COMP ---
+#version 450 core
+
+// uniform buffer
+layout( std140, binding = 5 ) uniform Compute_UBO {
+    float   omega;            // collision frequency
+    float   wall_velocity;
+    int     wall_thickness;
+    int     comp_index;
+    vec2    mouse_xy;
+    vec2    force_xy;
+    int     force_type;
+    int     slide_axis_x;
+    int     slide_axis_y;
+    int     slide_axis_z;
+    int     slide_axis_i;
+};
+
+// specialization constants for local work group size
+layout( local_size_x_id = 0 ) in;
+//layout( local_size_y_id = 1 ) in;
+//layout( local_size_z_id = 2 ) in;
+
+// local work group defaults, when constants are not defined
+layout( local_size_x = 256 ) in;
+layout( local_size_y =   1 ) in;
+layout( local_size_z =   1 ) in;
+
+// populations 1 single buffered rest velocity, 8 double buffered link velocities
+layout( binding = 2, r32f  ) uniform restrict imageBuffer popul_buffer;
+
+// velocity and density write target, will be rendered as texture in next pass
+layout( binding = 3, rgba32f /*rgba16f*/ ) uniform restrict writeonly image2DArray vel_rho_img;
+
+
+// population indexes
+// 6 2 5 //
+//  \|/  //
+// 3-0-1 //
+//  /|\  //
+// 7 4 8 //
+
+
+// Directions:          R       E       N       W       S       NE      NW      SW      SE
+const float[9] pw = {   4.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/36, 1.0/36, 1.0/36, 1.0/36 };
+
+
+////////////////////////////////////////////////////////
+// Common Indexes and Counts for VkImage and VkBuffer //
+////////////////////////////////////////////////////////
+
+// shortcut to imageSize, the Domain of the computation, same as Global Size
+//#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
+#define D imageSize( vel_rho_img )
+
+// define global equivalent for gl_LocalInvocationIndex
+#define UI gl_GlobalInvocationID.x
+
+// U and I are also the index velocity population index
+#define I int( UI )
+
+#define X ( I % D.x )
+#define Y ( I / D.x )
+#define Z ( I / ( D.x * D.y ))
+
+// derived total count of nodes
+int cell_count = int( gl_NumWorkGroups.x * gl_WorkGroupSize.x );
+
+
+// main simulation function
+void main( void ) {
+
+    ivec4 sa = ivec4( slide_axis_x, slide_axis_y, slide_axis_z, slide_axis_i );
+    float w = (( X == sa.x ) && ( Y == sa.y )) ? 1 : 0.1;
+    //float w = (( I == slide_axis_i )) ? 1 : 0.1;
+
+    //uvec3 sa = uvec3( slide_axis_x, slide_axis_y, slide_axis_z );
+    //float w = GII == sa ? 1 : 0.1;
+
+    // Init velocities and densities
+    imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( 0, 0, 0, w ));
+
+    /*
+    // init all distribution f(unctions) with equilibrium, p = population
+    for( int p = 0; p < 9; ++p )  {
+        imageStore( popul_buffer, p * cell_count + I, vec4( pw[ p ] ));
+        if( p > 0 ) imageStore( popul_buffer, ( p + 8 ) * cell_count + I, vec4( pw[ p ] ));
+    }
+    */
+}   // main
+
+
+
+
+
+/////////////////////////////////////////
+// Indexes and Counts if using VkImage //
+/////////////////////////////////////////
+/*
+// indexes velocity and density
+#define UX gl_GlobalInvocationID.x
+#define UY gl_GlobalInvocationID.y
+#define UZ gl_GlobalInvocationID.z
+
+#define X int( UX )
+#define Y int( UY )
+#define Z int( UZ )
+
+// buffer offsets corresponding streaming ( in 2D so far )
+int[9] buffer_offset = { 0, 1, -D.x, -1, D.x, 1 - D.x, -1 - D.x, -1 + D.x, 1 + D.x };
+
+// stream function if not near boundary
+void stream( int p, float f ) {
+    int i = ( I + buffer_offset[ p ] + cell_count ) % cell_count;
+    imageStore( popul_buf[ pong + p ], i, vec4( f ));
+}
+
+// bounce function if next to boundary and velocity is pointing towards it
+void bounce( int p, float f ) {
+    imageStore( popul_buf[ pong + inv[ p ] ], I, vec4( f ));
+}
+*/
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// alternative access method using multi dim local work group size, currently not working properly //
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/*
+// shortcut to imageSize, the Domain of the computation, same as Global Size
+#define Domain ivec3( gl_WorkGroupSize * gl_NumWorkGroups )
+#define D ( Domain )
+//#define D imageSize( vel_rho_img )
+
+#define GID ivec3( gl_GlobalInvocationID )
+// define gl_WorkGroupIndex equivalent to gl_LocalInvocationIndex
+// this is confirmed on CPU, where is the crux ???
+uint work_group_index =
+    gl_WorkGroupID.z * gl_NumWorkGroups.z * gl_NumWorkGroups.y +
+    gl_WorkGroupID.y * gl_NumWorkGroups.x +
+    gl_WorkGroupID.x;
+
+// define linearization of the whole domain
+int I = int(
+    gl_WorkGroupSize.z *
+    gl_WorkGroupSize.y *
+    gl_WorkGroupSize.x * work_group_index + gl_LocalInvocationIndex );
+
+
+#define X int( GID.x )
+#define Y int( GID.y )
+#define Z ( I / ( D.x * D.y ))
+*/
