@@ -7,26 +7,35 @@ copyright           "Copyright (c) 2017 Peter Particle"
 authors             "Peter Particle"
 license             "MIT"
 
-dependency          "derelict-glfw3"    version = "~>3.1"
-//dependency          "dlsl"              version = "~>0.1"
-//dependency          "erupted"           version = "~>2.0"
+dependency			"bindbc-glfw"		version="~>1.0.0"
+subConfiguration	"bindbc-glfw"		"dynamicBC"
+versions			"GLFW_33"
+
+dependency          "dlsl"              path    = "../../DLang/projects/DLSL"
 dependency          "erupted"        	path    = "../ErupteD"
-//dependency          "erupted_v2"        path    = "../ErupteD-V2"
 dependency          "vdrive"            path    = "../V-Drive"
 dependency          "imgui_lib"         path    = "../../Lib_CPP/imgui_lib"
-dependency          "dlsl"              path    = "../../DLang/projects/DLSL"
 
-libs                "../../Lib_CPP/imgui_lib/project/Release/imgui"     // this should not be required or should simply be "imgui"
+//dependency     	"dlsl"              version = "~>0.1"
+//dependency     	"erupted"           version = "~>2.0"
+
+//libs                "../../Lib_CPP/imgui_lib/project/Release/imgui"     // this should not be required or should simply be "imgui"
+libs                "../../Lib_CPP/imgui_lib/lib v1.50 WIP/imgui"     // this should not be required or should simply be "imgui"
 
 //buildOptions      "profile"
 //buildOptions      "profileGC"
 //dub build --build=release --arch=x86_64
 
-lflags "/NODEFAULTLIB:LIBVCRUNTIME"
+
+//lflags "/NODEFAULTLIB:LIBVCRUNTIME"
+lflags "/LTCG" "/NODEFAULTLIB:LIBCMT" "/NODEFAULTLIB:LIBVCRUNTIME"
 
 buildRequirements   "allowWarnings"
 
 buildType "release-noinline" {
     buildOptions "releaseMode" "optimize" "noBoundsCheck"
 }
+
+//buildOptions "verbose"
+//buildOptions "betterC"
 

@@ -3,7 +3,7 @@ LINK : fatal error LNK1104: cannot open file 'phobos64.lib'
 
 imgui.lib linker errors
  -> drag and drop imgui.lib onto lbmdmethod project folder
- Path and the lib can and should be removed from VisualD linker settings 
+ Path and the lib can and should be removed from VisualD linker settings
 
 MSIL .netmodule or module compiled with /GL found; restarting link with /LTCG;
 add /LTCG to the link command line to improve linker performance
@@ -12,3 +12,5 @@ fatal error C1905: Front end and back end not compatible (must target same proce
  compile optimization \GL and link time code generation \LTCG
  use E:\Code\Lib_CPP\imgui_lib\project\Debug_NoGL_NoLTGC\imgui.lib
  recompile with settings above if out of date
+
+If debugging and trying to cast an address to a structure, use the full module path
