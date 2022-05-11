@@ -7,3 +7,7 @@ dub.selections.json
 .vs/
 ensight/
 backup/
+*.exe
+*.zip
+lib/
+*.jpg
