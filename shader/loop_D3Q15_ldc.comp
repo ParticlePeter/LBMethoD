@@ -13,6 +13,12 @@ layout( std140, binding = 5 ) uniform Compute_UBO {
     float   wall_velocity;
     int     wall_thickness;
     int     comp_index;
+    vec2    mouse_xy;
+    vec2    force_xy;
+    int     force_type;
+    int     slide_axis_x;
+    int     slide_axis_y;
+    int     slide_axis_z;
 };
 
 // specialization constants for local work group size
@@ -59,14 +65,6 @@ const float[15] pw = {  2.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  
 // Common Indexes and Counts for VkImage and VkBuffer //
 ////////////////////////////////////////////////////////
 
-// shortcut to imageSize, the Domain of the computation, same as Global Size
-//#define D imageSize( vel_rho_img )
-#define D ivec3( gl_NumWorkGroups * gl_WorkGroupSize )
-
-//////////////////////////////////////////
-// Indexes and Counts if using VkBuffer //
-//////////////////////////////////////////
-
 // We use one rest position and two times the stream populations due to double buffering
 // loading populations p with variable ping = 0 V 8 and storing with pong = 8 V 0
 // All populations are stored in one continuous float array/buffer
@@ -83,23 +81,34 @@ const float[15] pw = {  2.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  
 #define WGS gl_WorkGroupSize
 #define GII gl_GlobalInvocationID
 #define LII gl_LocalInvocationID
-#define LI gl_LocalInvocationIndex
+#define  LI gl_LocalInvocationIndex
 //#define I int(( NWG.x * NWG.y * WGI.z + NWG.x * WGI.y + WGI.x ) * WGS.x * WGS.y * WGS.z + LI )
 
-#define DIM D
-#define I int( DIM.x * DIM.y * GII.z + DIM.x * GII.y + GII.x )
+// Size of the Domain of the computation, same as imagesize
+#define D imageSize( vel_rho_img )
+#define I int( D.x * D.y * GII.z + D.x * GII.y + GII.x )
 
 // in th 3D case we must modulate Y with with D.y
-//#define X (  I % D.x )
-//#define Y (( I / D.x ) % D.y  )
-//#define Z (  I / ( D.x * D.y ))
+#define X (  I % D.x )
+#define Y (( I / D.x ) % D.y  )
+#define Z (  I / ( D.x * D.y ))
 
-// We cannot use these as they do not correspond to the X, Y, Z algorithm above and do not work correctly
-// when a multi dimensional work group size is setup. In that case all one work group is consecutive in memory
+// Deltas in 3D
+#define DX 1
+#define DY D.x
+#define DZ ( D.x * D.y )
+
+#define B0 0
+#define BX ( D.x - 1 )
+#define BY ( D.y - 1 )
+#define BZ ( D.z - 1 )
+
+// We cannot use these as they do not correspond to the X, Y, Z algorithm above and do not work correctly, when a
+// multi dimensional work group size is setup. In that case all cells of one work group is consecutive in memory
 // but we require first the whole domain in X laying consecutively
-#define X gl_GlobalInvocationID.x
-#define Y gl_GlobalInvocationID.y
-#define Z gl_GlobalInvocationID.z
+//#define X gl_GlobalInvocationID.x
+//#define Y gl_GlobalInvocationID.y
+//#define Z gl_GlobalInvocationID.z
 
 // derived total count of nodes
 int cell_count = int( NWG.x * NWG.y * NWG.z * WGS.x * WGS.y * WGS.z );
@@ -120,7 +129,7 @@ void main( void ) {
     // the count of step per draw is stored in the upper 24 bits of the ALGORITHM constant
     // only if this value is 1, pc.ping is alternating between 0 and 1
     // otherwise is greater than 1 it stores the step size of one command buffer submission
-    // hence the ping value must be computed accordingly 
+    // hence the ping value must be computed accordingly
     int ping;
     if(( ALGORITHM >> 8 ) > 1 )
         ping = 14 * (( pc.ping + comp_index ) % 2 );
@@ -129,15 +138,7 @@ void main( void ) {
     int pong = 14 -    ping;
 
 
-    // Deltas in 3D
-    #define DX 1
-    #define DY D.x
-    #define DZ ( D.x * D.y )
 
-    #define B0 0
-    #define BX ( D.x - 1 )
-    #define BY ( D.y - 1 )
-    #define BZ ( D.z - 1 )
 
     // read from the ping population p of the current cell index, while the cell index can still be offset
     #define POP(p) (( ping + p ) * cell_count + I )
@@ -180,10 +181,13 @@ void main( void ) {
 
 
 
+
+
     // compute macroscopic properties density and velocity
     float rho = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] + f[8] + f[7] + f[10] + f[11] + f[12] + f[13] + f[14];
 
     #define rho_0 1
+
     // Ladd's momentum correction for moving walls, applied to reflected populations not perpendicular to wall velocity
     if( Y >= D.y - wall_thickness ) {   // Handle top wall speed - 2 * w_i * rho * dot( c_i, u_w ) / c_s ^ 2
         f[10] -= 2 * pw[10] * rho_0 * wall_velocity;
@@ -193,11 +197,27 @@ void main( void ) {
     }
 
 
-    vec3  vel = ( vec3(f[1],f[3],f[5]) - vec3(f[2],f[4],f[6]) + vec3(f[7]) - vec3(f[8]) + vec3(f[9],f[9],f[10]) - vec3(f[10],f[10],f[9]) + vec3(f[14],f[13],f[13]) - vec3(f[13],f[14],f[14])) / rho;
-    //vec3 vel = vec3(    f[1] - f[2] + f[7] - f[8] + f[ 9] - f[10] + f[14] - f[13],
-    //                    f[3] - f[4] + f[7] - f[8] + f[ 9] - f[10] + f[13] - f[14],
-    //                    f[5] - f[6] + f[7] - f[8] + f[10] - f[ 9] + f[13] - f[14] ) / rho;
+    // population indexes, +Z, 0Z, -Z
+    // Z = 1 //     // Z = 0 //     // Z= -1 //
+    // ===================================== //
+    // 13  7 //     //   3   //     // 12  9 //
+    //  \ /  //     //   |   //     //  \ /  //
+    //   5   //     // 2-0-1 //     //   6   //
+    //  / \  //     //   |   //     //  / \  //
+    // 10 11 //     //   4   //     // 8  14 //
 
+    /*
+    vec3 vel = ( vec3(f[1],f[3],f[5]) - vec3(f[2],f[4],f[6]) + vec3(f[7]) - vec3(f[8]) + vec3(f[9],f[9],f[10]) - vec3(f[10],f[10],f[9]) + vec3(f[14],f[13],f[13]) - vec3(f[13],f[14],f[14])) / rho;
+    /*/
+    vec3 vel = vec3(    f[1] - f[2] + f[7] - f[8] + f[ 9] - f[10] + f[11] - f[12] + f[14] - f[13],
+                        f[3] - f[4] + f[7] - f[8] + f[ 9] - f[10] + f[12] - f[11] + f[13] - f[14],
+                        f[5] - f[6] + f[7] - f[8] + f[10] - f[ 9] + f[11] - f[12] + f[13] - f[14] ) / rho_0;
+
+
+    //vec3 vel = vec3(    f[1] - f[2] + f[11] - f[12] + f[14] - f[13] + f[7] - f[8] + f[ 9] - f[10],
+    //                    f[4] - f[3] + f[11] - f[12] + f[14] - f[13] + f[8] - f[7] + f[10] - f[ 9],
+    //                    f[5] - f[6] + f[11] - f[12] + f[13] - f[14] + f[7] - f[8] + f[10] - f[ 9] ) / rho_0;
+    //*/
     // store properties in image
     if(( ALGORITHM >> 8 ) > 1 ) {   // in this case we use multiple sim steps before we store macroscopic properties
         if(( ALGORITHM >> 8 ) == pc.ping + 1 ) {    // store the propertires when on the last sim step, e.g.: store each 5th step, ping is [0..5), hence store on 4 + 1 == 1
@@ -226,26 +246,43 @@ void main( void ) {
         #define PXPYMZ_2_45 ( 4.5 * PXPYMZ * PXPYMZ )
         #define PXMYPZ_2_45 ( 4.5 * PXMYPZ * PXMYPZ )
         #define MXPYPZ_2_45 ( 4.5 * MXPYPZ * MXPYPZ )
-        #define V_D_V ( 1.5 * dot( vel, vel ))
+    //  #define V_D_V ( 1.5 * dot( vel, vel ))
+        float V_D_V = ( 1.5 * dot( vel, vel ));
 
-        float f_eq[15] = {                                    // #define SQ(x) ((x) * (x))
-            pw[ 0] * rho * ( 1                            - V_D_V ), // pw[0] * rho * (1                                                                     - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[ 1] * rho * ( 1 + 3 * vel.x  + VX2_45      - V_D_V ), // pw[1] * rho * (1 + 3 * ( vel.x)                  + 4.5 * SQ( vel.x)                  - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[ 2] * rho * ( 1 - 3 * vel.x  + VY2_45      - V_D_V ), // pw[2] * rho * (1 + 3 * (-vel.x)                  + 4.5 * SQ(-vel.x)                  - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[ 3] * rho * ( 1 + 3 * vel.y  + VZ2_45      - V_D_V ), // pw[3] * rho * (1 + 3 * ( vel.y)                  + 4.5 * SQ( vel.y)                  - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[ 4] * rho * ( 1 - 3 * vel.y  + VX2_45      - V_D_V ), // pw[4] * rho * (1 + 3 * (-vel.y)                  + 4.5 * SQ(-vel.y)                  - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[ 5] * rho * ( 1 + 3 * vel.z  + VY2_45      - V_D_V ), // pw[3] * rho * (1 + 3 * ( vel.z)                  + 4.5 * SQ( vel.z)                  - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[ 6] * rho * ( 1 - 3 * vel.z  + VZ2_45      - V_D_V ), // pw[4] * rho * (1 + 3 * (-vel.z)                  + 4.5 * SQ(-vel.z)                  - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[ 7] * rho * ( 1 + 3 * PXPYPZ + PXPYPZ_2_45 - V_D_V ), // pw[5] * rho * (1 + 3 * ( vel.x + vel.y + vel.z ) + 4.5 * SQ( vel.x + vel.y + vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[ 8] * rho * ( 1 - 3 * PXPYPZ + PXPYPZ_2_45 - V_D_V ), // pw[6] * rho * (1 + 3 * (-vel.x - vel.y - vel.z ) + 4.5 * SQ(-vel.x - vel.y - vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[ 9] * rho * ( 1 - 3 * PXPYMZ + PXPYMZ_2_45 - V_D_V ), // pw[7] * rho * (1 + 3 * ( vel.x + vel.y - vel.z ) + 4.5 * SQ( vel.x + vel.y - vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[10] * rho * ( 1 + 3 * PXPYMZ + PXPYMZ_2_45 - V_D_V ), // pw[8] * rho * (1 + 3 * (-vel.x - vel.y + vel.z ) + 4.5 * SQ(-vel.x - vel.y + vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[11] * rho * ( 1 + 3 * PXMYPZ + PXMYPZ_2_45 - V_D_V ), // pw[5] * rho * (1 + 3 * ( vel.x - vel.y + vel.z ) + 4.5 * SQ( vel.x - vel.y + vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[12] * rho * ( 1 - 3 * PXMYPZ + PXMYPZ_2_45 - V_D_V ), // pw[6] * rho * (1 + 3 * (-vel.x + vel.y - vel.z ) + 4.5 * SQ(-vel.x + vel.y - vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[13] * rho * ( 1 + 3 * MXPYPZ + MXPYPZ_2_45 - V_D_V ), // pw[5] * rho * (1 + 3 * (-vel.x + vel.y + vel.z ) + 4.5 * SQ(-vel.x + vel.y + vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
-            pw[14] * rho * ( 1 - 3 * MXPYPZ + MXPYPZ_2_45 - V_D_V ), // pw[6] * rho * (1 + 3 * (+vel.x - vel.y - vel.z ) + 4.5 * SQ(+vel.x - vel.y - vel.z ) - 1.5 * (SQ(vel.x) + SQ(vel.y) + SQ(vel.z))),
+        #define SQ(x) ((x) * (x))
+
+        // f_eq[i] = rho * pw[i]( 1 + 3 * dot( c[i], u ) - 1.5 * dot( u, u ) + 4.5 * dot( c[i] * u ) ^ 2 )
+        float f_eq[15] = {
+            pw[ 0] * rho * (1                                  -  V_D_V                                      ),  //  pw[ 0] * rho * ( 1                            - V_D_V ), //
+            pw[ 1] * rho * (1 + 3 * ( vel.x)                   -  V_D_V  +  4.5 * SQ( vel.x)                 ),  //  pw[ 1] * rho * ( 1 + 3 * vel.x  + VX2_45      - V_D_V ), //
+            pw[ 2] * rho * (1 + 3 * (-vel.x)                   -  V_D_V  +  4.5 * SQ(-vel.x)                 ),  //  pw[ 2] * rho * ( 1 - 3 * vel.x  + VY2_45      - V_D_V ), //
+            pw[ 3] * rho * (1 + 3 * ( vel.y)                   -  V_D_V  +  4.5 * SQ( vel.y)                 ),  //  pw[ 3] * rho * ( 1 + 3 * vel.y  + VZ2_45      - V_D_V ), //
+            pw[ 4] * rho * (1 + 3 * (-vel.y)                   -  V_D_V  +  4.5 * SQ(-vel.y)                 ),  //  pw[ 4] * rho * ( 1 - 3 * vel.y  + VX2_45      - V_D_V ), //
+            pw[ 5] * rho * (1 + 3 * ( vel.z)                   -  V_D_V  +  4.5 * SQ( vel.z)                 ),  //  pw[ 5] * rho * ( 1 + 3 * vel.z  + VY2_45      - V_D_V ), //
+            pw[ 6] * rho * (1 + 3 * (-vel.z)                   -  V_D_V  +  4.5 * SQ(-vel.z)                 ),  //  pw[ 6] * rho * ( 1 - 3 * vel.z  + VZ2_45      - V_D_V ), //
+            pw[ 7] * rho * (1 + 3 * ( vel.x + vel.y + vel.z )  -  V_D_V  +  4.5 * SQ( vel.x + vel.y + vel.z )),  //  pw[ 7] * rho * ( 1 + 3 * PXPYPZ + PXPYPZ_2_45 - V_D_V ), //
+            pw[ 8] * rho * (1 + 3 * (-vel.x - vel.y - vel.z )  -  V_D_V  +  4.5 * SQ(-vel.x - vel.y - vel.z )),  //  pw[ 8] * rho * ( 1 - 3 * PXPYPZ + PXPYPZ_2_45 - V_D_V ), //
+            pw[ 9] * rho * (1 + 3 * ( vel.x + vel.y - vel.z )  -  V_D_V  +  4.5 * SQ( vel.x + vel.y - vel.z )),  //  pw[ 9] * rho * ( 1 - 3 * PXPYMZ + PXPYMZ_2_45 - V_D_V ), //
+            pw[10] * rho * (1 + 3 * (-vel.x - vel.y + vel.z )  -  V_D_V  +  4.5 * SQ(-vel.x - vel.y + vel.z )),  //  pw[10] * rho * ( 1 + 3 * PXPYMZ + PXPYMZ_2_45 - V_D_V ), //
+            pw[11] * rho * (1 + 3 * ( vel.x - vel.y + vel.z )  -  V_D_V  +  4.5 * SQ( vel.x - vel.y + vel.z )),  //  pw[11] * rho * ( 1 + 3 * PXMYPZ + PXMYPZ_2_45 - V_D_V ), //
+            pw[12] * rho * (1 + 3 * (-vel.x + vel.y - vel.z )  -  V_D_V  +  4.5 * SQ(-vel.x + vel.y - vel.z )),  //  pw[12] * rho * ( 1 - 3 * PXMYPZ + PXMYPZ_2_45 - V_D_V ), //
+            pw[13] * rho * (1 + 3 * (-vel.x + vel.y + vel.z )  -  V_D_V  +  4.5 * SQ(-vel.x + vel.y + vel.z )),  //  pw[13] * rho * ( 1 + 3 * MXPYPZ + MXPYPZ_2_45 - V_D_V ), //
+            pw[14] * rho * (1 + 3 * (+vel.x - vel.y - vel.z )  -  V_D_V  +  4.5 * SQ(+vel.x - vel.y - vel.z ))   //  pw[14] * rho * ( 1 - 3 * MXPYPZ + MXPYPZ_2_45 - V_D_V ), //
         };
 
+
+        // population indexes, +Z, 0Z, -Z
+        // Z = 1 //     // Z = 0 //     // Z= -1 //
+        // ===================================== //
+        // 13  7 //     //   3   //     // 12  9 //
+        //  \ /  //     //   |   //     //  \ /  //
+        //   5   //     // 2-0-1 //     //   6   //
+        //  / \  //     //   |   //     //  / \  //
+        // 10 11 //     //   4   //     // 8  14 //
+
+        //                      0       1       2       3       4       5       6       7       8       9       10      11      12      13      14
+        // Directions:          R       +X      -X      +Y      -Y      +Z     -Z       +X+Y+Z  -X-Y-Z  +X+Y-Z  -X-Y+Z  +X-Y+Z  -X+Y-Z  -X+Y+Z  +X-Y-Z
+        const float[15] pw = {  2.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72, 1.0/72 };
 
         // Collide - might be optimized if using f0 and 2 * vec4
         f[ 0] = mix( f[ 0], f_eq[ 0], omega ); //f[ 0] * ( 1 - omega ) + f_eq[ 0] * omega;
@@ -265,7 +302,7 @@ void main( void ) {
         f[14] = mix( f[14], f_eq[14], omega ); //f[14] * ( 1 - omega ) + f_eq[14] * omega;
 
     }
-
+    //*/
 
 
     // population indexes, +Z, 0Z, -Z

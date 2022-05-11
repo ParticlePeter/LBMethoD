@@ -1,6 +1,21 @@
 // --- COMP ---
 #version 450 core
 
+// uniform buffer
+layout( std140, binding = 5 ) uniform Compute_UBO {
+    float   omega;            // collision frequency
+    float   wall_velocity;
+    int     wall_thickness;
+    int     comp_index;
+    vec2    mouse_xy;
+    vec2    force_xy;
+    int     force_type;
+    int     slide_axis_x;
+    int     slide_axis_y;
+    int     slide_axis_z;
+    int     slide_axis_i;
+};
+
 // specialization constants for local work group size
 layout( local_size_x_id = 0 ) in;
 //layout( local_size_y_id = 1 ) in;
@@ -37,33 +52,52 @@ const float[15] pw = {  2.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  1.0/9,  
 ////////////////////////////////////////////////////////
 
 // shortcut to imageSize, the Domain of the computation, same as Global Size
-//#define D ( gl_WorkGroupSize * gl_NumWorkGroups )
 #define D imageSize( vel_rho_img )
-
-// define global equivalent for gl_LocalInvocationIndex
-#define UI gl_GlobalInvocationID.x
+//#define D ivec3( gl_NumWorkGroups * gl_WorkGroupSize )
 
 // U and I are also the index velocity population index
-#define I int( UI )
 
-#define X ( I % D.x )
-#define Y ( I / D.x )
-#define Z ( I / ( D.x * D.y ))
+// work group dimensions
+#define NWG gl_NumWorkGroups
+#define WGS gl_WorkGroupSize
+
+// work group and invocation IDs
+#define WGI gl_WorkGroupID
+#define LII gl_LocalInvocationID
+
+// derived variables
+#define GII gl_GlobalInvocationID
+#define  LI gl_LocalInvocationIndex
+
+// computed index
+//#define I int(( NWG.x * NWG.y * WGI.z + NWG.x * WGI.y + WGI.x ) * WGS.x * WGS.y * WGS.z + LI )
+
+#define DIM D
+//#define I int( DIM.x * DIM.y * GII.z + DIM.x * GII.y + GII.x )
+#define I int( gl_GlobalInvocationID.x )
+
+// in th 3D case we must modulate Y with with D.y
+#define X (  I % D.x )
+#define Y (( I / D.x ) % D.y  )
+#define Z (  I / ( D.x * D.y ))
 
 // derived total count of nodes
-int cell_count = int( gl_WorkGroupSize.x * gl_NumWorkGroups.x );
+int cell_count = int( gl_NumWorkGroups.x * gl_WorkGroupSize.x );
 
 
 // main simulation function
 void main( void ) {
 
+    ivec4 sa = ivec4( slide_axis_x, slide_axis_y, slide_axis_z, slide_axis_i );
+    float w = 1;//(( X == sa.x ) && ( Y == sa.y ) && ( Z == sa.z )) ? 1 : 0.001;
+
     // Init velocities and densities
-    imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( 0, 0, Y / 25.0, 1 ));
+    imageStore( vel_rho_img, ivec3( X, Y, Z ), vec4( 0, 0, 0, w ));
 
     // init all distribution f(unctions) with equilibrium, p = population
     for( int p = 0; p < 15; ++p )  {
-        imageStore( popul_buffer, p * cell_count + I, vec4( pw[ p ] ));
-        if( p > 0 ) imageStore( popul_buffer, ( p + 14 ) * cell_count + I, vec4( pw[ p ] ));
+        imageStore( popul_buffer, p * cell_count + I, w * vec4( pw[ p ] ));
+        if( p > 0 ) imageStore( popul_buffer, ( p + 14 ) * cell_count + I, w * vec4( pw[ p ] ));
     }
 }   // main
 
