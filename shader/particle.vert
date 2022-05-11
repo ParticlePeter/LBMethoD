@@ -2,9 +2,9 @@
 
 // push constants
 layout( push_constant ) uniform Push_Constant {
-    vec4    point_rgba;
-    float   point_size;
-    float   speed_scale;
+    vec4    point_rgba;     // Add and ...
+    float   point_size;     // ... use with ...
+    float   speed_scale;    // ... Display_UBO
     int     ping_pong;
 
 } pc;
@@ -56,20 +56,28 @@ void main() {
 
     if( TYPE == VELOCITY ) {
         vec4 pos_a = imageLoad( particle_buffer, VI );
+    //  vec3 pos = vec3( pos_a.x, pos_a.y, pos_a.z ); // must flip Y
         vec3 pos = vec3( pos_a.x, D.y - pos_a.y, pos_a.z ); // must flip Y
+        vec3 uvw = pos / D; // Todo(pp): add 1/D to Display_UBO and use as factor, same bellow
 
         /*
         // Eulerian integration
-        vec3 vel = texture( vel_rho_tex, pos ).xyz;
+        vec3 vel = texture( vel_rho_tex, uvw ).xyz;
 
         /*/
 
         // Runge-Kutta 4 integration
-        vec3 v_1 = texture( vel_rho_tex, pos ).xyz;
-        vec3 v_2 = texture( vel_rho_tex, pos + 0.5 * v_1 ).xyz;
-        vec3 v_3 = texture( vel_rho_tex, pos + 0.5 * v_2 ).xyz;
-        vec3 v_4 = texture( vel_rho_tex, pos + v_3 ).xyz;
-        vec3 vel = ( 2 * v_1 + v_2 + v_3 + 2 * v_4 ) / 6;
+        vec3 v_1 = texture( vel_rho_tex, uvw ).xyz;
+        vec3 v_2 = texture( vel_rho_tex, ( pos + 0.5 * v_1 ) / D ).xyz;
+        vec3 v_3 = texture( vel_rho_tex, ( pos + 0.5 * v_2 ) / D ).xyz;
+        vec3 v_4 = texture( vel_rho_tex, ( pos + v_3 ) / D ).xyz;
+        vec3 vel = ( 2 * v_1 + v_2 + v_3 + 2 * v_4 ) / 6;   // Todo: Add Factor to UI
+
+        // Cool Jitter FX
+        //vec3 v_1 = texture( vel_rho_tex, uvw ).xyz;
+        //vec3 v_2 = texture( vel_rho_tex, uvw + 0.5 / D * v_1 ).xyz;
+        //vec3 v_3 = texture( vel_rho_tex, uvw + 0.5 / D * v_2 ).xyz;
+        //vec3 v_4 = texture( vel_rho_tex, uvw + v_3 ).xyz;
         //*/
 
         pos_a.xyz += vel;
