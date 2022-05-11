@@ -1,13 +1,21 @@
 
-import derelict.glfw3;
+import bindbc.glfw;
 import dlsl.matrix;
 import erupted;
 import vdrive;
 import input;
 
+import settings : setting;
 
+debug import core.stdc.stdio : printf;
+
+enum validate_vulkan = true;
+enum verbose = false;
 
 enum Transport : uint32_t { pause, play, step, profile };
+
+
+nothrow:    // @nogc:
 
 
 //////////////////////////////
@@ -15,7 +23,9 @@ enum Transport : uint32_t { pause, play, step, profile };
 //////////////////////////////
 struct VDrive_State {
 
-    // count of maximum per frame resources, might be less dependent on swachain image count
+    //nothrow @nogc:
+
+    // count of maximum per frame resources, might be less dependent on swapchain image count
     enum                        MAX_FRAMES = 2;
 
     // initialize
@@ -24,7 +34,6 @@ struct VDrive_State {
     VkQueue                     graphics_queue;
     uint32_t                    graphics_queue_family_index; // required for command pool
     GLFWwindow*                 window;
-    VkDebugReportCallbackEXT    debugReportCallback;
 
     struct XForm_UBO {
         mat4        wvpm;
@@ -36,23 +45,39 @@ struct VDrive_State {
     TrackballButton             tbb;                        // Trackball manipulator updating View Matrix
     MouseMove                   mouse;
     XForm_UBO*                  xform_ubo;                  // World View Projection Matrix
+
+    // return window width and height stored in Meta_Swapchain struct
+    @setting auto windowWidth()  @nogc { return swapchain.image_extent.width;  }
+    @setting auto windowHeight() @nogc { return swapchain.image_extent.height; }
+
+    // set window width and hight before recreating swapchain
+    @setting void windowWidth(  uint32_t w ) @nogc { swapchain.image_extent.width  = w; }
+    @setting void windowHeight( uint32_t h ) @nogc { swapchain.image_extent.height = h; }
+
+    alias win_w = windowWidth;
+    alias win_h = windowHeight;
+
     mat4                        projection;                 // Projection Matrix
-    float                       projection_fovy =    60;    // Projection Field Of View in Y dimension
-    float                       projection_near =   0.1;    // Projection near plane distance
-    float                       projection_far  = 10000;    // Projection  far plane distance
+    @setting float              projection_fovy =    60;    // Projection Field Of View in Y dimension
+    @setting float              projection_near =   0.1;    // Projection near plane distance
+    @setting float              projection_far  =  1000;    // Projection  far plane distance
     float                       projection_aspect;          // Projection aspect, will be computed from window dim, when updateProjection is called
+
+    @setting mat3               look_at() @nogc { return tbb.lookingAt; }
+    @setting void               look_at( ref mat3 etu ) @nogc { tbb.lookAt( etu[0], etu[1], etu[2] ); }
+
     // Todo(pp): calculate best possible near and far clip planes when manipulating the trackball
 
     // surface and swapchain
-    Meta_Swapchain              swapchain;
+    Core_Swapchain_Queue_Extent swapchain;
+    @setting VkPresentModeKHR   present_mode = VK_PRESENT_MODE_MAX_ENUM_KHR;
     VkSampleCountFlagBits       sample_count = VK_SAMPLE_COUNT_1_BIT;
-    VkFormat                    depth_image_format = VK_FORMAT_D32_SFLOAT;
 
     // memory Resources
-    Meta_Image                  depth_image;
-    Meta_Buffer                 xform_ubo_buffer;
-    VkMappedMemoryRange         xform_ubo_flush;
-    Meta_Memory                 host_visible_memory;
+    alias                       Ubo_Buffer = Core_Buffer_T!( 0, BMC.Mem_Range );
+    Ubo_Buffer                  xform_ubo_buffer;
+    Core_Image_Memory_View      depth_image;
+    VkDeviceMemory              host_visible_memory;
 
 
     // command and related
@@ -72,24 +97,24 @@ struct VDrive_State {
 
     // one descriptor for all purposes
     Core_Descriptor             descriptor;
-    Meta_Descriptor_Update      sim_descriptor_update;  // updating the descriptor in the case of reconstructed sim resources
 
 
     // render setup
-    Meta_Renderpass             render_pass;
-    Meta_FB!( MAX_FRAMES, 2 )   framebuffers;           // template count of ( VkFramebuffer, VkClearValue )
+    VkRenderPassBeginInfo       render_pass_bi;
+    VkFramebuffer[ MAX_FRAMES ] framebuffers;
+    VkClearValue[ 2 ]           clear_values;
     VkViewport                  viewport;               // dynamic state viewport
     VkRect2D                    scissors;               // dynamic state scissors
 
 
     // simulate resources
     import simulate;
-    VDrive_Simulate_State       sim;
+    @setting Sim_State          sim;
 
 
     // visualize resources
     import visualize;
-    VDrive_Visualize_State      vis;
+    @setting Vis_State          vis;
 
 
     // cpu resources
@@ -110,30 +135,16 @@ struct VDrive_State {
     uint32_t        sim_profile_step_count = 0;
     uint32_t        sim_profile_step_index;
 
-    version( LDC ) {
-        import std.datetime; // ldc is behind and datetime is a module and not a package yet
-        StopWatch stop_watch;
-        nothrow {
-            void resetStopWatch()       { try { stop_watch.reset; } catch( Exception ) {} }
-            void startStopWatch()       { try { stop_watch.start; } catch( Exception ) {} }
-            void stopStopWatch()        { try { stop_watch.stop;  } catch( Exception ) {} }
-            long getStopWatch_nsecs()   { try { return stop_watch.peek.to!( "nsecs" , long ); } catch( Exception ) { return 0; } }
-            long getStopWatch_hnsecs()  { try { return stop_watch.peek.to!( "hnsecs", long ); } catch( Exception ) { return 0; } }
-            long getStopWatch_usecs()   { try { return stop_watch.peek.to!( "usecs" , long ); } catch( Exception ) { return 0; } }
-            long getStopWatch_msecs()   { try { return stop_watch.peek.to!( "msecs" , long ); } catch( Exception ) { return 0; } }
-        }
-    } else {
-        import std.datetime.stopwatch; // ldc is behind and datetime is a module and not a package yet
-        StopWatch stop_watch;
-        nothrow {
-            void resetStopWatch()       { stop_watch.reset; }
-            void startStopWatch()       { stop_watch.start; }
-            void stopStopWatch()        { stop_watch.stop; }
-            long getStopWatch_nsecs()   { return stop_watch.peek.total!"nsecs"; }
-            long getStopWatch_hnsecs()  { return stop_watch.peek.total!"hnsecs"; }
-            long getStopWatch_usecs()   { return stop_watch.peek.total!"usecs"; }
-            long getStopWatch_msecs()   { return stop_watch.peek.total!"msecs"; }
-        }
+    import std.datetime.stopwatch;
+    StopWatch stop_watch;
+    nothrow {
+        void resetStopWatch()       { stop_watch.reset; }
+        void startStopWatch()       { stop_watch.start; }
+        void stopStopWatch()        { stop_watch.stop; }
+        long getStopWatch_nsecs()   { return stop_watch.peek.total!"nsecs"; }
+        long getStopWatch_hnsecs()  { return stop_watch.peek.total!"hnsecs"; }
+        long getStopWatch_usecs()   { return stop_watch.peek.total!"usecs"; }
+        long getStopWatch_msecs()   { return stop_watch.peek.total!"msecs"; }
     }
 
 
@@ -141,37 +152,40 @@ struct VDrive_State {
     //
     // transport control data
     //
-    uint32_t    sim_play_cmd_buffer_count;          // count of command buffers to be drawn when in play mode
-    Transport   transport = Transport.pause;        // current transport mode
-    Transport   play_mode = Transport.play;         // can be either play or profile
+    uint32_t sim_play_cmd_buffer_count;                // count of command buffers to be drawn when in play mode
+    @setting Transport  transport = Transport.pause;   // current transport mode
+    @setting Transport  play_mode = Transport.play;    // can be either play or profile
 
 
     // flags Todo(pp): create a proper uint32_t flag structure
-    bool        feature_shader_double   = false;
-    bool        feature_large_points    = false;
-    bool        feature_wide_lines      = false;
-    bool        draw_gui                = false;    // hidden by default in case we compile without gui
-    bool        draw_scale              = true;
-    bool        draw_display            = true;
-    bool        draw_particles          = false;
-    bool        additive_particle_blend = true;
-    bool        use_double              = false;
-    bool        use_3_dim               = false;
-    bool        use_cpu                 = false;
+    bool            feature_shader_double   = false;
+    bool            feature_large_points    = false;
+    bool            feature_wide_lines      = false;
+    @setting bool   use_cpu                 = false;
 
 
 
     // window resize callback result
-    bool        window_resized          = false;
+    bool            window_resized          = false;
 
+
+
+
+
+    import initialize;
+    VkResult initVulkan() {
+        if( win_w == 0 ) win_w = 1600;
+        if( win_h == 0 ) win_h =  900;
+        return initialize.initVulkan( this, win_w, win_h ).vkAssert;
+    }
+
+
+    void destroyVulkan() {
+        initialize.destroyVulkan( this );
+    }
 
 
     nothrow:
-
-    // return window width and height stored in Meta_Swapchain struct
-    auto windowWidth()  @nogc { return swapchain.imageExtent.width;  }
-    auto windowHeight() @nogc { return swapchain.imageExtent.height; }
-
 
     //
     // transport control funcs
@@ -213,14 +227,13 @@ struct VDrive_State {
         sim.index = sim.compute_ubo.comp_index = 0;
         try {
             if( use_cpu ) {
-                import cpustate : cpuInit;
-                this.cpuInit;
+                //import cpustate : cpuInit;
+                //this.cpuInit;
             } else {
                 import simulate : createBoltzmannPSO;
                 this.createBoltzmannPSO( false, false, true );  // rebuild init pipeline, rebuild loop pipeline, reset domain
             }
         } catch( Exception ) {}
-
     }
 
 
@@ -232,22 +245,28 @@ struct VDrive_State {
     void updateWVPM() @nogc {
         xform_ubo.wvpm = projection * tbb.worldTransform;
         xform_ubo.eyep = tbb.eye;
-        vk.device.vkFlushMappedMemoryRanges( 1, & xform_ubo_flush );
+        vk.flushMappedMemoryRange( xform_ubo_buffer.mem_range );
     }
 
     // update LBM compute UBO
     void updateComputeUBO() @nogc {
         // data will be updated elsewhere
-        vk.device.vkFlushMappedMemoryRanges( 1, & sim.compute_ubo_flush );
+        vk.flushMappedMemoryRange( sim.compute_ubo_buffer.mem_range );
     }
 
     // update display UBO of velocity and density data
     void updateDisplayUBO() @nogc {
         // data will be updated elsewhere
-        vk.device.vkFlushMappedMemoryRanges( 1, & vis.display_ubo_flush );
+        vk.flushMappedMemoryRange( vis.display_ubo_buffer.mem_range );
     }
 
-
+    // amplify display property by reciprocal sim steps
+    void amplifyDisplayProperty() {
+        vis.display_ubo.amplify_property = vis.amplify_prop_div_steps && sim.step_size > 1
+            ? vis.amplify_property / sim.step_size
+            : vis.amplify_property;
+        updateDisplayUBO;
+    }
 
     /// Scale the display based on the aspect(s) of sim.domain
     /// Parameter signals dimension count, 2D sim 3D
@@ -282,7 +301,7 @@ struct VDrive_State {
         try {
             //swapchain.create_info.imageExtent  = VkExtent2D( win_w, win_h );  // Set the desired swapchain extent, this might change at swapchain creation
             import resources : resizeRenderResources;
-            this.resizeRenderResources;   // destroy old and recreate window size dependent resources
+            this.resizeRenderResources( present_mode );   // destroy old and recreate window size dependent resources
 
         } catch( Exception ) {}
     }
@@ -291,7 +310,7 @@ struct VDrive_State {
     // this is used in windowResizeCallback
     // there only a VDrive_State pointer is available and we avoid ugly dereferencing
     void swapchainExtent( uint32_t win_w, uint32_t win_h ) {
-        swapchain.create_info.imageExtent = VkExtent2D( win_w, win_h );
+        swapchain.image_extent = VkExtent2D( win_w, win_h );
     }
 
 
@@ -337,6 +356,9 @@ struct VDrive_State {
         // reset the fence corresponding to the currently acquired image index, will be signal after next draw
         vk.device.vkResetFences( 1, & submit_fence[ next_image_index ] ).vkAssert;
 
+        // if the transport was set to play by settings or default, we must jump start it
+        if( transport == Transport.play )
+            simPlay;
     }
 
 
@@ -393,7 +415,9 @@ struct VDrive_State {
         vk.device.vkAcquireNextImageKHR( swapchain.swapchain, uint64_t.max, acquired_semaphore[ next_image_index ], VK_NULL_HANDLE, & next_image_index );
 
         // wait for finished drawing
-        vk.device.vkWaitForFences( 1, & submit_fence[ next_image_index ], VK_TRUE, uint64_t.max );
+        auto vkResult = vk.device.vkWaitForFences( 1, & submit_fence[ next_image_index ], VK_TRUE, uint64_t.max );
+        debug if( vkResult != VK_SUCCESS )
+            printf( "%s\n", vkResult.toCharPtr );
         vk.device.vkResetFences( 1, & submit_fence[ next_image_index ] ).vkAssert;
     }
 
@@ -411,7 +435,6 @@ struct VDrive_State {
 }
 
 
-nothrow:
 
 //////////////////////////////////////////////////////////
 // Free functions called via function pointer mechanism //
@@ -451,7 +474,7 @@ void profileSim( ref VDrive_State app ) @system {
     // edit submmit info for display work
     // this time we do not wait for the acquired semaphore
     // as we did it in the previous step which is guarded by a fence
-    // but we do signal the rendering finished semaphore, which is consumed by vkQueuePresentKHR 
+    // but we do signal the rendering finished semaphore, which is consumed by vkQueuePresentKHR
     app.submit_info.waitSemaphoreCount      = 0;
     app.submit_info.signalSemaphoreCount    = 1;
     app.submit_info.pCommandBuffers         = & app.cmd_buffers[ app.next_image_index ];
