@@ -9,8 +9,11 @@ import visualize;
 
 import dlsl.matrix;
 
+debug import core.stdc.stdio : printf;
 
 
+
+//nothrow @nogc:
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -41,7 +44,7 @@ void createCommandObjects( ref VDrive_State app, VkCommandPoolCreateFlags comman
 
 
     // rendering and presenting semaphores for VkSubmitInfo, VkPresentInfoKHR and vkAcquireNextImageKHR
-    foreach( i; 0 .. app.MAX_FRAMES ) {
+    foreach( i; 0 .. VDrive_State.MAX_FRAMES ) {
         app.acquired_semaphore[i] = app.createSemaphore;        // signaled when a new swapchain image is acquired
         app.rendered_semaphore[i] = app.createSemaphore;        // signaled when submitted command buffer(s) complete execution
     }
@@ -70,7 +73,7 @@ void createCommandObjects( ref VDrive_State app, VkCommandPoolCreateFlags comman
         swapchainCount          = 1;
         pSwapchains             = & app.swapchain.swapchain;
     //  pImageIndices           = & next_image_index;           // set before presentation, using the acquired next_image_index
-    //  pResults                = null;                         // per swapchain prsentation results, redundant when using only one swapchain
+    //  pResults                = null;                         // per swapchain presentation results, redundant when using only one swapchain
     }
 }
 
@@ -88,59 +91,76 @@ void createMemoryObjects( ref VDrive_State app ) {
     // create uniform buffers - called once
     //
 
-    // create transformation ubo buffer withour memory backing
+    // create transformation ubo buffer without memory backing
     import dlsl.matrix;
-    app.xform_ubo_buffer( app )
-        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VDrive_State.XForm_UBO.sizeof );
-
+    auto xform_ubo_buffer = Meta_Buffer_T!( VDrive_State.Ubo_Buffer )( app )
+        .usage( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT )
+        .bufferSize( VDrive_State.XForm_UBO.sizeof )
+        .constructBuffer;
 
     // create compute ubo buffer without memory backing
-    app.sim.compute_ubo_buffer( app )
-        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VDrive_Simulate_State.Compute_UBO.sizeof );
-
+    auto compute_ubo_buffer = Meta_Buffer_T!( VDrive_State.Ubo_Buffer )( app )
+        .usage( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT )
+        .bufferSize( Sim_State.Compute_UBO.sizeof )
+        .constructBuffer;
 
     // create display ubo buffer without memory backing
-    app.vis.display_ubo_buffer( app )
-        .create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VDrive_Visualize_State.Display_UBO.sizeof );
+    auto display_ubo_buffer = Meta_Buffer_T!( VDrive_State.Ubo_Buffer )( app )
+        .usage( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT )
+        .bufferSize( Vis_State.Display_UBO.sizeof )
+        .constructBuffer;
 
+    // Todo(pp): selective code path if DEVICE_LOCAL | HOST_VISIBLE is available (AMD), use memory : hasMemoryHeapType
 
     // create host visible memory for ubo buffers and map it
-    auto mapped_memory = app.host_visible_memory( app )
+    void* mapped_memory;
+    app.host_visible_memory = Meta_Memory( app )
         .memoryType( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
-        .addRange( app.xform_ubo_buffer )
-        .addRange( app.sim.compute_ubo_buffer )
-        .addRange( app.vis.display_ubo_buffer )
-        .allocate
-        .bind( app.xform_ubo_buffer )
-        .bind( app.sim.compute_ubo_buffer )
-        .bind( app.vis.display_ubo_buffer )
-        .mapMemory;                         // map the memory object persistently
+        .allocateAndBind( xform_ubo_buffer, compute_ubo_buffer, display_ubo_buffer )
+        .mapMemory( mapped_memory )                         // map the memory object persistently
+        .memory;
 
     // cast the mapped memory pointer without offset into our transformation matrix
     app.xform_ubo = cast( VDrive_State.XForm_UBO* )mapped_memory;                       // cast to mat4
-    app.xform_ubo_flush = app.xform_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the wvpm ubo
+
+    // extract Core_Buffer data, including mapped memory range for memory flushing, from xform Meta_Buffer and update the underlying VkBuffer
+    app.xform_ubo_buffer = xform_ubo_buffer.extractCore;    // extract Core_Buffer data, including mapped memory range for memory flushing, from Meta_Buffer
     app.updateProjection;   // update projection matrix from member data _fovy, _near, _far and aspect of the swapchain extent
     app.updateWVPM;         // multiply projection with trackball (view) matrix and upload to uniform buffer
 
 
     // cast the mapped memory pointer with its offset into the backing memory to our compute ubo struct and init_pso the memory
-    app.sim.compute_ubo = cast( VDrive_Simulate_State.Compute_UBO* )( mapped_memory + app.sim.compute_ubo_buffer.memOffset );
-    app.sim.compute_ubo_flush = app.sim.compute_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the compute ubo
-    app.sim.compute_ubo.collision_frequency = 1 / 0.504;
-    app.sim.compute_ubo.wall_velocity  = 0.005 * 3;     //0.25 * 3;// / app.sim.speed_of_sound / app.sim.speed_of_sound;
-    app.sim.compute_ubo.wall_thickness = 3;
-    app.sim.compute_ubo.comp_index = 0;
+    if( app.sim.compute_ubo is null ) {
+        app.sim.compute_ubo = cast( Sim_State.Compute_UBO* )( mapped_memory + compute_ubo_buffer.memOffset );
+        app.sim.compute_ubo.collision_frequency = 1; //1 / 0.504;
+        app.sim.compute_ubo.wall_velocity  = 3 * 0.1; //0.005;     //0.25 * 3;// / app.sim.speed_of_sound / app.sim.speed_of_sound;
+        app.sim.compute_ubo.wall_thickness = 1; // 3;
+        app.sim.compute_ubo.comp_index = 0;
+    } else {
+        auto compute_ubo = cast( Sim_State.Compute_UBO* )( mapped_memory + compute_ubo_buffer.memOffset );
+        *compute_ubo = *app.sim.compute_ubo;    // copy data
+        app.sim.compute_ubo = compute_ubo;      // copy pointer
+    }
+    // extract Core_Buffer data, including mapped memory range for memory flushing, from compute Meta_Buffer and update the underlying VkBuffer
+    app.sim.compute_ubo_buffer = compute_ubo_buffer.extractCore;
     app.updateComputeUBO;
 
 
     // cast the mapped memory pointer with its offset into the backing memory to our display ubo struct and init_pso the memory
-    app.vis.display_ubo = cast( VDrive_Visualize_State.Display_UBO* )( mapped_memory + app.vis.display_ubo_buffer.memOffset );
-    app.vis.display_ubo_flush = app.vis.display_ubo_buffer.createMappedMemoryRange; // specify mapped memory range for the display ubo
-    app.vis.display_ubo.amplify_property = 1;
-    app.vis.display_ubo.color_layers = 0;
-    app.vis.display_ubo.z_layer = 0;
+    if( app.vis.display_ubo is null ) {
+        app.vis.display_ubo = cast( Vis_State.Display_UBO* )( mapped_memory + display_ubo_buffer.memOffset );
+        app.vis.display_ubo.amplify_property = 1;
+        app.vis.display_ubo.color_layers = 0;
+        app.vis.display_ubo.z_layer = 0;
+    } else {
+        auto display_ubo = cast( Vis_State.Display_UBO* )( mapped_memory + display_ubo_buffer.memOffset );
+        *display_ubo = *app.vis.display_ubo;    // copy data
+        app.vis.display_ubo = display_ubo;      // copy pointer
+    }
+    // extract Core_Buffer data, including mapped memory range for memory flushing, from display Meta_Buffer and update the underlying VkBuffer
+    app.vis.display_ubo_buffer = display_ubo_buffer.extractCore;
+    app.amplifyDisplayProperty; // Calls updateDisplayUBO, after initializing visualization display property, possibly divided by sim steps.
     app.updateDisplayUBO;
-
 
 
     //
@@ -156,7 +176,17 @@ void createMemoryObjects( ref VDrive_State app ) {
 ///////////////////////////
 // create descriptor set //
 ///////////////////////////
-void createDescriptorSet( ref VDrive_State app, Meta_Descriptor* meta_descriptor_ptr = null ) {
+void createDescriptorSet( ref VDrive_State app ) {
+
+    // this is required if no Meta Descriptor has been passed in from the outside
+    Meta_Descriptor_T!(9,3,8,4,3,2) meta_descriptor = app;    // temporary
+    //Meta_Descriptor meta_descriptor;    // temporary
+
+    // call the real create function
+    app.createDescriptorSet_T( meta_descriptor );
+}
+
+void createDescriptorSet_T( Descriptor_T )( ref VDrive_State app, ref Descriptor_T meta_descriptor ) {
 
     // configure descriptor set with required descriptors
     // the descriptor set will be constructed in createRenderRecources
@@ -164,104 +194,45 @@ void createDescriptorSet( ref VDrive_State app, Meta_Descriptor* meta_descriptor
     // descriptors can be added through other means before finalizing
     // maybe we even might overwrite it completely in a parent struct
 
-    // this is required if no Meta Descriptor has been passed in from the outside
-    Meta_Descriptor meta_descriptor = app;
-    if( meta_descriptor_ptr is null ) {
-        meta_descriptor_ptr = & meta_descriptor;
-    }
-
-
-    Meta_Sampler meta_sampler;
-    app.sim.macro_image.sampler = meta_sampler( app )
-    //  .addressMode( VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER )
-        .unnormalizedCoordinates( VK_TRUE )
-        .construct
-        .sampler;
-
-    // reuse Meta_sampler to construct a new nearest neighbor sampler
-    app.sim.nearest_sampler = meta_sampler
-        .filter( VK_FILTER_NEAREST, VK_FILTER_NEAREST )
-    //  .addressMode( VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER )
-    //  .unnormalizedCoordinates( VK_TRUE )     // not required to set as it is still set from edit before
-        .construct
-        .sampler;
-
-    // Note(pp): immutable does not filter properly, either driver bug or module descriptor bug
-    // Todo(pp): debug the issue
-    ( *meta_descriptor_ptr )    // VDrive_State.descriptor is a Core_Descriptor
+    app.descriptor = meta_descriptor     // VDrive_State.descriptor is a Core_Descriptor
 
         // XForm_UBO
-        .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
+        .addUniformBufferBinding( 0, VK_SHADER_STAGE_VERTEX_BIT )
         .addBufferInfo( app.xform_ubo_buffer.buffer )
 
         // Main Compute Buffer for populations
-        .addLayoutBinding( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT )
-        .addTexelBufferView( app.sim.popul_buffer_view )
+        .addStorageTexelBufferBinding( 2, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_COMPUTE_BIT )
+        .addTexelBufferView( app.sim.popul_buffer.view )
 
         // Image to store macroscopic variables ( velocity, density ) from simulation compute shader
-        .addLayoutBinding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT )
-        .addImageInfo( app.sim.macro_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
+        .addStorageImageBinding( 3, VK_SHADER_STAGE_COMPUTE_BIT )
+        .addImage( app.sim.macro_image.view, VK_IMAGE_LAYOUT_GENERAL )
 
         // Sampler to read from macroscopic image in lines, display and export shader
-        .addLayoutBinding/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT )
-        .addImageInfo( app.sim.macro_image.image_view, VK_IMAGE_LAYOUT_GENERAL, app.sim.macro_image.sampler )
-        .addImageInfo( app.sim.macro_image.image_view, VK_IMAGE_LAYOUT_GENERAL, app.sim.nearest_sampler )        // additional sampler if we want to examine each node
+        .addSamplerImageBinding( 4, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT )
+        .addSamplerImage( app.sim.macro_image.sampler[0], app.sim.macro_image.view, VK_IMAGE_LAYOUT_GENERAL )
+        .addSamplerImage( app.sim.macro_image.sampler[1], app.sim.macro_image.view, VK_IMAGE_LAYOUT_GENERAL )       // additional sampler if we want to examine each node
 
         // Compute UBO for compute parameter
-        .addLayoutBinding( 5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT )
+        .addUniformBufferBinding( 5, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT )
         .addBufferInfo( app.sim.compute_ubo_buffer.buffer )
 
         // Display UBO for display parameter
-        .addLayoutBinding( 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT )
+        .addUniformBufferBinding( 6, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT )
         .addBufferInfo( app.vis.display_ubo_buffer.buffer )
 
         // Particle Buffer
-        .addLayoutBinding( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
-        .addTexelBufferView( app.vis.particle_buffer_view )
+        .addStorageTexelBufferBinding( 7, VK_SHADER_STAGE_VERTEX_BIT )
+        .addTexelBufferView( app.vis.particle_buffer.view )
 
         // Export Buffer views will be set and written when export is activated
-        .addLayoutBinding( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 2 );
+        .addStorageTexelBufferBinding( 8, VK_SHADER_STAGE_COMPUTE_BIT, 2 )
         //.addTexelBufferView( app.export_buffer_view[0] );
         //.addTexelBufferView( app.export_buffer_view[1] );
 
-
-
-    // The app crashes here in construct sometimes, and it is not clear why
-    // In Debug mode we see that some undefined exception is thrown, which cannot be caught here
-    // The error seems to be unrelated to this section, check all the steps taken before this occurs
-    // Exit Code: -1073740940 (FFFFFFFFC0000374)
-    // ---
-    // New insight tells us that this is a memory corruption which only occurs when using immutable samplers
-
-    app.descriptor = ( *meta_descriptor_ptr ).construct.reset;
-
-
-    // prepare simulation data descriptor update
-    // necessary when we recreate resources and have to rebind them to our descriptors
-    app.sim_descriptor_update( app )
-        .addBindingUpdate( 2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
-        .addTexelBufferView( app.sim.popul_buffer_view )
-
-        .addBindingUpdate( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE )
-        .addImageInfo( app.sim.macro_image.image_view, VK_IMAGE_LAYOUT_GENERAL )
-
-        .addBindingUpdate/*Immutable*/( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ) // immutable does not filter properly, module descriptor bug
-        .addImageInfo( app.sim.macro_image.image_view, VK_IMAGE_LAYOUT_GENERAL, app.sim.macro_image.sampler )
-        .addImageInfo( app.sim.macro_image.image_view, VK_IMAGE_LAYOUT_GENERAL, app.sim.nearest_sampler )
-
-        .addBindingUpdate( 7, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
-        .addTexelBufferView( app.vis.particle_buffer_view )
-
-        .attachSet( app.descriptor.descriptor_set );
-
-    // this one is solely for export data purpose to be absolute lazy about resource construction
-    // which is only necessary if we export at all
-    app.exp.export_descriptor_update( app )
-    //  .addBindingUpdate( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 2 )  // Todo(pp): This variant should work, but it doesn't, see exportstate line 221
-        .addBindingUpdate( 8, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER )
-        .addTexelBufferView( app.exp.export_buffer_view[0] )
-        .addTexelBufferView( app.exp.export_buffer_view[1] )
-        .attachSet( app.descriptor.descriptor_set );
+        // build and reset, returning a Core_Descriptor
+        .construct
+        .reset;
 }
 
 
@@ -272,15 +243,27 @@ void createDescriptorSet( ref VDrive_State app, Meta_Descriptor* meta_descriptor
 void updateDescriptorSet( ref VDrive_State app ) {
 
     // update the descriptor
-    app.sim_descriptor_update.texel_buffer_views[0]     = app.sim.popul_buffer_view;        // populations buffer and optionally other data like temperature
-    app.sim_descriptor_update.image_infos[0].imageView  = app.sim.macro_image.image_view;   // image view for writing from compute shader
-    app.sim_descriptor_update.image_infos[1].imageView  = app.sim.macro_image.image_view;   // image view for reading in display fragment shader with linear  sampling
-    app.sim_descriptor_update.image_infos[2].imageView  = app.sim.macro_image.image_view;   // image view for reading in display fragment shader with nearest sampling
-    app.sim_descriptor_update.texel_buffer_views[1]     = app.vis.particle_buffer_view;     // particles to visualize LBM velocity
-    app.sim_descriptor_update.update;
+    Descriptor_Update_T!( 4, 3, 0, 2 )()
+        .addStorageTexelBufferUpdate( 2 )
+        .addTexelBufferView( app.sim.popul_buffer.view )
+
+        .addStorageImageUpdate( 3 )
+        .addImage( app.sim.macro_image.view, VK_IMAGE_LAYOUT_GENERAL )
+
+        .addSamplerImageUpdate( 4 ) // immutable does not filter properly, module descriptor bug?
+    //  .addImage( app.sim.macro_image.view, VK_IMAGE_LAYOUT_GENERAL )        // immutable sampler
+    //  .addImage( app.sim.macro_image.view, VK_IMAGE_LAYOUT_GENERAL )        // immutable sampler
+        .addSamplerImage( app.sim.macro_image.sampler[0], app.sim.macro_image.view, VK_IMAGE_LAYOUT_GENERAL ) // mutable sampler
+        .addSamplerImage( app.sim.macro_image.sampler[1], app.sim.macro_image.view, VK_IMAGE_LAYOUT_GENERAL ) // mutable sampler
+
+        .addStorageTexelBufferUpdate( 7 )
+        .addTexelBufferView( app.vis.particle_buffer.view )
+
+        .attachSet( app.descriptor.descriptor_set )
+        .update( app );
 
     // Note(pp):
-    // it would be more efficient to create another descriptor update for the sim_buffer_particle_view
+    // it would be more efficient to create another descriptor update for the app.vis.particle_buffer.view
     // it will most likely not be updated with the other resources and vice versa
     // but ... what the heck ... for now ... we won't update both of them often enough
 }
@@ -293,8 +276,37 @@ void updateDescriptorSet( ref VDrive_State app ) {
 void createRenderResources( ref VDrive_State app ) {
 
     //
+    // create simulate and visualize resources
+    //
+    app.createSimResources;      // create all resources for the simulate compute pipeline
+    app.createVisResources;      // create all resources for the visualize graphics pipelines
+}
+
+
+
+////////////////////////////////////////////////
+// (re)create window size dependent resources //
+////////////////////////////////////////////////
+void resizeRenderResources( ref VDrive_State app, VkPresentModeKHR request_present_mode = VK_PRESENT_MODE_MAX_ENUM_KHR ) {
+
+    //
+    // destroy possibly existing swapchain and image views, but keep the surface.
+    //
+    if(!app.swapchain.is_null ) {
+        app.device.vkDeviceWaitIdle;             // wait till device is idle
+        app.destroy( app.swapchain, false );
+    }
+
+
+
+    //
     // select swapchain image format and presentation mode
     //
+
+    // Optionally, we can pass in a request present mode, which will be preferred. It will not be checked for availability.
+    // If VK_PRESENT_MODE_MAX_ENUM_KHR is passed in we check VDrive_State.present_mode is valid and available (it's a setting, it will be set by ini file).
+    // If it's value is set to VK_PRESENT_MODE_MAX_ENUM_KHR, or is not valid for the current implementation the present mode will be set
+    // to VK_PRESENT_MODE_FIFO_KHR, which is mandatory for every swapchain supporting implementation.
 
     // Note: to get GPU swapchain capabilities to check for possible image usages
     //VkSurfaceCapabilitiesKHR surface_capabilities;
@@ -310,57 +322,27 @@ void createRenderResources( ref VDrive_State app ) {
 
     // list of preferred formats and modes, the first found will be used, otherwise the first available not in lists
     VkFormat[4] request_format = [ VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM ];
-    VkPresentModeKHR[3] request_mode = [ VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
 
-    // parametrize swapchain but postpone construction
-    app.swapchain( app )
+    // set present mode to the passed in value and trust that
+    if( request_present_mode != VK_PRESENT_MODE_MAX_ENUM_KHR )
+        app.present_mode = request_present_mode;
+
+    else if( app.present_mode == VK_PRESENT_MODE_MAX_ENUM_KHR || !app.hasPresentMode( app.swapchain.surface, app.present_mode ))
+        app.present_mode = VK_PRESENT_MODE_FIFO_KHR;
+
+    // parametrize swapchain and keep Meta_Swapchain around to access extended data
+    auto swapchain = Meta_Swapchain_T!( typeof( app.swapchain ))( app )
+        .surface( app.swapchain.surface )
+        .oldSwapchain( app.swapchain.swapchain )
         .selectSurfaceFormat( request_format )
-        .selectPresentMode( request_mode )
-        .minImageCount( 2 ) // MAX_FRAMES
+        .presentMode( app.present_mode )
+        .minImageCount( 2 )
         .imageArrayLayers( 1 )
-        .imageUsage( VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT );
-        // delay .construct; call to finalize in a later step
+        .imageUsage( VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT )
+        .construct
+        .reset( app.swapchain );
 
-
-
-    //
-    // create render pass
-    //
-    app.render_pass( app )
-        .renderPassAttachment_Clear_None(  app.depth_image_format,    app.sample_count, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ).subpassRefDepthStencil
-        .renderPassAttachment_Clear_Store( app.swapchain.imageFormat, app.sample_count, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ).subpassRefColor( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL )
-
-        // Note: specify dependencies despite of only one subpass, as suggested by:
-        // https://software.intel.com/en-us/articles/api-without-secrets-introduction-to-vulkan-part-4#
-        .addDependencyByRegion
-        .srcDependency( VK_SUBPASS_EXTERNAL, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT         , VK_ACCESS_MEMORY_READ_BIT )
-        .dstDependency( 0                  , VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT )
-        .addDependencyByRegion
-        .srcDependency( 0                  , VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT )
-        .dstDependency( VK_SUBPASS_EXTERNAL, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT         , VK_ACCESS_MEMORY_READ_BIT )
-        .construct;
-
-
-    //
-    // create simulate and visualize resources
-    //
-    app.createSimResources;      // create all resources for the simulate compute pipeline
-    app.createVisResources;      // create all resources for the visualize graphics pipelines
-}
-
-
-
-////////////////////////////////////////////////
-// (re)create window size dependent resources //
-////////////////////////////////////////////////
-void resizeRenderResources( ref VDrive_State app ) {
-
-    //
-    // (re)construct the already parametrized swapchain
-    //
-    app.swapchain.construct;
-
-    // set the corresponding present info member to the (re)constructed swapchain
+    // assign pointer of our new swapchain to the app.present_info
     app.present_info.pSwapchains = & app.swapchain.swapchain;
 
 
@@ -369,23 +351,33 @@ void resizeRenderResources( ref VDrive_State app ) {
     // create depth image
     //
 
+    // first destroy old image and view
+    if(!app.depth_image.image.is_null )
+        app.destroy(  app.depth_image );
+
+    // depth image format is also required for the renderpass
+    VkFormat depth_image_format = VK_FORMAT_D32_SFLOAT; // VK_FORMAT_D16_UNORM
+
     // prefer getting the depth image into a device local heap
     // first we need to find out if such a heap exist on the current device
     // we do not check the size of the heap, the depth image will probably fit if such heap exists
     // Todo(pp): the assumption above is NOT guaranteed, add additional functions to memory module
-    // which consider a minimum heap size for the memory type, heap as well as memory cretaion functions
-    // Todo(pp): this should be a member of VDrive_State and figured out only once
-    // including the proper memory heap index
+    // which consider a minimum heap size for the memory type, heap as well as memory creation functions
     auto depth_image_memory_property = app.memory_properties.hasMemoryHeapType( VK_MEMORY_HEAP_DEVICE_LOCAL_BIT )
         ? VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         : VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
-    // app.depth_image_format can be set before this function gets called
-    app.depth_image( app )
-        .create( app.depth_image_format, app.windowWidth, app.windowHeight, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, app.sample_count )
-        .createMemory( depth_image_memory_property )
-        .createView( VK_IMAGE_ASPECT_DEPTH_BIT );
-
+    // depth_image_format can be set before this function gets called
+    auto depth_image = Meta_Image_T!Core_Image_Memory_View( app )
+        .format( depth_image_format )
+        .extent( app.windowWidth, app.windowHeight )
+        .usage( VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT )
+        .sampleCount( app.sample_count )
+        .constructImage
+        .allocateMemory( depth_image_memory_property )
+        .viewAspect( VK_IMAGE_ASPECT_DEPTH_BIT )
+        .constructView
+        .extractCore( app.depth_image );
 
 
     //
@@ -393,17 +385,14 @@ void resizeRenderResources( ref VDrive_State app ) {
     //
 
     // Note: allocate one command buffer
-    // cmd_buffer is an Array!VkCommandBuffer
-    // the array itself will be destroyed after this scope
     auto cmd_buffer = app.allocateCommandBuffer( app.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
 
-    VkCommandBufferBeginInfo cmd_buffer_begin_info = {
-        flags : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, };
-    vkBeginCommandBuffer( cmd_buffer, & cmd_buffer_begin_info );
+    VkCommandBufferBeginInfo cmd_buffer_bi = { flags : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT };
+    vkBeginCommandBuffer( cmd_buffer, & cmd_buffer_bi );
 
     cmd_buffer.recordTransition(
-        app.depth_image.image,
-        app.depth_image.image_view_create_info.subresourceRange,
+        depth_image.image,
+        depth_image.image_view_ci.subresourceRange,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         0,  // no access mask required here
@@ -415,48 +404,80 @@ void resizeRenderResources( ref VDrive_State app ) {
     // finish recording
     cmd_buffer.vkEndCommandBuffer;
 
-    // submit the command buffer
+    // submit info stays local in this function scope
     auto submit_info = cmd_buffer.queueSubmitInfo;
+
+    // submit the command buffer, we do not need to wait for the result here.
     app.graphics_queue.vkQueueSubmit( 1, & submit_info, VK_NULL_HANDLE ).vkAssert;
 
 
 
     //
+    // create render pass and clear values
+    //
+
+    // clear values, stored in VDrive_State
+    app.clear_values
+        .set( 0, 1.0f )                             // add depth clear value
+        .set( 1, 0.0f, 0.0f, 0.0f, 1.0f );          // add color clear value
+    //  .set( 1, 0.9922f, 0.9647f, 0.8902f, 1.0f ); // solarize
+
+    // destroy possibly previously created render pass
+    if( !app.render_pass_bi.renderPass.is_null )
+        app.destroy( app.render_pass_bi.renderPass );
+
+
+    //Meta_Render_Pass_T!( 2,2,1,0,1,0,0 ) render_pass;
+    app.render_pass_bi = Meta_Render_Pass_T!( 2,2,1,0,1,0,0 )( app )
+        .renderPassAttachment_Clear_None(  depth_image_format,    app.sample_count, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL           ).subpassRefDepthStencil
+        .renderPassAttachment_Clear_Store( swapchain.imageFormat, app.sample_count, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ).subpassRefColor( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL )
+
+        // Note: specify dependencies despite of only one subpass, as suggested by:
+        // https://software.intel.com/en-us/articles/api-without-secrets-introduction-to-vulkan-part-4#
+        //.addDependency( VK_DEPENDENCY_BY_REGION_BIT )
+        //.srcDependency( VK_SUBPASS_EXTERNAL, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT         , VK_ACCESS_MEMORY_READ_BIT )
+        //.dstDependency( 0                  , VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT )
+        //.addDependency( VK_DEPENDENCY_BY_REGION_BIT )
+        //.srcDependency( 0                  , VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT )
+        //.dstDependency( VK_SUBPASS_EXTERNAL, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT         , VK_ACCESS_MEMORY_READ_BIT )
+
+        // Note: specify dependencies despite of only one subpass, as suggested by:
+        // https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples#swapchain-image-acquire-and-present
+        .addDependency( VK_DEPENDENCY_BY_REGION_BIT )
+        .srcDependency( VK_SUBPASS_EXTERNAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0 )
+        .dstDependency( 0                  , VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT )
+
+        .clearValues( app.clear_values )
+        .construct
+        .beginInfo;
+
+
+    //import std.stdio;
+    //writeln( render_pass.static_config );
+
+
+    //
     // create framebuffers
     //
-    VkImageView[1] render_targets = [ app.depth_image.image_view ];  // compose render targets into an array
-    app.framebuffers( app )
-        .initFramebuffers!(
-            typeof( app.framebuffers ),
-            app.framebuffers.fb_count + render_targets.length.toUint
-            )(
-            app.render_pass.render_pass,                // specify render pass COMPATIBILITY
-            app.swapchain.imageExtent,                  // extent of the framebuffer
-            render_targets,                             // first ( static ) attachments which will not change ( here only )
-            app.swapchain.present_image_views.data,     // next one dynamic attachment ( swapchain ) which changes per command buffer
-            [], false );                                // if we are recreating we do not want to destroy clear values ...
+    VkImageView[1] render_targets = [ app.depth_image.view ];     // compose render targets into an array
+    app.createFramebuffers(
+        app.framebuffers,
+        app.render_pass_bi.renderPass,              // specify render pass COMPATIBILITY
+        app.swapchain.image_extent.width,           // framebuffer width
+        app.swapchain.image_extent.height,          // framebuffer height
+        render_targets,                             // first ( static ) attachments which will not change ( here only )
+        app.swapchain.image_views.data              // next one dynamic attachment ( swapchain ) which changes per command buffer
+    );
 
-    // ... we should keep the clear values, they might have been edited by the gui
-    if( app.framebuffers.clear_values.empty )
-        app.framebuffers
-            .addClearValue( 1.0f )                      // add depth clear value
-            .addClearValue( 0.0f, 0.0f, 0.0f, 1.0f );   // add color clear value
-
-    // attach one of the framebuffers, the render area and clear values to the render pass begin info
-    // Note: attaching the framebuffer also sets the clear values and render area extent into the render pass begin info
-    // setting clear values corresponding to framebuffer attachments and framebuffer extent could have happend before, e.g.:
-    //      app.render_pass.clearValues( some_clear_values );
-    //      app.render_pass.begin_info.renderArea = some_render_area;
-    // but meta framebuffer(s) has a member for them, hence no need to create and manage extra storage/variables
-    app.render_pass.attachFramebuffer( app.framebuffers, 0 );
+    app.render_pass_bi.renderAreaExtent( app.swapchain.image_extent );  // specify the render area extent of our render pass begin info
 
 
 
     //
     // update dynamic viewport and scissor state
     //
-    app.viewport = VkViewport( 0, 0, app.swapchain.imageExtent.width, app.swapchain.imageExtent.height, 0, 1 );
-    app.scissors = VkRect2D( VkOffset2D( 0, 0 ), app.swapchain.imageExtent );
+    app.viewport = VkViewport( 0, 0, app.swapchain.image_extent.width, app.swapchain.image_extent.height, 0, 1 );
+    app.scissors = VkRect2D( VkOffset2D( 0, 0 ), app.swapchain.image_extent );
 }
 
 
@@ -467,7 +488,8 @@ void resizeRenderResources( ref VDrive_State app ) {
 void createResizedCommands( ref VDrive_State app ) nothrow {
 
     // we need to do this only if the gui is not displayed
-    if( app.draw_gui ) return;
+//    if( app.draw_gui )
+//        return;
 
     // reset the command pool to start recording drawing commands
     app.graphics_queue.vkQueueWaitIdle;   // equivalent using a fence per Spec v1.0.48
@@ -475,21 +497,21 @@ void createResizedCommands( ref VDrive_State app ) nothrow {
 
 
     // if we know how many command buffers are required we can use this static array function
-    app.allocateCommandBuffers( app.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, app.cmd_buffers[ 0 .. app.swapchain.imageCount ] );
+    app.allocateCommandBuffers( app.cmd_pool, app.cmd_buffers[ 0 .. app.swapchain.image_count ] );
 
 
     // draw command buffer begin info for vkBeginCommandBuffer, can be used in any command buffer
-    VkCommandBufferBeginInfo cmd_buffer_begin_info;
+    VkCommandBufferBeginInfo cmd_buffer_bi;
 
 
     // record command buffer for each swapchain image
-    foreach( uint32_t i, ref cmd_buffer; app.cmd_buffers[ 0 .. app.swapchain.imageCount ] ) {    // remove .data if using static array
+    foreach( i, ref cmd_buffer; app.cmd_buffers[ 0 .. app.swapchain.image_count ] ) {    // remove .data if using static array
 
         // attach one of the framebuffers to the render pass
-        app.render_pass.attachFramebuffer( app.framebuffers( i ));
+        app.render_pass_bi.framebuffer = app.framebuffers[ i ];
 
         // begin command buffer recording
-        cmd_buffer.vkBeginCommandBuffer( & cmd_buffer_begin_info );
+        cmd_buffer.vkBeginCommandBuffer( & cmd_buffer_bi );
 
         // take care of dynamic state
         cmd_buffer.vkCmdSetViewport( 0, 1, & app.viewport );
@@ -507,10 +529,10 @@ void createResizedCommands( ref VDrive_State app ) nothrow {
         );
 
         // begin the render pass
-        cmd_buffer.vkCmdBeginRenderPass( & app.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
+        cmd_buffer.vkCmdBeginRenderPass( & app.render_pass_bi, VK_SUBPASS_CONTENTS_INLINE );
 
         // bind lbmd display plane pipeline and draw
-        if( app.draw_display ) {
+        if( app.vis.draw_display ) {
 
             cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, app.vis.display_pso.pipeline );
 
@@ -522,7 +544,7 @@ void createResizedCommands( ref VDrive_State app ) nothrow {
         }
 
         // bind particle pipeline and draw
-        if( app.draw_particles ) {
+        if( app.vis.draw_particles ) {
             cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, app.vis.particle_pso.pipeline );
             cmd_buffer.vkCmdPushConstants( app.vis.particle_pso.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, app.vis.particle_pc.sizeof, & app.vis.particle_pc );
             cmd_buffer.vkCmdDraw( app.vis.particle_count, 1, 0, 0 );    // vertex count, instance count, first vertex, first instance
@@ -559,16 +581,16 @@ void destroyResources( ref VDrive_State app ) {
     app.destroyCpuResources;    // Cpu
 
     // surface, swapchain and present image views
-    app.swapchain.destroyResources;
+    app.destroy( app.swapchain );
 
     // memory Resources
-    app.depth_image.destroyResources;
-    app.xform_ubo_buffer.destroyResources;
-    app.host_visible_memory.unmapMemory.destroyResources;
+    app.destroy( app.depth_image );
+    app.destroy( app.xform_ubo_buffer );
+    app.unmapMemory( app.host_visible_memory ).destroy( app.host_visible_memory );
 
     // render setup
-    app.render_pass.destroyResources;
-    app.framebuffers.destroyResources;
+    foreach( ref f; app.framebuffers )  app.destroy( f );
+    app.destroy( app.render_pass_bi.renderPass );
     app.destroy( app.descriptor );
 
     // command and synchronize
