@@ -1,17 +1,22 @@
 //module input;
 
+import bindbc.glfw;
+
 import dlsl.vector;
 import dlsl.trackball;
-import derelict.glfw3.glfw3;
 
 import appstate;
+import visualize;
 
+
+//nothrow @nogc:
 
 
 void registerCallbacks( ref VDrive_State app ) {
     glfwSetWindowUserPointer(   app.window, & app );
     glfwSetWindowSizeCallback(  app.window, & windowSizeCallback );
     glfwSetMouseButtonCallback( app.window, & mouseButtonCallback );
+    glfwSetWindowFocusCallback( app.window, & windowFocusCallback );
     glfwSetCursorPosCallback(   app.window, & cursorPosCallback );
     glfwSetScrollCallback(      app.window, & scrollCallback );
     glfwSetKeyCallback(         app.window, & keyCallback );
@@ -19,7 +24,7 @@ void registerCallbacks( ref VDrive_State app ) {
 
 // wrap dlsl.Trackball and extracted glfw mouse buttons
 struct TrackballButton {
-    Trackball tb;
+    Trackball_Persp tb;
     alias tb this;
     ubyte button;
 }
@@ -56,9 +61,9 @@ void initTrackball( ref VDrive_State app ) {
 
     import std.math : tan;
     enum deg2rad = 0.0174532925199432957692369076849f;
-    home_pos_x = 0.5f * app.sim.domain[0];    // Todo(pp): this seems to be a bug in the trackball manipulator
-    home_pos_y = 0.5f * app.sim.domain[1];    // both the values should be positive, confirm if we are creating an inverse matrix
-    home_pos_z = - 0.5 / tan( 0.5 * deg2rad * app.projection_fovy );   // this is not finished yet and will be scaled bellow
+    home_pos_x = 0.5f * app.sim.domain[0];
+    home_pos_y = 0.5f * app.sim.domain[1];
+    home_pos_z = - 0.5 / tan( 0.5 * deg2rad * app.projection_fovy );   // this value is not finished yet and will be scaled bellow
     home_trg_x = home_pos_x;
     home_trg_y = home_pos_y;
     home_trg_z = 0;
@@ -72,14 +77,22 @@ void initTrackball( ref VDrive_State app ) {
     }
 
     app.tbb.perspectiveFovyWindowHeight( app.projection_fovy, app.windowHeight );
-    app.camHome;
+    //app.camHome;
 }
+
+
+
+/// private utility to get and access VDrive_State from GLFWwindow user data
+private VDrive_State * getApp( GLFWwindow * window ) nothrow {
+    return cast( VDrive_State* )window.glfwGetWindowUserPointer;
+}
+
 
 
 /// Callback Function for capturing window resize events
 extern( C ) void windowSizeCallback( GLFWwindow * window, int w, int h ) nothrow {
     // the extent might change at swapchain creation when the specified extent is not usable
-    auto app = cast( VDrive_State* )window.glfwGetWindowUserPointer;
+    auto app = window.getApp;
     app.swapchainExtent( w, h );
     app.window_resized = true;
 }
@@ -87,7 +100,7 @@ extern( C ) void windowSizeCallback( GLFWwindow * window, int w, int h ) nothrow
 
 /// Callback Function for capturing mouse motion events
 extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) nothrow {
-    auto app = cast( VDrive_State* )window.glfwGetWindowUserPointer;
+    auto app = window.getApp;
 
     // Todo(pp): move this into trackball - Trackball reference should then take no args and get a snapshot of these values
     // get mouse position and compute mouse velocity
@@ -104,7 +117,7 @@ extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) no
             case 4  : app.tbb.dolly( x, y ); app.updateWVPM; break;
             default : break;
         }
-    } 
+    }
 
     else if( app.tbb.button > 0 ) {
         // apply force on plane at mouse click location
@@ -116,7 +129,7 @@ extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) no
 
 /// Callback Function for capturing mouse motion events
 extern( C ) void mouseButtonCallback( GLFWwindow * window, int button, int val, int mod ) nothrow {
-    auto app = cast( VDrive_State* )window.glfwGetWindowUserPointer;
+    auto app = window.getApp;
     // compute mouse button bittfield flags
     switch( button ) {
         case 0  : app.tbb.button += 2 * val - 1; break;
@@ -136,9 +149,15 @@ extern( C ) void mouseButtonCallback( GLFWwindow * window, int button, int val, 
 }
 
 
+extern( C ) void windowFocusCallback( GLFWwindow * window, int focus ) nothrow {
+    auto app = window.getApp;
+    app.tbb.button = 0;
+}
+
+
 /// Callback Function for capturing mouse wheel events
 extern( C ) void scrollCallback( GLFWwindow * window, double x, double y ) nothrow {
-    auto app = cast( VDrive_State* )window.glfwGetWindowUserPointer;
+    auto app = window.getApp;
     app.tbb.reference( 0, 0 );
     app.tbb.dolly( 5 * x, - 10 * y );
     app.updateWVPM;
@@ -147,23 +166,23 @@ extern( C ) void scrollCallback( GLFWwindow * window, double x, double y ) nothr
 
 /// Callback Function for capturing keyboard events
 extern( C ) void keyCallback( GLFWwindow * window, int key, int scancode, int val, int mod ) nothrow {
-    auto app = cast( VDrive_State* )window.glfwGetWindowUserPointer;
+    auto app = window.getApp;
     // use key press results only
     if( val != GLFW_PRESS ) return;
     import visualize : resetParticleBuffer;
     import resources : createResizedCommands;
     switch( key ) {
-        case GLFW_KEY_ESCAPE    : glfwSetWindowShouldClose( window, GLFW_TRUE );        break;
-        case GLFW_KEY_HOME      : (*app).camHome;                                       break;
-        case GLFW_KEY_KP_ENTER  : if( mod == GLFW_MOD_ALT ) window.toggleFullscreen;    break;
-        case GLFW_KEY_F1        : app.draw_gui ^= 1 ; (*app).createResizedCommands;     break;
-        case GLFW_KEY_F5        : if( app.isPlaying ) app.simPause; else app.simPlay;   break;
-        case GLFW_KEY_F6        : app.simStep;                                          break;
-        case GLFW_KEY_F7        : app.simReset;                                         break;
-        case GLFW_KEY_F8        : (*app).resetParticleBuffer;                           break;
-        case GLFW_KEY_F9        : app.draw_particles ^= 1; (*app).createResizedCommands;break;
-        case GLFW_KEY_F12       : app.draw_display ^= 1; (*app).createResizedCommands;  break;
-        default                 :                                                       break;
+        case GLFW_KEY_ESCAPE    : glfwSetWindowShouldClose( window, GLFW_TRUE );            break;
+        case GLFW_KEY_HOME      : (*app).camHome;                                           break;
+        case GLFW_KEY_KP_ENTER  : if( mod == GLFW_MOD_ALT ) window.toggleFullscreen;        break;
+        case GLFW_KEY_F5        : if( app.isPlaying ) app.simPause; else app.simPlay;       break;
+        case GLFW_KEY_F6        : app.simStep;                                              break;
+        case GLFW_KEY_F7        : app.simReset;                                             break;
+        case GLFW_KEY_F8        : (*app).resetParticleBuffer;                               break;
+        case GLFW_KEY_F9        : app.vis.draw_particles ^= 1; (*app).createResizedCommands;break;
+        case GLFW_KEY_F12       : app.vis.draw_display ^= 1; (*app).createResizedCommands;  break;
+        case GLFW_KEY_P         : try { (*app).createParticlePSO; } catch( Exception ) {}   break;
+        default                 :                                                           break;
     }
 }
 
