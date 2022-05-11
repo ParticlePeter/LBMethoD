@@ -24,8 +24,11 @@ layout( binding = 4 ) uniform sampler2DArray vel_rho_tex[2];      // VK_DESCRIPT
 #define VEL_MAG     3
 #define VEL_GRAD    4
 #define VEL_CURL    5
+#define TEX_COORD   6
 layout( constant_id = 0 ) const uint PROPERTY = VEL_MAG;
 
+
+#define D textureSize( vel_rho_tex[0], 0 )
 
 // ramp values
 // R: 0 0 0 0 1 1
@@ -59,12 +62,11 @@ void main() {
     switch( PROPERTY ) {
 
         case DENSITY : {
-            float vel_mag;
-            if( color_layers == 0 )
-                vel_mag = amplify_property * vel_rho.a;
-            else
-                vel_mag = floor( color_layers * amplify_property * vel_rho.a ) / color_layers;
+            float vel_mag = amplify_property * vel_rho.a;
+            if( color_layers > 0 )
+                vel_mag = floor( color_layers * vel_mag ) / color_layers;
             fs_color = vec4( colorRamp( vel_mag ), 1 );
+            //fs_color = vec4( vec3( vs_tex_coord, 0.5 + z_layer ) / vec3( D ), 1 );
         } break;
 
         case VEL_X :
@@ -80,33 +82,32 @@ void main() {
         break;
 
         case VEL_MAG : {
-            float vel_mag;
-            if( color_layers == 0 )
-                vel_mag = amplify_property * length( vel_rho.xy );
-            else
-                vel_mag = floor( color_layers * amplify_property * length( vel_rho.xy )) / color_layers;
+            float vel_mag = amplify_property * length( vel_rho.xy );
+            if( color_layers > 0 )
+                vel_mag = floor( color_layers * vel_mag ) / color_layers;
             fs_color = vec4( colorRamp( vel_mag ), 1 );
+        //  fs_color -= ( smoothstep( 0.48, 0.5, 2 * vel_mag ) - smoothstep( 0.5, 0.52, 2 * vel_mag ));
         } break;
 
         case VEL_GRAD : {
-            float vel_mag;
-            if( color_layers == 0 )
-                vel_mag = amplify_property * length( vel_rho.xy );
-            else
-                vel_mag = floor( color_layers * amplify_property * length( vel_rho.xy )) / color_layers;
+            float vel_mag = amplify_property * length( vel_rho.xy );
+            if( color_layers > 0 )
+                vel_mag = floor( color_layers * vel_mag ) / color_layers;
             fs_color = vec4( 0.5 + dFdx( vel_mag ), 0.5 + dFdy( vel_mag ), 0, 1 );
         } break;
 
         case VEL_CURL : {
-            float curl;
-            if( color_layers == 0 ) {
-                vel_rho *= amplify_property;
-                curl = dFdx( vel_rho.y ) - dFdy( vel_rho.x );  // compute 2D curl
-            } else {
-                vel_rho *= color_layers * amplify_property;
-                curl = round( dFdx( vel_rho.y ) - dFdy( vel_rho.x )) / color_layers;  // compute 2D curl
+            vel_rho *= amplify_property;
+            float curl = dFdx( vel_rho.y ) - dFdy( vel_rho.x );  // compute 2D curl
+            if( color_layers > 0 ) {
+                vel_rho *= color_layers;
+                curl = round( curl ) / color_layers;  // compute 2D curl
             }
             fs_color = vec4( max( 0, curl ), max( 0, -curl ), 0, 1 );
+        } break;
+
+        case TEX_COORD : {
+            fs_color = vec4( vs_tex_coord, 0, 1 );
         } break;
     }
 }
