@@ -1,11 +1,13 @@
 import erupted;
 import vdrive;
-import gui;
+//import gui;
 import appstate;
 import simulate;
 import resources;
 import ensight;
 
+
+//nothrow @nogc:
 
 
 //////////////////////////////////////
@@ -16,16 +18,14 @@ struct VDrive_Export_State {
     // export vulkan resources
     Core_Pipeline               export_pso;
     Meta_Memory                 export_memory;
-    Meta_Buffer[2]              export_buffer;
-    VkBufferView[2]             export_buffer_view;
-    Meta_Descriptor_Update      export_descriptor_update;  // update only the export descriptor
+    Meta_Buffer_View[2]         export_buffer;
     VkDeviceSize                export_size;
     void*[2]                    export_data;
     VkMappedMemoryRange[2]      export_mapped_range;
-    string                      export_shader = "shader\\export_from_image.comp";
+    char[64]                    export_shader = "shader/export_from_image.comp";
 
 
-    // export parameter 
+    // export parameter
     int             start_index     = 0;
     int             step_count      = 21;
     int             step_size       = 101;
@@ -133,7 +133,7 @@ void createExportResources( ref VDrive_State app ) {
     options.set_default_options;
 
     // setup domain parameter
-    if( app.use_3_dim ) app.sim.domain[2] = 1;
+    if( app.sim.use_3_dim ) app.sim.domain[2] = 1;
     float[3] minDomain = [ 0, 0, 0 ];
     float[3] maxDomain = [ app.sim.domain[0], app.sim.domain[1], app.sim.domain[2] ];
     float[3] incDomain = [ 1, 1, 1 ];
@@ -166,7 +166,7 @@ void createExportResources( ref VDrive_State app ) {
 
 void createExportBuffer( ref VDrive_State app ) {
 
-    uint32_t buffer_size = app.sim.domain[0] * app.sim.domain[1] * ( app.use_3_dim ? app.sim.domain[2] : 1 );
+    uint32_t buffer_size = app.sim.domain[0] * app.sim.domain[1] * ( app.sim.use_3_dim ? app.sim.domain[2] : 1 );
     uint32_t buffer_mem_size = buffer_size * (( app.exp.as_vector ? 3 : 1 ) * float.sizeof ).toUint;
     auto header_size = ensGetBinaryVarHeaderSize;
 
@@ -186,14 +186,14 @@ void createExportBuffer( ref VDrive_State app ) {
     if( app.exp.export_buffer[0].buffer != VK_NULL_HANDLE )
         app.exp.export_buffer[0].destroyResources;              // destroy old buffer
 
-    if( app.exp.export_buffer_view[0]   != VK_NULL_HANDLE )
-        app.destroy( app.exp.export_buffer_view[0] );           // destroy old buffer view
+    if( app.exp.export_buffer[0].view != VK_NULL_HANDLE )
+        app.destroy( app.exp.export_buffer[0].view );           // destroy old buffer view
 
     if( app.exp.export_buffer[1].buffer != VK_NULL_HANDLE )
         app.exp.export_buffer[1].destroyResources;              // destroy old buffer
 
-    if( app.exp.export_buffer_view[1]   != VK_NULL_HANDLE )
-        app.destroy( app.exp.export_buffer_view[1] );           // destroy old buffer view
+    if( app.exp.export_buffer[1].view != VK_NULL_HANDLE )
+        app.destroy( app.exp.export_buffer[1].view );           // destroy old buffer view
 
     //
     // as we are computing in a ping pong fashion we need two export buffers
@@ -202,17 +202,21 @@ void createExportBuffer( ref VDrive_State app ) {
 
     // create first memory less buffer and get its alignment requirement
     auto aligned_offset_0 = app.exp.export_buffer[0]( app )
-        .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_mem_size )
+        .usage( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT )
+        .bufferSize( buffer_mem_size )
+        .constructBuffer
         .alignedOffset( header_size );
 
     // create second memory less buffer and get its alignment requirement
     auto aligned_offset_1 = app.exp.export_buffer[1]( app )
-        .create( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, buffer_mem_size )
+        .usage( VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT )
+        .bufferSize( buffer_mem_size )
+        .constructBuffer
         .alignedOffset( aligned_offset_0 + app.exp.export_buffer[0].memSize + header_size );
 
     // create memory with additional spaces for two headers
     app.exp.export_memory( app )
-        .create( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, aligned_offset_1 + app.exp.export_buffer[1].memSize );
+        .allocate( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, aligned_offset_1 + app.exp.export_buffer[1].memSize );
 
     // bind memory with offset to first buffer
     app.exp.export_buffer[0]
@@ -222,14 +226,22 @@ void createExportBuffer( ref VDrive_State app ) {
     app.exp.export_buffer[1]
         .bindMemory( app.exp.export_memory.memory, aligned_offset_1 );
 
-    // bind two buffers to two buffer views
-    app.exp.export_buffer_view[0] = app.createBufferView( app.exp.export_buffer[0].buffer, VK_FORMAT_R32_SFLOAT );
-    app.exp.export_buffer_view[1] = app.createBufferView( app.exp.export_buffer[1].buffer, VK_FORMAT_R32_SFLOAT );
+    // bind each of two buffers to a buffer view
+    app.exp.export_buffer[0].view = app.createBufferView( app.exp.export_buffer[0].buffer, VK_FORMAT_R32_SFLOAT );
+    app.exp.export_buffer[1].view = app.createBufferView( app.exp.export_buffer[1].buffer, VK_FORMAT_R32_SFLOAT );
 
-    // update the descriptor with buffer
-    app.exp.export_descriptor_update.texel_buffer_views[0] = app.exp.export_buffer_view[0];  // export target buffer
-    app.exp.export_descriptor_update.texel_buffer_views[1] = app.exp.export_buffer_view[1];  // export target buffer
-    app.exp.export_descriptor_update.update;
+    // update the descriptor with only the new buffer views
+    Descriptor_Update_T!( 1, 0, 0, 2 )()
+        .addStorageTexelBufferUpdate( 8 )
+        .addTexelBufferView( app.exp.export_buffer[0].view )
+        .addTexelBufferView( app.exp.export_buffer[1].view )
+        .attachSet( app.descriptor.descriptor_set )
+        .update( app );
+
+    // Todo(pp): test the descriptor update code above, then remove the commented code bellow
+    //app.exp.descriptor_update.texel_buffer_views[0] = app.exp.export_buffer[0].view;  // export target buffer
+    //app.exp.descriptor_update.texel_buffer_views[1] = app.exp.export_buffer[1].view;  // export target buffer
+    //app.exp.descriptor_update.update( app );
 
     // map first and second memory ranges, including the aligned headers
     app.exp.export_size = header_size + buffer_mem_size;
@@ -242,19 +254,24 @@ void createExportBuffer( ref VDrive_State app ) {
 
 void createExportPipeline( ref VDrive_State app ) {
 
-    if( app.exp.export_pso.is_constructed ) {
+    if( app.exp.export_pso.is_null ) {
         app.graphics_queue.vkQueueWaitIdle;         // wait for queue idle as we need to destroy the pipeline
         app.destroy( app.exp.export_pso );
     }
 
+    import std.string : fromStringz;
     Meta_Compute meta_compute;                      // use temporary Meta_Compute struct to specify and create the pso
     app.exp.export_pso = meta_compute( app )        // extracting the core items after construction with reset call
-        .shaderStageCreateInfo( app.createPipelineShaderStage( VK_SHADER_STAGE_COMPUTE_BIT, app.exp.export_shader ))
+        .shaderStageCreateInfo( app.createPipelineShaderStage( VK_SHADER_STAGE_COMPUTE_BIT, app.exp.export_shader.ptr ))
         .addDescriptorSetLayout( app.descriptor.descriptor_set_layout )
         .addPushConstantRange( VK_SHADER_STAGE_COMPUTE_BIT, 0, 8 )
         .construct( app.sim.compute_cache )              // construct using pipeline cache
         .destroyShaderModule
         .reset;
+
+        //import std.stdio;
+        //writeln( meta_compute.static_config );
+        //app.exp.export_pso = meta_compute.reset;
 }
 
 
@@ -269,7 +286,7 @@ void createExportCommands( ref VDrive_State app ) nothrow {
     app.device.vkResetCommandPool( app.sim.cmd_pool, 0 );   // second argument is VkCommandPoolResetFlags
 
     // two command buffers for compute loop, one ping and one pong buffer
-    app.allocateCommandBuffers( app.sim.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, app.sim.cmd_buffers );
+    app.allocateCommandBuffers( app.sim.cmd_pool, app.sim.cmd_buffers );
     auto sim_cmd_buffers_bi = createCmdBufferBI;
 
     // barrier for population access from export shader
@@ -418,10 +435,10 @@ void createExportCommands( ref VDrive_State app ) nothrow {
 
 void destroyExpResources( ref VDrive_State app ) {
     // export resources
-    if( app.exp.export_pso.is_constructed ) app.destroy( app.exp.export_pso );
-    if( app.exp.export_memory.is_constructed ) app.exp.export_memory.destroyResources;
-    if( app.exp.export_buffer[0].is_constructed ) app.exp.export_buffer[0].destroyResources;
-    if( app.exp.export_buffer[1].is_constructed ) app.exp.export_buffer[1].destroyResources;
-    if( app.exp.export_buffer_view[0] != VK_NULL_HANDLE ) app.destroy( app.exp.export_buffer_view[0] );
-    if( app.exp.export_buffer_view[1] != VK_NULL_HANDLE ) app.destroy( app.exp.export_buffer_view[1] );
+    if( !app.exp.export_pso.is_null ) app.destroy( app.exp.export_pso );
+    if( !app.exp.export_memory.is_null ) app.exp.export_memory.destroyResources;
+    if( !app.exp.export_buffer[0].is_null ) app.exp.export_buffer[0].destroyResources;
+    if( !app.exp.export_buffer[1].is_null ) app.exp.export_buffer[1].destroyResources;
+    if( !app.exp.export_buffer[0].view.is_null ) app.destroy( app.exp.export_buffer[0].view );
+    if( !app.exp.export_buffer[1].view.is_null ) app.destroy( app.exp.export_buffer[1].view );
 }
