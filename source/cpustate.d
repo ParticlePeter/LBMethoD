@@ -8,6 +8,11 @@ import exportstate;
 import appstate : setSimFuncPlay, setDefaultSimFuncs;
 import dlsl.vector;
 
+import vdrive.buffer;
+private alias Sim_Stage_Buffer = Core_Buffer_T!( 0, BMC.Memory | BMC.Mem_Range );
+
+
+//nothrow @nogc:
 
 
 ///////////////////////////////////
@@ -25,18 +30,46 @@ struct VDrive_Cpu_State {
     float*      sim_image_ptr;          // pointer to mapped image to be displayd
     float*      sim_export_ptr;
 
-    import vdrive.memory;
-    Meta_Buffer sim_stage_buffer;
-
+    Sim_Stage_Buffer        sim_stage_buffer;
+    VkExtent3D              sim_macro_image_extent;
+    VkImageSubresourceRange sim_macro_image_subresourceRange;
 }
 
+
+// create and map macro image staging buffer
+void createCpuMacroImageStaggingBuffer(
+    ref VDrive_State                    app,
+    const ref VkExtent3D                extent,
+    const ref VkImageSubresourceRange   subresource_range
+
+    ) {
+
+    // staging buffer for cpu computed velocity copy to the sim_image
+    if(!app.cpu.sim_stage_buffer.is_null ) {
+        app.graphics_queue.vkQueueWaitIdle;
+        app.destroy( app.cpu.sim_stage_buffer );    // destroy old image and its view, keeping the sampler
+    }
+
+    uint32_t buffer_size = 4 * app.sim.domain[0] * app.sim.domain[1];   // only in 2D and with VK_FORMAT_R32G32B32A32_SFLOAT
+    VkDeviceSize buffer_mem_size = buffer_size * cast( uint32_t )( float.sizeof );
+
+    app.cpu.sim_stage_buffer = Meta_Buffer_T!Sim_Stage_Buffer( app )
+        .usage( VK_BUFFER_USAGE_TRANSFER_SRC_BIT )
+        .bufferSize( buffer_mem_size )
+        .construct( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
+        .mapMemory( app.cpu.sim_image_ptr )
+        .reset;
+
+    app.cpu.sim_macro_image_extent = extent;
+    app.cpu.sim_macro_image_subresourceRange = subresource_range;
+}
 
 
 // initialize data required for simulation
 void cpuInit( ref VDrive_State app ) {
     app.cpu.ping = 8;
 
-    if( app.use_double ) {
+    if( app.sim.use_double ) {
         if( app.cpu.popul_buffer_d is null || app.cpu.sim_image_ptr is null )
             app.cpuReset;
 
@@ -65,8 +98,6 @@ void cpuInit( ref VDrive_State app ) {
         }
     }
 
-    import vdrive.memory;
-    app.sim.macro_image.flushMappedMemoryRange;
     app.exp.store_index = -1;
 }
 
@@ -79,17 +110,17 @@ void cpuReset( ref VDrive_State app ) {
 
     auto old_cell_count = app.cpu.cell_count;
     app.cpu.cell_count = app.sim.domain[0] * app.sim.domain[1] * app.sim.domain[2];
-    size_t buffer_size = app.cpu.cell_count * app.sim.layers;
+    size_t buffer_size = app.cpu.cell_count * ( app.sim.layout_value_count[ app.sim.layout ] + app.sim.layers );
     size_t old_buffer_mem_size = app.cpu.current_buffer_mem_size;
-    app.cpu.current_buffer_mem_size = buffer_size * ( app.use_double ? double.sizeof : float.sizeof );
+    app.cpu.current_buffer_mem_size = buffer_size * ( app.sim.use_double ? double.sizeof : float.sizeof );
     if( app.cpu.current_buffer_mem_size < old_buffer_mem_size )
         app.cpu.current_buffer_mem_size = old_buffer_mem_size;
 
 
     bool must_init;
     import core.stdc.stdlib : malloc, free;
-    if( app.use_double ) {
-        setSimFuncPlay( & cpuSimD_Play );
+    if( app.sim.use_double ) {
+        //setSimFuncPlay( & cpuSimD_Play );
         if( app.cpu.popul_buffer_f !is null ) {
             if( old_buffer_mem_size < app.cpu.current_buffer_mem_size ) { // 2 * float.sizeof = double.sizeof
                 free( cast( void* )app.cpu.popul_buffer_f );
@@ -107,8 +138,8 @@ void cpuReset( ref VDrive_State app ) {
             app.cpu.popul_buffer_d = cast( double* )malloc( app.cpu.current_buffer_mem_size );
         }
 
-    } else {    // app.use_double = false;
-        setSimFuncPlay( & cpuSimF_Play );
+    } else {    // app.sim.use_double = false;
+        //setSimFuncPlay( & cpuSimF_Play );
         if( app.cpu.popul_buffer_d !is null ) {
             if( old_cell_count * 2 < app.cpu.cell_count ) { // 2 * float.sizeof = double.sizeof
                 free( cast( void* )app.cpu.popul_buffer_d );
@@ -146,12 +177,12 @@ void cpuFree( ref VDrive_State app ) {
 
 // setup cpu play and profile function pointer
 void setCpuSimFuncs( ref VDrive_State app ) nothrow @system {
-    if( app.use_double ) {
-        setSimFuncPlay( & cpuSimD_Play );
-        setSimFuncProfile( & cpuSimD_Profile );
+    if( app.sim.use_double ) {
+        //setSimFuncPlay( & cpuSimD_Play );
+        //setSimFuncProfile( & cpuSimD_Profile );
     } else {
-        setSimFuncPlay( & cpuSimF_Play );
-        setSimFuncProfile( & cpuSimF_Profile );
+        //setSimFuncPlay( & cpuSimF_Play );
+        //setSimFuncProfile( & cpuSimF_Profile );
     }
 }
 
@@ -168,7 +199,7 @@ alias cpuSimD_Profile   = cpuSim!( double, true );
 void cpuSim( T, bool PROFILE = false )( ref VDrive_State app ) nothrow @system {
 
     float    omega = app.sim.compute_ubo.collision_frequency;
-    float    wall_velocity = app.sim.compute_ubo.wall_velocity;
+    float    wall_velocity = app.sim.compute_ubo.wall_velocity_soss;
     int      D_x = app.sim.domain[0];
     int      D_y = app.sim.domain[1];
 
@@ -270,7 +301,8 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State app ) nothrow @system {
 
 
     import vdrive.memory;
-    app.cpu.sim_stage_buffer.flushMappedMemoryRange;
+    app.flushMappedMemoryRange( app.cpu.sim_stage_buffer.mem_range );
+    //app.cpu.sim_stage_buffer.flushMappedMemoryRange;
 
     // increment indexes
     ++app.sim.index;
@@ -286,6 +318,6 @@ void cpuSim( T, bool PROFILE = false )( ref VDrive_State app ) nothrow @system {
 // destroy vulkan resources //
 //////////////////////////////
 void destroyCpuResources( ref VDrive_State app ) {
-    app.cpu.sim_stage_buffer.destroyResources;
+    app.destroy( app.cpu.sim_stage_buffer );
 }
 
