@@ -173,8 +173,10 @@ void createMacroImage( ref VDrive_State app ) {
 
     // specify and construct sampler 0
     if( app.sim.macro_image.sampler[0].is_null )
-        meta_macro_image.filter( VK_FILTER_LINEAR, VK_FILTER_LINEAR ).constructSampler( 0 );
-    //  meta_macro_image.unnormalizedCoordinates( VK_TRUE ).constructSampler( 0 );
+        meta_macro_image
+            .filter( VK_FILTER_LINEAR, VK_FILTER_LINEAR )
+        //  .unnormalizedCoordinates( VK_TRUE )     // unnormalized coordinates don't work on 3D Tex Views, see VUID-vkCmdDrawIndirectByteCountEXT-None-02702
+            .constructSampler( 0 );
 
     // specify and construct sampler 1, inherits sampler 0 specification, as we didn't reset the sampler create info
     if( app.sim.macro_image.sampler[1].is_null )
