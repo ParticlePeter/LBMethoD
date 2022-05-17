@@ -44,6 +44,22 @@
 			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release", ".vs" ]
 		},
 
+		{
+			"name": "D_SnPrintf",
+			"path": "C:/Users/Elliot/AppData/Local/dub/packages/d_snprintf-1.1.1/d_snprintf",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.opendb", "*.sln", "*.vcx*" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release", ".vs" ]
+		},
+
+		{
+			"name": "D_ImGui",
+			"path": "E:/Code/DLang/Github/D_ImGui",
+			"file_exclude_patterns": [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.opendb", "*.sln", "*.vcx*" ],
+			"folder_exclude_patterns": [ ".dub", "lib", "Debug", "Release", ".vs" ]
+		},
+
+
+
 
 
 
@@ -56,22 +72,8 @@
 		},
 
 		{
-			"path"						: "E:/Code/DLang/projects/DLSL/source/dlsl",
-			"name"						: "dlsl",
-			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
-			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
-		},
-
-		{
 			"path"						: "../ErupteD",
 			"name"						: "ErupteD",
-			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
-			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
-		},
-
-		{
-			"path"						: "../ErupteD/source/erupted",
-			"name"						: "erupted",
 			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
 			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
 		},
@@ -82,15 +84,6 @@
 			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
 			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ]
 		},
-
-
-		{
-			"path"						: "../V-Drive/source/vdrive",
-			"name"						: "vdrive",
-			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
-			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ]
-		},
-
 
 
 
